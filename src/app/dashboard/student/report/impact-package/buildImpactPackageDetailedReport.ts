@@ -5,6 +5,7 @@ import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7Paki
 import { findSdgById } from "@/utils/sdgData";
 import { mergeReportSdgSnapshotRows } from "../utils/reportSdgMerge";
 import { distinctBeneficiaryTotal } from "../utils/activityReach";
+import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview } from "../utils/engagementMetrics";
 import { MEDIA_VISIBILITY_LABELS, hasPublicSharePermission, resolveMediaVisibility } from "../utils/mediaVisibility";
 import { reportRequiresReportingFee } from "@/utils/reviewQueue";
 import {
@@ -187,6 +188,29 @@ function declarationItems(data: ReportData): string[] {
     ];
 }
 
+/** Session owner ids: "lead:<id>" / "member:<n>:<id>" or the bare participant id. */
+function participantKey(id: string): string {
+    if (id.startsWith("lead:")) return id.slice("lead:".length);
+    const member = /^member:[^:]+:(.+)$/.exec(id);
+    return member?.[1] || id;
+}
+
+function sameParticipant(a?: unknown, b?: unknown): boolean {
+    const x = typeof a === "string" ? a : "";
+    const y = typeof b === "string" ? b : "";
+    if (!x || !y) return false;
+    return x === y || participantKey(x) === participantKey(y);
+}
+
+function hasSessionEvidence(log: Record<string, unknown>): boolean {
+    const urls = log.evidence_urls;
+    return Boolean(text(log.evidence_url) || log.evidence_file || (Array.isArray(urls) && urls.length));
+}
+
+function roundHours(n: number): number {
+    return Math.round(n * 10) / 10;
+}
+
 export function buildImpactPackageDetailedReport(
     data: ReportData,
     projectData?: unknown,
@@ -200,6 +224,62 @@ export function buildImpactPackageDetailedReport(
     const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
     const required = data.required_hours || 16;
     const liveHours = (model.tiles[0]?.chips || []).map((chip) => chip.text).filter((line) => /\d/.test(line));
+    const leadRec = rec(lead);
+    /** Shareable (partner / public) copies keep student IDs private, like CNIC, mobile and email. */
+    const privateId = (value: string) => (hidePrivate && value ? PRIVATE_EXCLUDED : value);
+    const isTeam = data.section1?.participation_type === "team";
+    const roster = [
+        { id: text(leadRec.id) || "lead", rec: leadRec, name: personName(lead) || "Team lead", lead: true },
+        ...(isTeam ? members : []).map((member, index) => {
+            const m = rec(member);
+            return { id: text(m.id, m.participantId) || `member-${index}`, rec: m, name: personName(member) || `Member ${index + 1}`, lead: false };
+        }),
+    ];
+    const onRoster = (owner: unknown) => roster.some((person) => sameParticipant(owner, person.id));
+    /** Whose session: its participant id, else the lead (individual reports and unassigned / orphan logs). */
+    const ownerOf = (log: Record<string, unknown>) => {
+        const owner = log.participantId;
+        if (typeof owner === "string" && owner && onRoster(owner)) {
+            return roster.find((person) => sameParticipant(owner, person.id)) || roster[0];
+        }
+        return roster[0];
+    };
+    const countedLogs = logs.filter((log) => isLogCountedBeforeFacultyReview(log));
+    const hoursByStudent = roster.map((person) => {
+        const own = countedLogs.filter((log) => ownerOf(rec(log)) === person);
+        const logged = roundHours(own.reduce((sum, log) => sum + effectiveHoursFromLog(log), 0));
+        return {
+            student: person.name,
+            role: person.lead ? "Team lead" : "Team member",
+            entries: own.length,
+            logged_hours: logged,
+            required_hours: required,
+            remaining_hours: roundHours(Math.max(0, required - logged)),
+            status: logged >= required ? "Minimum met" : "Below minimum",
+        };
+    });
+    const sessionKey = (log: Record<string, unknown>) =>
+        [
+            text(log.date, log.dateOfEngagement, log.date_of_engagement),
+            text(log.start_time, log.startTime),
+            text(log.end_time, log.endTime),
+            text(log.location, log.organizationName, log.organization_name),
+        ]
+            .filter(Boolean)
+            .join(" · ") || "Session";
+    const matrixSessions = [...new Set(countedLogs.map((log) => sessionKey(rec(log))))].sort();
+    const attendanceMatrix = roster.length > 1
+        ? matrixSessions.map((key) => {
+              const line: Record<string, DetailedReportValue> = { session: key };
+              for (const person of roster) {
+                  const hours = countedLogs
+                      .filter((log) => sessionKey(rec(log)) === key && ownerOf(rec(log)) === person)
+                      .reduce((sum, log) => sum + effectiveHoursFromLog(log), 0);
+                  line[person.name] = hours ? `${roundHours(hours)}h` : "—";
+              }
+              return line;
+          })
+        : [];
 
     const s1: DetailedReportSection = {
         id: "1",
@@ -223,11 +303,11 @@ export function buildImpactPackageDetailedReport(
                         const idn = identityAnswer(hidePrivate, "email", lead?.email);
                         return row("Institutional email / OTP verification", idn.answer, idn.origin);
                     })(),
-                    row("University", text(lead?.university)),
-                    row("Student / registration ID", text((lead as { student_id?: string } | undefined)?.student_id)),
-                    row("Programme", text(lead?.degree)),
-                    row("Department / discipline", text(data.section2?.discipline_other, data.section2?.discipline, lead?.degree)),
-                    row("Semester", text((lead as { semester?: string } | undefined)?.semester, lead?.year)),
+                    row("University", text(lead?.university, leadRec.universityName)),
+                    row("Student / registration ID", privateId(text(leadRec.student_id, leadRec.universityId))),
+                    row("Programme", text(lead?.degree, leadRec.academicProgram, leadRec.program)),
+                    row("Department / discipline", text(data.section2?.discipline_other, data.section2?.discipline, leadRec.department, lead?.degree, leadRec.academicProgram)),
+                    row("Semester", text(leadRec.semester, lead?.year, leadRec.yearOfStudy)),
                     row("Academic integration", text(data.section9?.academic_integration)),
                     row(
                         "Identity confirmation status",
@@ -251,11 +331,18 @@ export function buildImpactPackageDetailedReport(
                                 role: text(lead?.role) || "Team lead",
                                 hours: text(lead?.hours),
                             },
-                            ...members.map((member) => ({
-                                name: personName(member) || "Member",
-                                role: text(member.role) || "Team member",
-                                hours: text(member.hours),
-                            })),
+                            ...members.map((member) => {
+                                const m = rec(member);
+                                return {
+                                    name: personName(member) || "Member",
+                                    role: text(member.role) || "Team member",
+                                    hours: text(member.hours),
+                                    university: text(m.universityName, m.university),
+                                    student_id: privateId(text(m.universityId, m.student_id)),
+                                    programme: text(m.academicProgram, m.program, m.degree),
+                                    semester: text(m.semester, m.yearOfStudy, m.year),
+                                };
+                            }),
                         ],
                     ),
                     row(
@@ -283,6 +370,8 @@ export function buildImpactPackageDetailedReport(
                                 activity: text(item.activity_type, item.activityType),
                                 description: text(item.description),
                                 status: attendanceStatusLabel(item.approval_status ?? item.approvalStatus),
+                                student: ownerOf(item).name,
+                                evidence: hasSessionEvidence(item) ? "Attached" : "None",
                             };
                         }),
                     ),
@@ -321,6 +410,20 @@ export function buildImpactPackageDetailedReport(
                         "Privacy consent",
                         data.section1?.privacy_consent === true ? true : data.section1?.privacy_consent === false ? false : NOT_SUPPLIED,
                     ),
+                    row(
+                        "Participation declaration items confirmed",
+                        Array.isArray(data.section1?.review_checked) && data.section1.review_checked.length
+                            ? `${data.section1.review_checked.filter(Boolean).length} of ${data.section1.review_checked.length}`
+                            : NOT_SUPPLIED,
+                    ),
+                ],
+            },
+            {
+                id: "1.7",
+                title: "Hours by student",
+                rows: [
+                    row("Every student's hours against the minimum", hoursByStudent),
+                    ...(attendanceMatrix.length ? [row("Attendance matrix · one column per student", attendanceMatrix)] : []),
                 ],
             },
         ],
@@ -349,6 +452,7 @@ export function buildImpactPackageDetailedReport(
                             : "",
                         data.section2?.baseline_evidence_other,
                     )),
+                    row("What else informed you?", (data.section2?.baseline_other_entries || []).filter((item) => text(item))),
                 ],
             },
             {
@@ -357,6 +461,17 @@ export function buildImpactPackageDetailedReport(
                 rows: [
                     row("Composed baseline", text(data.section2?.summary_text, data.section2?.baseline_smart_draft)),
                     row("Problem category", text(data.section2?.problem_category)),
+                ],
+            },
+            {
+                id: "2.3",
+                title: "Risk, safeguarding & consent",
+                rows: [
+                    row("Who could be harmed, and how?", data.section2?.risk_factors || []),
+                    row("What did you do about it?", text(data.section2?.risk_mitigation)),
+                    row("Consent for photos and data", text(data.section2?.risk_consent)),
+                    row("Responsible for safeguarding on site", text(data.section2?.risk_safeguarding_lead)),
+                    row("Anything unresolved?", text(data.section2?.risk_unresolved)),
                 ],
             },
         ],
@@ -440,6 +555,13 @@ export function buildImpactPackageDetailedReport(
                             overlap: text(block.overlap_status, block.overlap_note),
                             reach: text(block.unique_beneficiaries, block.beneficiaries_reached),
                             count_method: text(block.reach_counting_method_other, block.reach_counting_method),
+                            partner_host: text(block.partner_host),
+                            served_people_directly:
+                                block.serves_beneficiaries === true ? "Yes" : block.serves_beneficiaries === false ? "No" : "",
+                            who_benefited: [
+                                ...(Array.isArray(block.beneficiary_categories) ? block.beneficiary_categories : []),
+                                text(block.other_beneficiary_text),
+                            ].filter((item) => text(item)),
                         })),
                     ),
                 ],
@@ -489,6 +611,16 @@ export function buildImpactPackageDetailedReport(
                             endline: text(outcome.endline),
                             unit: text(outcome.unit_other, outcome.unit),
                             proof: text(outcome.measurement_explanation),
+                            change: (() => {
+                                const b = Number(String(outcome.baseline ?? "").replace(/,/g, ""));
+                                const e = Number(String(outcome.endline ?? "").replace(/,/g, ""));
+                                if (!text(outcome.baseline) || !text(outcome.endline) || !Number.isFinite(b) || !Number.isFinite(e)) return "";
+                                const delta = roundHours(e - b);
+                                return `${delta > 0 ? "+" : ""}${delta}`;
+                            })(),
+                            sub_category: text(outcome.outcome_sub_category),
+                            metric_scale: text(outcome.metric_category),
+                            confidence: Array.isArray(outcome.confidence_level) ? outcome.confidence_level : [],
                         })),
                     ),
                 ],
@@ -521,9 +653,9 @@ export function buildImpactPackageDetailedReport(
                             type: text(item.type_other, item.type),
                             amount: text(item.amount),
                             unit: text(item.unit_other, item.unit),
-                            sources: item.sources || [],
+                            sources: [...(item.sources || []), text(item.source_other)].filter((value) => text(value)),
                             purpose: text(item.purpose),
-                            verification: item.verification || [],
+                            verification: [...(item.verification || []), text(rec(item).verification_other)].filter((value) => text(value)),
                         })),
                     ),
                 ],
@@ -539,6 +671,26 @@ export function buildImpactPackageDetailedReport(
                             const n = Number(String(item.amount || "").replace(/,/g, ""));
                             return sum + (Number.isFinite(n) ? n : 0);
                         }, 0),
+                    ),
+                    row(
+                        "Totals by resource type and unit (cash and in-kind kept separate)",
+                        (() => {
+                            const sums = new Map<string, { type: string; unit: string; total: number }>();
+                            for (const item of resources) {
+                                const n = Number(String(item.amount || "").replace(/,/g, ""));
+                                const unit = text(item.unit_other, item.unit);
+                                const type = text(item.type_other, item.type);
+                                if (!Number.isFinite(n) || !unit || !type) continue;
+                                const key = `${type}|${unit}`;
+                                const prev = sums.get(key) || { type, unit, total: 0 };
+                                sums.set(key, { ...prev, total: prev.total + n });
+                            }
+                            return [...sums.values()].map((entry) => ({
+                                type: entry.type,
+                                unit: entry.unit,
+                                total: Math.round(entry.total * 100) / 100,
+                            }));
+                        })(),
                     ),
                 ],
             },
@@ -561,7 +713,9 @@ export function buildImpactPackageDetailedReport(
                         partners.map((partner) => ({
                             name: text(partner.name),
                             type: text(partner.type_other, partner.type),
-                            roles: partner.role || [],
+                            roles: [...(partner.role || []), text(rec(partner).role_other)].filter((value) => text(value)),
+                            designation: text(partner.designation),
+                            website: text(partner.website),
                             contribution: text(partner.contribution_line, Array.isArray(partner.contribution) ? partner.contribution.join("; ") : ""),
                             contact: hidePrivate
                                 ? "Private contact excluded from this shareable package."
@@ -601,6 +755,7 @@ export function buildImpactPackageDetailedReport(
                 rows: [
                     row("Was evidence attached?", text(data.section8?.has_evidence)),
                     row("Evidence types", data.section8?.evidence_types || []),
+                    row("Other evidence type", text(data.section8?.evidence_type_other)),
                     row("What the files show", text(data.section8?.description)),
                     row("Current evidence sharing", `${visLabel} · applies to all evidence`),
                     row(
@@ -696,6 +851,31 @@ export function buildImpactPackageDetailedReport(
                 id: "9.4",
                 title: "System influence",
                 rows: [row("Policy / system influence", text(data.section10?.policy_influence))],
+            },
+            {
+                id: "9.5",
+                title: "Follow-up check",
+                rows: (() => {
+                    const s10 = data.section10;
+                    const plan = text(s10?.followup_plan);
+                    const planLabel = plan === "yes" ? "Planned" : plan === "no" ? "Not planned" : plan === "later" ? "Decide later" : "";
+                    return [
+                        row("Is a follow-up check planned or needed?", planLabel || NOT_SUPPLIED),
+                        row("Why is no follow-up planned?", text(s10?.followup_no_reason_other, s10?.followup_no_reason)),
+                        row("Who should decide whether follow-up is needed?", text(s10?.followup_decision_owner)),
+                        row("Who will check the results?", text(s10?.followup_owner_role)),
+                        row("Responsible person", text(s10?.followup_owner_name)),
+                        row(
+                            "Email for follow-up invitation",
+                            hidePrivate ? (text(s10?.followup_owner_email) ? PRIVATE_EMAIL : NOT_SUPPLIED) : text(s10?.followup_owner_email),
+                        ),
+                        row("When should results be checked?", text(s10?.followup_interval)),
+                        row("Chosen follow-up date", text(s10?.followup_custom_date)),
+                        row("Follow-up due date", text(s10?.followup_due_date)),
+                        row("What should be checked?", text(s10?.followup_check)),
+                        row("Specific instruction", text(s10?.followup_check_notes)),
+                    ];
+                })(),
             },
         ],
     };

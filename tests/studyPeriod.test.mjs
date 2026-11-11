@@ -54,5 +54,5 @@ test("certificates, dossiers and the detailed report use the semester; hours til
         "report summary tiles match the certificate",
     );
     assert.match(read("src/utils/reportTeamScope.ts"), /composeProgramLine\(base, participantStudyPeriod\(row\)\)/);
-    assert.match(read("src/app/dashboard/student/report/impact-package/buildImpactPackageDetailedReport.ts"), /row\("Semester", text\(\(lead as \{ semester\?: string \} \| undefined\)\?\.semester, lead\?\.year\)\)/);
+    assert.match(read("src/app/dashboard/student/report/impact-package/buildImpactPackageDetailedReport.ts"), /row\("Semester", text\(leadRec\.semester, lead\?\.year, leadRec\.yearOfStudy\)\)/);
 });

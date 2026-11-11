@@ -230,3 +230,20 @@ test("a report sent back by CIEL PK reads as CHANGES REQUESTED, not as awaiting 
     const ended = buildImpactPackageModel({ project_id: "p1", status: "rejected", faculty_status: "rejected" } as never);
     assert.equal(ended.returnedForRevision, false);
 });
+
+test("flashcard shows photo/data consent, outcome confidence, in-kind resources and the follow-up plan", () => {
+    const model = buildImpactPackageModel({
+        project_id: "p1",
+        section2: { problem_statement: "Low reading.", risk_consent: "written" },
+        section5: { measurable_outcomes: [{ metric: "Reading", baseline: "35", endline: "71", confidence_level: ["Directly measured"] }] },
+        section6: { use_resources: "yes", resources: [{ type: "Books", amount: "20", unit: "items", sources: [] }] },
+        section10: { continuation_status: "yes", continuation_details: "Teachers keep it.", followup_plan: "yes", followup_due_date: "2027-02-01" },
+    } as never);
+    const chips = (n: number) => (model.tiles.find((tile) => tile.n === n)?.chips || []).map((chip) => chip.text);
+    assert.ok(chips(2).some((t) => /consent/i.test(t)), "photo / data consent chip");
+    assert.ok(chips(4).includes("Confidence: Directly measured"));
+    const resources = model.tiles.find((tile) => tile.n === 5);
+    assert.match(String(resources?.text), /In-kind resources: 20 items · Books/);
+    assert.equal(resources?.hasContent, true);
+    assert.ok(chips(9).includes("Follow-up planned · 2027-02-01"));
+});

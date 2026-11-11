@@ -39,6 +39,22 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import "./impact-package.css";
 
+/** Where an evidence file was attached (report data section) → the label the student saw in the wizard. */
+const EVIDENCE_SECTION_LABELS: Record<string, string> = {
+    section1: "Participation · sessions",
+    section2: "Project context",
+    section3: "SDG mapping",
+    section4: "Activities & outputs",
+    section5: "Outcomes",
+    section6: "Resources",
+    section7: "Partnerships",
+    section8: "Evidence",
+    section9: "Reflection",
+    section10: "Sustainability",
+    report: "Report attachments",
+    package: "Added to package",
+};
+
 const TAB_LABEL: Record<ImpactPackageTab, { num: string; label: string; crumb: string }> = {
     flash: { num: "01", label: "Impact flashcard", crumb: "01 / Impact flashcard" },
     report: { num: "02", label: "Detailed report", crumb: "02 / Complete detailed report" },
@@ -243,6 +259,7 @@ export default function ImpactPackage({
     });
     const [evQuery, setEvQuery] = useState("");
     const [evKind, setEvKind] = useState("all");
+    const [evSection, setEvSection] = useState("all");
     const [preview, setPreview] = useState<ImpactPackageEvidenceFile | null>(null);
     const [previewStage, setPreviewStage] = useState<"pending" | "approved">(model.adminApproved ? "approved" : "pending");
 
@@ -374,8 +391,12 @@ export default function ImpactPackage({
         const q = evQuery.trim().toLowerCase();
         const kindOk = evKind === "all" || file.kind === evKind || (evKind === "file" && file.kind !== "image" && file.kind !== "video" && file.kind !== "audio" && file.kind !== "archive");
         const textOk = !q || `${file.name} ${file.claim} ${file.section}`.toLowerCase().includes(q);
-        return kindOk && textOk;
+        const sectionOk = evSection === "all" || file.section === evSection;
+        return kindOk && textOk && sectionOk;
     });
+    const evidenceSections = [...new Set(model.files.map((file) => file.section).filter(Boolean))].sort(
+        (a, b) => Number(a.replace(/\D/g, "")) - Number(b.replace(/\D/g, "")),
+    );
 
     // Evidence slideshow: previous / next over the files currently listed (search and format filter).
     const slideFiles = preview && filteredFiles.some((file) => file.id === preview.id) ? filteredFiles : model.files;
@@ -764,6 +785,16 @@ export default function ImpactPackage({
                                 <option value="file">Documents / other</option>
                                 <option value="archive">Archives</option>
                             </select>
+                            {evidenceSections.length > 1 ? (
+                                <select value={evSection} onChange={(e) => setEvSection(e.target.value)} aria-label="Filter evidence by report section">
+                                    <option value="all">All report sections</option>
+                                    {evidenceSections.map((section) => (
+                                        <option key={section} value={section}>
+                                            {EVIDENCE_SECTION_LABELS[section] || `Section ${section.replace("section", "")}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : null}
                             <button
                                 type="button"
                                 className="primary"
@@ -804,7 +835,7 @@ export default function ImpactPackage({
                                                 <div className="ev-name">{locked ? `${model.visibilityLabel} evidence` : file.name}</div>
                                                 <div className="ev-meta">
                                                     <span>{locked ? "Protected" : file.kind.toUpperCase()}</span>
-                                                    {locked ? null : <span>Section {file.section.replace("section", "")}</span>}
+                                                    {locked ? null : <span>{EVIDENCE_SECTION_LABELS[file.section] || `Section ${file.section.replace("section", "")}`}</span>}
                                                 </div>
                                                 <div className="ev-claim">{locked ? lockLine : file.claim}</div>
                                                 <div className="ev-link">{accessText}</div>

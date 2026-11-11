@@ -370,12 +370,34 @@ export function buildImpactPackageModel(
             after: pickNumber(o.endline),
             unit: pickString(o.unit_other, o.unit),
             note: pickString(o.measurement_explanation),
+            confidence: (Array.isArray(o.confidence_level) ? o.confidence_level : [])
+                .map((level) => String(level || "").replace(/^[^\p{L}\p{N}]+/u, "").trim())
+                .filter(Boolean)[0] || "",
         }))
         .find((row) => row.before != null && row.after != null) || null;
     const pkr = (data.section6?.resources || []).reduce((sum, r) => {
         if (String(r.unit || "").toUpperCase() !== "PKR") return sum;
         return sum + (pickNumber(r.amount) || 0);
     }, 0);
+    /** Non-cash resources (books, kits, transport …) with a quantity: shown beside the PKR total, never added to it. */
+    const inKind = (data.section6?.resources || [])
+        .filter((r) => String(r.unit || "").toUpperCase() !== "PKR" && (pickNumber(r.amount) || 0) > 0)
+        .map((r) => {
+            const unit = pickString(r.unit_other, r.unit);
+            const type = nice(pickString(r.type_other, r.type));
+            return `${fmtNum(pickNumber(r.amount) || 0)}${unit ? ` ${unit}` : ""}${type ? ` · ${type}` : ""}`;
+        });
+    const riskConsent = pickString(data.section2?.risk_consent);
+    const followupPlan = String(data.section10?.followup_plan || "").toLowerCase();
+    const followupWhen = pickString(data.section10?.followup_due_date, data.section10?.followup_custom_date, data.section10?.followup_interval);
+    const followupChip =
+        followupPlan === "yes"
+            ? `Follow-up planned${followupWhen ? ` · ${followupWhen}` : ""}`
+            : followupPlan === "no"
+              ? "No follow-up planned"
+              : followupPlan === "later"
+                ? "Follow-up decision pending"
+                : "";
     const files = collectEvidenceFiles(data, extraFiles);
     const visibility = resolveMediaVisibility(data.section8?.media_visible ?? asRecord(data.section8).media_usage);
     const publicConsent = visibility === "public" ? hasPublicSharePermission(data.section8) : false;
@@ -507,6 +529,7 @@ export function buildImpactPackageModel(
                 pickString(data.section2?.primary_beneficiary, data.section2?.affected_group)
                     ? { text: pickString(data.section2?.primary_beneficiary, data.section2?.affected_group) }
                     : null,
+                riskConsent ? { text: `Photo / data consent: ${nice(riskConsent)}` } : null,
             ].filter(Boolean) as ImpactPackageChip[],
             hasContent: Boolean(firstSentence(pickString(data.section2?.problem_statement, data.section2?.summary_text, data.section2?.affected_group))),
         },
@@ -537,6 +560,7 @@ export function buildImpactPackageModel(
             chips: [
                 acts[0]?.title ? { text: acts[0].title } : null,
                 numericChange ? { text: `${fmtNum(numericChange.before)} → ${fmtNum(numericChange.after)}` } : { text: "Before–after not quantified", cls: "warn" },
+                numericChange?.confidence ? { text: `Confidence: ${numericChange.confidence}` } : null,
             ].filter(Boolean) as ImpactPackageChip[],
             hasContent: Boolean(firstSentence(pickString(data.section5?.observed_change, data.section4?.summary_text, acts[0]?.title))),
         },
@@ -547,14 +571,20 @@ export function buildImpactPackageModel(
                 data.section6?.use_resources === "no"
                     ? "The team reported no cash or in-kind resources for this project."
                     : pkr > 0
-                      ? `PKR ${fmtNum(pkr)} recorded against resource lines.`
-                      : firstSentence(pickString(data.section6?.summary_text)) || "No resource amounts recorded.",
+                      ? `PKR ${fmtNum(pkr)} recorded against resource lines.${inKind.length ? ` In-kind: ${inKind.slice(0, 3).join("; ")}.` : ""}`
+                      : inKind.length
+                        ? `In-kind resources: ${inKind.slice(0, 3).join("; ")}.`
+                        : firstSentence(pickString(data.section6?.summary_text)) || "No resource amounts recorded.",
             chips: (data.section6?.resources || [])
                 .flatMap((row) => (Array.isArray(row.sources) ? row.sources : []))
                 .filter(Boolean)
                 .slice(0, 3)
                 .map((src) => ({ text: nice(src) })),
-            hasContent: data.section6?.use_resources === "no" || pkr > 0 || Boolean(firstSentence(pickString(data.section6?.summary_text))),
+            hasContent:
+                data.section6?.use_resources === "no" ||
+                pkr > 0 ||
+                inKind.length > 0 ||
+                Boolean(firstSentence(pickString(data.section6?.summary_text))),
         },
         {
             n: 6,
@@ -612,7 +642,10 @@ export function buildImpactPackageModel(
             n: 9,
             title: "Sustainability",
             text: firstSentence(continuation) || "Sustainability / continuation answer was not supplied.",
-            chips: [continuationChip ? { text: continuationChip } : { text: "Continuation not classified", cls: "warn" }],
+            chips: [
+                continuationChip ? { text: continuationChip } : { text: "Continuation not classified", cls: "warn" },
+                followupChip ? { text: followupChip } : null,
+            ].filter(Boolean) as ImpactPackageChip[],
             hasContent: Boolean(firstSentence(continuation)),
         },
     ];
