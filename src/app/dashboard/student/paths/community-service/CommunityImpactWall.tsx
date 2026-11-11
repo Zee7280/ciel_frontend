@@ -808,32 +808,24 @@ export default function CommunityImpactWall(_props: {
             <CommunityCrumb role="Student" view="My Impact" />
             <HubBackButton href={HUB} label="← Back to Community Service" />
 
-            <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div className="min-w-0 max-w-3xl">
-                    <h1 className="text-[32px] font-semibold tracking-tight text-[#143f3b]">My Impact Wall.</h1>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#0e7d74]">Community Service · Verified record</p>
+                    <h1 className="mt-1 text-[32px] font-semibold tracking-tight text-[#143f3b]">My Impact Wall</h1>
                     <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b7c86]">
                         A curated record of your published community service projects — verified outcomes, composite scores,
                         institutional recognition and supporting documentation, all in one place.
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="rounded-full border border-[#cfe0dc] bg-white px-4 py-2 text-[12px] font-bold text-[#174b43]"
-                    >
-                        Print portfolio
-                    </button>
-                    <Link
-                        href="/dashboard/student/impact?area=Community%20Service"
-                        className="rounded-full bg-[#0e4d4e] px-4 py-2 text-[12px] font-bold text-white"
-                    >
-                        View full portfolio →
-                    </Link>
-                </div>
+                <Link
+                    href="/dashboard/student/impact?area=Community%20Service"
+                    className="rounded-full bg-[#0e4d4e] px-5 py-2.5 text-[12px] font-bold text-white shadow-[0_6px_16px_rgba(14,77,78,.18)] transition hover:bg-[#0b3f40]"
+                >
+                    View full portfolio →
+                </Link>
             </div>
 
-            <div className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4 [&>div]:shadow-[0_4px_14px_rgba(20,63,59,.04)]">
                 <div className="rounded-2xl border border-[#e4eeec] bg-white px-5 py-4">
                     <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#7a919a]">Published projects</p>
                     <p className="mt-2 text-[28px] font-semibold tracking-tight text-[#143f3b]">{stats.published}</p>
@@ -944,32 +936,37 @@ export default function CommunityImpactWall(_props: {
                                 const packageHref = studentImpactPackageHref(r.project_id || r.opportunity_id, "package", { from: "wall" });
                                 const reportHref = studentImpactPackageHref(r.project_id || r.opportunity_id, "report", { from: "wall" }) || studentDetailedReportHref(r);
                                 return (
-                                    <article key={r.id} className="flex flex-col overflow-hidden rounded-[22px] border border-[#dde8e5] bg-white shadow-[0_8px_24px_rgba(20,63,59,.06)]">
-                                        <div className="relative bg-[linear-gradient(135deg,#0e4d4e,#117669)] px-5 py-4 text-white">
-                                            <span className="absolute right-3.5 top-3.5 rounded-full border border-white/25 bg-white/12 px-2.5 py-1 text-[8px] font-black tracking-wide">
-                                                ✓ VERIFIED & PUBLISHED
-                                            </span>
-                                            <p className="pr-28 text-[8.5px] font-black tracking-[0.1em] text-[#9fe2d7]">
-                                                COMMUNITY SERVICE · {year || "—"}
-                                            </p>
-                                            <h4 className="mt-1.5 break-words text-[17px] font-semibold leading-tight [overflow-wrap:anywhere]">
+                                    <article key={r.id} className="flex flex-col overflow-hidden rounded-[22px] border border-[#dde8e5] bg-white shadow-[0_8px_24px_rgba(20,63,59,.06)] transition hover:shadow-[0_12px_30px_rgba(20,63,59,.11)]">
+                                        <div className="bg-[linear-gradient(135deg,#0e4d4e,#117669)] px-5 py-4 text-white">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="min-w-0 truncate text-[8.5px] font-black tracking-[0.1em] text-[#9fe2d7]">
+                                                    COMMUNITY SERVICE · {year || "—"}
+                                                </p>
+                                                <span className="shrink-0 whitespace-nowrap rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[8px] font-black tracking-wide">
+                                                    ✓ VERIFIED & PUBLISHED
+                                                </span>
+                                            </div>
+                                            <h4
+                                                className="mt-2 line-clamp-2 min-h-[2.5em] break-words text-[17px] font-semibold leading-[1.25] [overflow-wrap:anywhere]"
+                                                title={r.project_title || undefined}
+                                            >
                                                 {r.project_title || "Community service"}
                                             </h4>
-                                            <p className="mt-1 text-[11px] text-[#d7eeea]">
+                                            <p className="mt-1 truncate text-[11px] text-[#d7eeea]" title={uni}>
                                                 {uni}
                                                 {hours ? ` · ${Math.round(hours)} verified hours` : ""}
                                             </p>
                                         </div>
                                         <div className="flex flex-1 flex-col px-5 py-4">
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex min-h-[104px] items-center gap-3">
                                                 <ImpactWallCiiRing score={score} />
                                                 <div className="min-w-0">
                                                     <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#7a919a]">Composite Impact Index</p>
-                                                    <p className="mt-0.5 text-[15px] font-semibold leading-tight text-[#16313d]">{badge}</p>
+                                                    <p className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-tight text-[#16313d]">{badge}</p>
                                                     <p className="mt-0.5 text-[11px] text-[#7a919a]">Verified CII score</p>
                                                 </div>
                                                 {national ? (
-                                                    <div className="ml-auto rounded-xl border border-[#efdfb6] bg-[#fff9e9] px-2.5 py-2 text-center">
+                                                    <div className="ml-auto shrink-0 rounded-xl border border-[#efdfb6] bg-[#fff9e9] px-2.5 py-2 text-center">
                                                         <p className="text-[7.5px] font-black uppercase tracking-wide text-[#875f16]">National rank</p>
                                                         <p className="text-[16px] font-black text-[#875f16]">#{national.rank}</p>
                                                     </div>
