@@ -38,6 +38,8 @@ import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { useAbortableFetch, isAbortError, readErrorMessage } from "@/components/admin/useAbortableFetch";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import { normalizeActiveOtps, type AdminActiveOtp } from "@/utils/adminActiveOtp";
+import { ActiveOtpPanel, UserOtpCodes } from "./AdminOtpViews";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { hecPrograms } from "@/utils/hecProgramsData";
 
@@ -103,6 +105,8 @@ interface User {
     orgName?: string;
     /** Super-admin only: decrypted password copy from backend */
     stored_password?: string | null;
+    /** Super-admin only (Passwords view): live OTP codes for this email */
+    active_otps?: AdminActiveOtp[];
     /** Raw ISO timestamp, used for sorting */
     createdAt: string;
     /** From backend `findAllForAdmin`; absent on older APIs */
@@ -275,6 +279,7 @@ export default function AdminUsersPage() {
                     typeof u.stored_password === "string" && u.stored_password.trim()
                         ? u.stored_password
                         : null,
+                active_otps: normalizeActiveOtps(u.active_otps),
                 profile_complete: typeof u.profile_complete === "boolean" ? u.profile_complete : undefined,
                 profile_missing_fields: Array.isArray(u.profile_missing_fields) ? u.profile_missing_fields : undefined,
                 university: u.university || u.institution || "",
@@ -743,10 +748,11 @@ export default function AdminUsersPage() {
                         <Info className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" aria-hidden />
                         <p className="leading-relaxed">
                             Passwords appear after signup, when you set a new password in <strong>Edit</strong>, or when the user logs in again.
-                            Empty rows need a login or an admin password reset.
+                            Empty rows need a login or an admin password reset. A live OTP shows under the password while it is valid.
                         </p>
                     </div>
                 )}
+                {showPasswordColumn && <ActiveOtpPanel search={debouncedSearch} onRefresh={() => void fetchUsers()} />}
             </div>
 
             {/* Table */}
@@ -783,23 +789,41 @@ export default function AdminUsersPage() {
                         ...(showPasswordColumn
                             ? [
                                   {
-                                      name: "Password",
+                                      name: "Password / OTP",
                                       cell: (user: User) => {
                                           const key = String(user.id);
                                           const stored = user.stored_password;
+                                          const revealed = Boolean(revealedPasswordIds[key]);
+                                          const otps = user.active_otps;
                                           if (!stored) {
                                               return (
-                                                  <span
-                                                      className="text-xs text-slate-400"
-                                                      title="Set via Edit, or captured on next login"
-                                                  >
-                                                      Not stored yet
-                                                  </span>
+                                                  <div className="flex flex-col gap-1 py-1">
+                                                      <span
+                                                          className="text-xs text-slate-400"
+                                                          title="Set via Edit, or captured on next login"
+                                                      >
+                                                          Not stored yet
+                                                      </span>
+                                                      {otps?.length ? (
+                                                          <div className="flex items-start gap-1">
+                                                              <UserOtpCodes otps={otps} revealed={revealed} />
+                                                              <button
+                                                                  type="button"
+                                                                  onClick={() => togglePasswordReveal(user.id)}
+                                                                  className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                                                  title={revealed ? "Hide OTP" : "Show OTP"}
+                                                                  aria-label={revealed ? "Hide OTP" : "Show OTP"}
+                                                              >
+                                                                  {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                                              </button>
+                                                          </div>
+                                                      ) : null}
+                                                  </div>
                                               );
                                           }
-                                          const revealed = revealedPasswordIds[key];
                                           return (
-                                              <div className="flex items-center gap-1 py-1">
+                                              <div className="flex flex-col py-1">
+                                              <div className="flex items-center gap-1">
                                                   <code className="max-w-[140px] truncate rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-800">
                                                       {revealed ? stored : "••••••••"}
                                                   </code>
@@ -826,9 +850,11 @@ export default function AdminUsersPage() {
                                                       <Copy className="h-3.5 w-3.5" />
                                                   </button>
                                               </div>
+                                              <UserOtpCodes otps={otps} revealed={revealed} />
+                                              </div>
                                           );
                                       },
-                                      minWidth: "200px",
+                                      minWidth: "240px",
                                   },
                               ]
                             : []),
