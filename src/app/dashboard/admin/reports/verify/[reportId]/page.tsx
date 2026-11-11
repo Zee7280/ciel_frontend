@@ -77,6 +77,8 @@ import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 import { REVIEW_DOSSIER_FLASH_NAV, REVIEW_DOSSIER_FORM_NAV } from "../../../../student/report/utils/reportWizardNav";
 import CommunityCiiAnalyser from "@/components/ciel/community-service/CommunityCiiAnalyser";
 import AdminReviewPackageStrip from "../AdminReviewPackageStrip";
+import ApprovalWhatsAppPanel, { openApprovalWhatsApp } from "../ApprovalWhatsAppPanel";
+import { approvalWhatsappRecipients } from "@/utils/approvalShowcaseMessage";
 import { ADMIN_REPORTS_TABLE_HREF, adminReviewReturnLabel, readAdminReviewReturn } from "@/utils/adminReviewReturn";
 import type { ImpactPackageAudience } from "@/app/dashboard/student/report/impact-package/buildImpactPackageModel";
 import ConfirmModal from "../../../_shared/ConfirmModal";
@@ -1040,15 +1042,23 @@ function AdminReportDetailPage() {
             );
 
             if (response?.ok) {
-                toast.success(
-                    apiAction === 'unlock'
-                        ? 'Report returned to student for edits.'
-                        : apiAction === 'close'
-                            ? 'Report closed and removed from published results.'
-                            : apiAction === 'reject'
-                                ? 'Report sent back to the student for revision.'
-                                : 'Report approved successfully!',
-                );
+                if (apiAction === 'approve') {
+                    // Approval issues the certificate: offer the "showcase your project" WhatsApp to the student.
+                    const lead = approvalWhatsappRecipients(report?.section1, report?.student?.name)[0];
+                    toast.success('Report approved successfully!', {
+                        duration: 15000,
+                        description: 'Send the student the congratulations message on WhatsApp.',
+                        action: { label: 'WhatsApp student', onClick: () => openApprovalWhatsApp(lead?.phone || '') },
+                    });
+                } else {
+                    toast.success(
+                        apiAction === 'unlock'
+                            ? 'Report returned to student for edits.'
+                            : apiAction === 'close'
+                                ? 'Report closed and removed from published results.'
+                                : 'Report sent back to the student for revision.',
+                    );
+                }
                 setPendingDecision(null);
                 // The table's queue only drives "next" when the report was opened from the table.
                 const nextId = returnHref === ADMIN_REPORTS_TABLE_HREF ? queueNav.next : null;
@@ -2388,6 +2398,10 @@ function AdminReportDetailPage() {
                                 </button>
                             </div>
                         </div>
+
+                        {String(report.admin_status || "").trim().toLowerCase() === "approved" ? (
+                            <ApprovalWhatsAppPanel section1={report.section1} studentName={report.student?.name} />
+                        ) : null}
 
                         <div className="space-y-6">
                             <div>
