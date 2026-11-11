@@ -30,6 +30,7 @@ import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInst
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isFacultyProfileComplete, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToFacultyForm } from "./mapDetailToForm";
+import OrgAiDraftAssistant from "../../student/create-opportunity/OrgAiDraftAssistant";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY, parsePhoneForDisplay, validateOptionalNationalPhone } from "@/utils/countryCallingCodes";
 import {
@@ -1288,6 +1289,22 @@ export default function FacultyOpportunityCreationPage() {
                             <Loader2 className="h-4 w-4 animate-spin" /> Loading opportunity…
                         </p>
                     ) : null}
+                    <OrgAiDraftAssistant
+                        formData={formData}
+                        setFormData={setFormData}
+                        creatorPathway="faculty"
+                        mainPartner={formData.partnerCollaboration.hasPartner ? formData.partnerCollaboration.orgName : ""}
+                        withMainPartner={(form, name) =>
+                            form.partnerCollaboration.orgName.trim()
+                                ? form
+                                : { ...form, partnerCollaboration: { ...form.partnerCollaboration, hasPartner: true, orgName: name } }
+                        }
+                        hidden={isLoadingEdit}
+                        onApplied={() => {
+                            goToStep("B");
+                            if (!editingOpportunityId || isDraftMode) void persistDraftRef.current(true);
+                        }}
+                    />
                     <div className="mt-3">
                         <DuplicateNotice state={duplicateNotice} onRetry={() => setDuplicateRetry((n) => n + 1)} />
                     </div>

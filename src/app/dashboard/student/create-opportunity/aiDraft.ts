@@ -120,10 +120,13 @@ export function aiDraftInputError(inputs: AiDraftInputs): string | null {
     return null;
 }
 
+/** Who is filling the form; tells the AI whose listing it drafts (backend OPPORTUNITY_DRAFT_CREATOR_PATHWAYS). */
+export type AiDraftCreatorPathway = "university" | "private" | "faculty" | "organization";
+
 /** Body for POST /api/v1/ai/opportunity-draft. Empty values are left out. */
 export function buildAiDraftRequest(
     inputs: AiDraftInputs,
-    creatorPathway: "university" | "private",
+    creatorPathway: AiDraftCreatorPathway,
 ): Record<string, unknown> {
     const body: Record<string, unknown> = {
         idea: inputs.idea.trim(),
@@ -297,5 +300,188 @@ export function applyAiDraft<F extends AiDraftFormShape>(
             mainPartner && !form.supervision.partnerOrgName.trim()
                 ? { ...form.supervision, executingContext: "partner", partnerOrgName: mainPartner }
                 : form.supervision,
+    };
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Faculty (also Super Admin) and Partner / NGO / University / Corporate wizards. Their form has no
+ * summary or team mode, keeps supporting SDGs as a list, and "Other" skills in a separate list.
+ * Partner contacts, faculty lead, apply scope, safety, declarations and signature are never touched.
+ * --------------------------------------------------------------------------------------------- */
+
+/** The slice of the faculty / partner wizard form state this module reads and writes. */
+export type AiDraftOrgFormShape = {
+    title: string;
+    hook: string;
+    opportunityType: string[];
+    mode: string;
+    location: { city: string; venue: string; pin: string };
+    dates: { start: string; end: string; fromTime: string; endTime: string };
+    scheduleNotes: string;
+    capacity: { hours: string; volunteers: string };
+    sdg: string;
+    target: string;
+    indicator: string;
+    subIndicator: string;
+    sdgWhy: string;
+    secondarySdgs: Array<{ sdgId: string; targetId: string; indicatorId: string; subIndicatorId: string; justification: string }>;
+    objectives: {
+        description: string;
+        outputs: string;
+        outcome: string;
+        beneficiariesCount: string;
+        beneficiariesType: string[];
+    };
+    activity: {
+        responsibilities: string;
+        skills: string[];
+        isOtherSkillChecked: boolean;
+        otherSkills: string[];
+        prerequisites: string;
+        resources: string;
+    };
+};
+
+export type ApplyAiDraftOrgOptions = Omit<ApplyAiDraftOptions, "teamModeChoosable"> & {
+    /** Activity-type chips the wizard shows. */
+    activityTypeOptions: readonly string[];
+    /** Skill chips the wizard shows; other AI skills go to the "Other" skills list. */
+    skillOptions: readonly string[];
+    /** Beneficiary chips the wizard shows; custom beneficiaries already typed are kept. */
+    beneficiaryOptions: readonly string[];
+};
+
+/** AI activity types (student list) → the faculty / partner chip with the same meaning. */
+const ORG_ACTIVITY_TYPE_ALIASES: Record<string, string> = {
+    Research: "Research / Survey Support",
+    "Technical Support": "Technical / Professional Support",
+    "Corporate CSR": "Corporate CSR Activity",
+};
+
+const uniq = (values: string[]) => [...new Set(values.map((v) => v.trim()).filter(Boolean))];
+
+/** Pre-fills the modal from what the faculty / organisation already typed. */
+export function aiDraftInputsFromOrgForm(form: AiDraftOrgFormShape, mainPartner = ""): AiDraftInputs {
+    return {
+        idea: "",
+        titleHint: form.title,
+        place: [form.location.venue, form.location.city].map((s) => s.trim()).filter(Boolean).join(", "),
+        beneficiaries: form.objectives.beneficiariesCount,
+        teamMode: "open",
+        seats: form.capacity.volunteers,
+        hours: form.capacity.hours,
+        startDate: form.dates.start,
+        endDate: form.dates.end,
+        mainPartner,
+    };
+}
+
+/**
+ * New faculty / partner form state with the AI draft and the creator's own modal facts applied.
+ * The main partner name is left to the caller (each wizard keeps it in a different block).
+ */
+export function applyAiDraftToOrgForm<F extends AiDraftOrgFormShape>(
+    form: F,
+    fields: AiDraftFields,
+    inputs: AiDraftInputs,
+    opts: ApplyAiDraftOrgOptions,
+): F {
+    // Reuse the student mapper for everything the two forms share, then fix what differs.
+    const shared = applyAiDraft(
+        {
+            title: form.title,
+            hook: form.hook,
+            opportunitySummary: "",
+            opportunityType: form.opportunityType,
+            mode: form.mode,
+            location: { ...form.location, mapSearch: "", mapLink: "" },
+            dates: form.dates,
+            scheduleNotes: form.scheduleNotes,
+            capacity: form.capacity,
+            teamMode: "open",
+            sdg: form.sdg,
+            target: form.target,
+            indicator: form.indicator,
+            subIndicator: form.subIndicator,
+            sdgWhy: form.sdgWhy,
+            secondarySdg: "",
+            secondaryTarget: "",
+            secondaryIndicator: "",
+            secondarySubIndicator: "",
+            secondarySdgWhy: "",
+            objectives: form.objectives,
+            activity: form.activity,
+            supervision: { executingContext: "", partnerOrgName: "" },
+        },
+        { ...fields, mode: fields.mode, activity_types: [], skills: [], beneficiary_types: [] },
+        { ...inputs, teamMode: "open", mainPartner: "" },
+        { ...opts, teamModeChoosable: false },
+    );
+
+    const types = uniq(
+        fields.activity_types
+            .map((t) => ORG_ACTIVITY_TYPE_ALIASES[t] ?? t)
+            .filter((t) => opts.activityTypeOptions.includes(t)),
+    );
+
+    const presetSkills = fields.skills.filter((s) => opts.skillOptions.includes(s));
+    const extraSkills = fields.skills.filter((s) => !opts.skillOptions.includes(s));
+    const keptOtherSkills = form.activity.isOtherSkillChecked ? form.activity.otherSkills : [];
+    const otherSkills = uniq([...keptOtherSkills, ...extraSkills]);
+
+    const aiBeneficiaries = fields.beneficiary_types.filter((b) => opts.beneficiaryOptions.includes(b));
+    const customBeneficiaries = form.objectives.beneficiariesType.filter((b) => !opts.beneficiaryOptions.includes(b));
+
+    const supporting = fields.supporting_sdg;
+    const primarySdg = shared.sdg;
+    const filledSecondaries = form.secondarySdgs.filter((s) => s.sdgId.trim());
+    let secondarySdgs = form.secondarySdgs.filter((s) => !fields.primary_sdg || s.sdgId !== primarySdg);
+    if (supporting && supporting.sdg_id !== primarySdg && !filledSecondaries.some((s) => s.sdgId !== primarySdg)) {
+        const target = supporting.target_id && opts.sdgTargetExists(supporting.sdg_id, supporting.target_id) ? supporting.target_id : "";
+        const indicator =
+            target && supporting.indicator_id && opts.sdgIndicatorExists(supporting.sdg_id, target, supporting.indicator_id)
+                ? supporting.indicator_id
+                : "";
+        secondarySdgs = [
+            { sdgId: supporting.sdg_id, targetId: target, indicatorId: indicator, subIndicatorId: "", justification: supporting.why },
+        ];
+    }
+
+    return {
+        ...form,
+        title: shared.title,
+        hook: shared.hook,
+        opportunityType: types.length ? types : form.opportunityType,
+        mode: shared.mode,
+        location: { ...form.location, city: shared.location.city, venue: shared.location.venue },
+        dates: shared.dates,
+        scheduleNotes: shared.scheduleNotes,
+        capacity: shared.capacity,
+        sdg: shared.sdg,
+        target: shared.target,
+        indicator: shared.indicator,
+        subIndicator: shared.subIndicator,
+        sdgWhy: shared.sdgWhy,
+        secondarySdgs,
+        objectives: {
+            ...form.objectives,
+            description: shared.objectives.description,
+            outputs: shared.objectives.outputs,
+            outcome: shared.objectives.outcome,
+            beneficiariesCount: shared.objectives.beneficiariesCount,
+            beneficiariesType: aiBeneficiaries.length
+                ? uniq([...aiBeneficiaries, ...customBeneficiaries])
+                : form.objectives.beneficiariesType,
+        },
+        activity: {
+            ...form.activity,
+            responsibilities: shared.activity.responsibilities,
+            skills: fields.skills.length ? presetSkills : form.activity.skills,
+            ...(otherSkills.length && extraSkills.length
+                ? { isOtherSkillChecked: true, otherSkills }
+                : {}),
+            prerequisites: shared.activity.prerequisites,
+            resources: shared.activity.resources,
+        },
     };
 }

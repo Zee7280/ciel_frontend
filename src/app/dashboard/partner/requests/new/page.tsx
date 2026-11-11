@@ -25,6 +25,7 @@ import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle
 import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
+import OrgAiDraftAssistant from "@/app/dashboard/student/create-opportunity/OrgAiDraftAssistant";
 import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInstitutions, pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isPartnerOrganizationComplete } from "@/utils/profileCompletion";
@@ -1315,6 +1316,28 @@ export default function OpportunityPostingPage() {
                         <span className="co-hero-chip">🎯 Role-aware Apply Now</span>
                         <span className="co-hero-chip">🔒 Private contacts protected</span>
                     </div>
+                    <OrgAiDraftAssistant
+                        formData={formData}
+                        setFormData={setFormData}
+                        creatorPathway="organization"
+                        mainPartner={formData.verificationSafety.partnerOrg.hasPartner ? formData.verificationSafety.partnerOrg.orgName : ""}
+                        withMainPartner={(form, name) =>
+                            form.verificationSafety.partnerOrg.orgName.trim()
+                                ? form
+                                : {
+                                      ...form,
+                                      verificationSafety: {
+                                          ...form.verificationSafety,
+                                          partnerOrg: { ...form.verificationSafety.partnerOrg, hasPartner: true, orgName: name },
+                                      },
+                                  }
+                        }
+                        hidden={isLoadingEdit}
+                        onApplied={() => {
+                            goToStep("B");
+                            if (!editingOpportunityId || isDraftMode) void persistDraftRef.current(true);
+                        }}
+                    />
                 </div>
                 <div
                     className="co-progress-ring"

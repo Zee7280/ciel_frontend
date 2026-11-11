@@ -9,6 +9,7 @@ import {
     aiDraftInputError,
     aiWorkloadHint,
     buildAiDraftRequest,
+    type AiDraftCreatorPathway,
     type AiDraftFields,
     type AiDraftInputs,
 } from "./aiDraft";
@@ -17,7 +18,8 @@ import { PRIVATE_TEAM_MAX_SEATS } from "./teamMode";
 type Props = {
     /** Pre-filled from the form; mounted fresh each time it opens. */
     initial: AiDraftInputs;
-    creatorPathway: "university" | "private";
+    /** Student pathways keep the student copy; faculty / organization get creator-neutral labels. */
+    creatorPathway: AiDraftCreatorPathway;
     /** Private / Open choice is only offered while the wizard shows it. */
     teamModeChoosable: boolean;
     onClose: (inputs: AiDraftInputs) => void;
@@ -34,6 +36,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
         setError("");
     };
     const privateTeam = inputs.teamMode === "private_team";
+    const forOrg = creatorPathway === "faculty" || creatorPathway === "organization";
     const workload = aiWorkloadHint(inputs);
     /** Close on a real backdrop click only — not when a text selection drag ends outside the card. */
     const pressStartedOnBackdrop = useRef(false);
@@ -92,7 +95,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                     <div>
                         <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#0e7d74]">AI-assisted draft</p>
                         <h2 id="ai-draft-title" className="mt-1 text-lg font-extrabold text-[#0d2b33]">
-                            Tell us what you want to do
+                            {forOrg ? "Describe the opportunity" : "Tell us what you want to do"}
                         </h2>
                         <p className="mt-1 text-[11.5px] leading-relaxed text-[#3c5a5c]">
                             Write naturally — keywords, unfinished sentences or Urdu-English are fine. AI turns your idea into
@@ -214,7 +217,11 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                             <label className="co-label" style={{ marginTop: 0 }} htmlFor="ai-seats">
-                                {privateTeam ? `Team places · 1–${PRIVATE_TEAM_MAX_SEATS} (including you)` : "Total places (including you)"}
+                                {forOrg
+                                    ? "Total student places"
+                                    : privateTeam
+                                      ? `Team places · 1–${PRIVATE_TEAM_MAX_SEATS} (including you)`
+                                      : "Total places (including you)"}
                             </label>
                             <input
                                 id="ai-seats"
@@ -269,7 +276,7 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                     </div>
                     <div>
                         <label className="co-label" style={{ marginTop: 0 }} htmlFor="ai-partner">
-                            Main partner organization (optional)
+                            {forOrg ? "Partner / co-host organization (optional)" : "Main partner organization (optional)"}
                         </label>
                         <input
                             id="ai-partner"
@@ -281,8 +288,9 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                             onChange={(e) => set("mainPartner", e.target.value)}
                         />
                         <p className="mt-1 text-[10px] text-[#7a919a]">
-                            Only the one partner who approves your opportunity. You will still add their contact person and
-                            official email yourself.
+                            {forOrg
+                                ? "Only the name is filled in. Add the partner's contact person and official email in the form yourself."
+                                : "Only the one partner who approves your opportunity. You will still add their contact person and official email yourself."}
                         </p>
                     </div>
                     {workload ? (
@@ -292,8 +300,9 @@ export default function AiDraftModal({ initial, creatorPathway, teamModeChoosabl
                     ) : null}
                     <div className="co-note">
                         <span>
-                            AI drafts text only. Faculty, partner contacts, location pin, safety declarations and your signature
-                            stay with you.
+                            {forOrg
+                                ? "AI drafts text only. Contacts, location pin, who can apply, safety declarations and your signature stay with you."
+                                : "AI drafts text only. Faculty, partner contacts, location pin, safety declarations and your signature stay with you."}
                         </span>
                     </div>
                     {error ? (
