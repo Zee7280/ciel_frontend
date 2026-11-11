@@ -23,6 +23,7 @@ import { SDG_COLORS } from "@/utils/ventureStudioV11";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import { fetchImpactSummary } from "@/utils/cielImpactSummary";
 import { CIEL_PATHS } from "@/utils/cielPaths";
+import { overallCurrentWorkCompletion } from "@/utils/currentWorkCompletion";
 import { rankMovement } from "@/utils/courseProjectTypes";
 import FypFilesButton from "@/components/ciel/FypFilesButton";
 
@@ -774,9 +775,7 @@ export default function FypThesisHub({
                 const active = dashboard?.overview?.activeProjectsCount ?? dashboard?.activeProjects?.length ?? 0;
                 const verifiedHours = Math.round(summary?.verifiedHours ?? dashboard?.overview?.totalVerifiedHours ?? 0);
                 const portfolio = dashboard?.overview?.impactHistoryBadgeCount ?? dashboard?.overview?.completedCount ?? 0;
-                const completion = Math.round(
-                    (CIEL_PATHS.reduce((sum, path) => sum + (summary?.pathsStatus[path.key]?.progress ?? 0), 0) / (CIEL_PATHS.length || 1)) || 0,
-                );
+                const completion = overallCurrentWorkCompletion(summary?.pathsStatus, CIEL_PATHS.map((path) => path.key));
                 setDashHero({
                     active,
                     hours: verifiedHours ? `${verifiedHours}h` : "0h",

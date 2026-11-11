@@ -5,6 +5,7 @@ import { fetchStudentDashboardData, useStudentDashboardCache } from "@/utils/stu
 import { fetchImpactSummary, useImpactSummaryCache, type CielImpactSummary } from "@/utils/cielImpactSummary";
 import type { DashboardData } from "@/app/dashboard/student/types";
 import { CIEL_PATHS } from "@/utils/cielPaths";
+import { overallCurrentWorkCompletion } from "@/utils/currentWorkCompletion";
 import { MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import StudentImpactPortfolioTable from "./StudentImpactPortfolioTable";
 
@@ -29,9 +30,7 @@ export default function ImpactHistoryPage() {
     const activeRecords = viewDashboard?.overview?.activeProjectsCount ?? viewDashboard?.activeProjects?.length ?? 0;
     const verifiedHours = Math.round(viewSummary?.verifiedHours ?? viewDashboard?.overview?.totalVerifiedHours ?? 0);
     const portfolioCount = viewDashboard?.overview?.impactHistoryBadgeCount ?? viewDashboard?.overview?.completedCount ?? 0;
-    const completion = Math.round(
-        (CIEL_PATHS.reduce((sum, path) => sum + (viewSummary?.pathsStatus[path.key]?.progress ?? 0), 0) / (CIEL_PATHS.length || 1)) || 0,
-    );
+    const completion = overallCurrentWorkCompletion(viewSummary?.pathsStatus, CIEL_PATHS.map((path) => path.key));
 
     return (
         <div className="mx-auto max-w-[1500px]">
