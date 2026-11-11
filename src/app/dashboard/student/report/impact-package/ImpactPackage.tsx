@@ -370,32 +370,6 @@ export default function ImpactPackage({
         }, 30);
     };
 
-    const exportPublicHtml = () => {
-        const article = document.getElementById("flashcard-capture");
-        if (!article) return;
-        const css = [...document.styleSheets]
-            .map((sheet) => {
-                try {
-                    return [...sheet.cssRules].map((rule) => rule.cssText).join("\n");
-                } catch {
-                    return "";
-                }
-            })
-            .join("\n");
-        const scoped = css
-            .split("}")
-            .filter((chunk) => /(?:^|[,\s])(?:\.ipkg|\.flash|html|body|:root)/.test(chunk))
-            .join("}");
-        const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${model.title} · CIEL PK Impact Package</title><style>${scoped || ""}body{margin:0;background:#f0efe8}.ipkg{padding:24px 0 40px}</style></head><body class="ipkg"><main>${article.outerHTML}</main></body></html>`;
-        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${model.title.replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "ciel-pk"}-impact-package.html`;
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
     const filteredFiles = model.files.filter((file) => {
         const q = evQuery.trim().toLowerCase();
         const kindOk = evKind === "all" || file.kind === evKind || (evKind === "file" && file.kind !== "image" && file.kind !== "video" && file.kind !== "audio" && file.kind !== "archive");
@@ -510,16 +484,6 @@ export default function ImpactPackage({
                     >
                         <span className="button-content">
                             <Icon name="print" /> Print / Save PDF
-                        </span>
-                    </button>
-                    <button
-                        type="button"
-                        disabled={studentExportsLocked}
-                        title={studentExportsLocked ? "Available after CIEL PK Super Admin approval" : undefined}
-                        onClick={exportPublicHtml}
-                    >
-                        <span className="button-content">
-                            <Icon name="download" /> Export public HTML
                         </span>
                     </button>
                     {analyserHref ? (

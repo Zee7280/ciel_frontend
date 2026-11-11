@@ -1312,10 +1312,6 @@ function ReportFormContent() {
                                         After you submit, this flashcard is the locked package. Score, badge, QR and downloads unlock when CIEL PK Super Admin approves.
                                     </p>
                                 </div>
-                            ) : postSubmitAwaitingReview ? (
-                                <p className="mt-4 rounded-xl border border-[#d9dfd4] bg-[#fffef9] px-4 py-3 text-sm text-[#61716c]">
-                                    Report submitted. CIEL PK is reviewing this flashcard. Score and downloads unlock after Super Admin approval.
-                                </p>
                             ) : null}
                         </>
                     )}
