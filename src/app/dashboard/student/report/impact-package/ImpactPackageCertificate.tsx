@@ -208,15 +208,13 @@ export default function ImpactPackageCertificate({
     }, [section1?.metrics?.total_verified_hours, section1?.team_lead?.hours, section1?.team_members, engagementRecalc.total_verified_hours]);
 
     /**
-     * Verified Hours tile: same basis as the package Overview, report header and lists — stored
-     * total first, then every logged session that faculty has not rejected.
+     * Verified Hours tile: every logged session that faculty has not rejected (the package
+     * Overview, report lists and dashboards use the same count). A stored approved-only recount
+     * can be lower when sessions were never approved one by one, so the larger of the two is shown.
      */
     const verifiedHours = useMemo(() => {
-        const stored = Number(section1?.metrics?.total_verified_hours);
-        if (Number.isFinite(stored) && stored > 0) return ciiVerifiedHours;
         const logs = Array.isArray(section1?.attendance_logs) ? section1.attendance_logs : [];
-        const logged = sumNonRejectedLoggedHours(logs);
-        return logged > 0 ? Math.round(logged) : ciiVerifiedHours;
+        return Math.max(ciiVerifiedHours, Math.round(sumNonRejectedLoggedHours(logs)));
     }, [section1, ciiVerifiedHours]);
 
     const engagementSpanDays = useMemo(() => {

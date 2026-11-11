@@ -371,8 +371,9 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     }, [showCertificate]);
 
     const beneficiaries = String(distinctBeneficiaryTotal(section4) || 0);
-    const verifiedHours = section1.metrics?.total_verified_hours || 0;
     const loggedHours = sumNonRejectedLoggedHours(section1.attendance_logs || []);
+    /** Same count as the certificate: the stored approved-only recount can be lower than the non-rejected logged hours. */
+    const verifiedHours = Number(Math.max(Number(section1.metrics?.total_verified_hours) || 0, loggedHours).toFixed(1));
     const incompleteSectionNums = useMemo(
         () => new Set(incompleteSectionsSummary.map((block) => block.section)),
         [incompleteSectionsSummary],
