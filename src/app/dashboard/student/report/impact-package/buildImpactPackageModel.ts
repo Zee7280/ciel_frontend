@@ -352,9 +352,10 @@ export function buildImpactPackageModel(
     const title = pickString(opportunity.title, project.title, data.project_title) || "Community engagement";
     const sdgs = mergeReportSdgSnapshotRows({ ...opportunity, ...data }, data.section3);
     const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
+    // Same count as the certificate: the stored metric is an approved-only recount and can be lower
+    // than the non-rejected hours the team logged, so the larger of the two is shown.
     const hours =
-        pickNumber(data.section1?.metrics?.total_verified_hours) ||
-        sumNonRejectedLoggedHours(logs) ||
+        Math.max(pickNumber(data.section1?.metrics?.total_verified_hours) || 0, sumNonRejectedLoggedHours(logs)) ||
         memberHours(data).reduce((sum, row) => sum + row.hours, 0);
     const acts = (Array.isArray(data.section4?.activity_blocks) ? data.section4.activity_blocks : []).filter((block) =>
         pickString(block.title, block.primary_category),

@@ -247,3 +247,16 @@ test("flashcard shows photo/data consent, outcome confidence, in-kind resources 
     assert.equal(resources?.hasContent, true);
     assert.ok(chips(9).includes("Follow-up planned · 2027-02-01"));
 });
+
+test("flashcard team-hours: an approved-only stored metric lower than the logged hours does not win", () => {
+    const logs = Array.from({ length: 20 }, (_, i) => ({ id: `l${i}`, date: "2026-10-16", hours: 4, approval_status: i < 12 ? "approved" : "pending" }));
+    const tile = (stored: number) =>
+        buildImpactPackageModel({
+            project_id: "p1",
+            required_hours: 16,
+            section1: { participation_type: "individual", attendance_logs: logs, metrics: { total_verified_hours: stored } },
+        } as never).metrics.find((m) => m.label === "team-hours logged")?.value;
+    assert.match(String(tile(48)), /^80\b/, "48 approved-only vs 80 logged → 80");
+    assert.match(String(tile(96)), /^96\b/, "a higher stored count is kept");
+    assert.match(String(tile(0)), /^80\b/);
+});

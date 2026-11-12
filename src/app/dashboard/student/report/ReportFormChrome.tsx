@@ -133,8 +133,9 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
               0,
           )
         : 0;
-    const hours =
-        metricHours > 0 ? metricHours : logHours > 0 ? logHours : individualHours > 0 ? individualHours : rosterHours;
+    // Stored metric is an approved-only recount; the non-rejected logged hours can be higher (same rule as the certificate).
+    const loggedOrMetric = Math.max(metricHours, logHours);
+    const hours = loggedOrMetric > 0 ? loggedOrMetric : individualHours > 0 ? individualHours : rosterHours;
     const members =
         (data.section1?.participation_type === "team"
             ? 1 + (Array.isArray(data.section1.team_members) ? data.section1.team_members.length : 0)
