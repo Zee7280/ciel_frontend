@@ -5,7 +5,7 @@ import { BarChart3, Calendar, Clock, Globe, Lock, Target, Users } from "lucide-r
 import "./certificate-print.css";
 import CertificateScaleShell from "./CertificateScaleShell";
 import { calculateCII } from "../utils/calculateCII";
-import { calculateEngagementMetrics, buildIndividualRosterFromSection1, sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1, displayReportHours } from "../utils/engagementMetrics";
 import { composeProgramLine, participantStudyPeriod } from "@/utils/studyPeriod";
 import {
     deriveCertificateProjectDisplay,
@@ -204,7 +204,7 @@ export default function CertificateView({ projectData }: { projectData?: unknown
      */
     const verifiedHours = useMemo(() => {
         const logs = Array.isArray(section1?.attendance_logs) ? section1.attendance_logs : [];
-        return Math.max(ciiVerifiedHours, Math.round(sumNonRejectedLoggedHours(logs)));
+        return Math.max(ciiVerifiedHours, Math.round(displayReportHours(section1?.metrics?.total_verified_hours, logs)));
     }, [section1, ciiVerifiedHours]);
 
     const engagementSpanDays = useMemo(() => {

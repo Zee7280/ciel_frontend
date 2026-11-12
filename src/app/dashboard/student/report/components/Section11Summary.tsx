@@ -21,7 +21,7 @@ import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
 import { distinctBeneficiaryTotal } from "../utils/activityReach";
 import { buildSection11DashboardView } from "@/lib/section11DashboardNarrative";
-import { sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
+import { displayReportHours, sumNonRejectedLoggedHours } from "../utils/engagementMetrics";
 import { reportRequiresReportingFee, communityReportReviewerName, isStudentReportAwaitingReview } from "@/utils/reviewQueue";
 
 type Section11SummaryProps = {
@@ -373,7 +373,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const beneficiaries = String(distinctBeneficiaryTotal(section4) || 0);
     const loggedHours = sumNonRejectedLoggedHours(section1.attendance_logs || []);
     /** Same count as the certificate: the stored approved-only recount can be lower than the non-rejected logged hours. */
-    const verifiedHours = Number(Math.max(Number(section1.metrics?.total_verified_hours) || 0, loggedHours).toFixed(1));
+    const verifiedHours = Number(displayReportHours(section1.metrics?.total_verified_hours, section1.attendance_logs).toFixed(1));
     const incompleteSectionNums = useMemo(
         () => new Set(incompleteSectionsSummary.map((block) => block.section)),
         [incompleteSectionsSummary],

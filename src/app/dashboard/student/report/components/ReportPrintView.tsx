@@ -8,6 +8,8 @@ import {
     buildIndividualRosterFromSection1,
     calculateEngagementMetrics,
     formatHecComplianceLabel,
+    displayReportHours,
+    displayReportSessionCount,
 } from "../utils/engagementMetrics";
 import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
@@ -459,10 +461,11 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
         rosterIds,
     );
 
-    const storedVerified = Number(data.section1?.metrics?.total_verified_hours);
+    // Same hours as the flashcard and certificate (larger of the stored count and the logged hours).
+    const shownHours = displayReportHours(data.section1?.metrics?.total_verified_hours, data.section1?.attendance_logs);
     const verifiedHours =
-        Number.isFinite(storedVerified) && storedVerified > 0
-            ? Math.round(storedVerified)
+        shownHours > 0
+            ? Math.round(shownHours)
             : engagementRecalc.total_verified_hours > 0
               ? Math.round(engagementRecalc.total_verified_hours)
               : Math.round(
@@ -669,7 +672,10 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
         : engagementRecalc.individual_metrics;
 
     const engagementForPrintDossier = {
-        verified_session_count: metricsMerged?.verified_session_count ?? engagementRecalc.verified_session_count,
+        verified_session_count: Math.max(
+            displayReportSessionCount(metricsMerged?.verified_session_count, data.section1?.attendance_logs),
+            engagementRecalc.verified_session_count,
+        ),
         total_active_days: metricsMerged?.total_active_days ?? engagementRecalc.total_active_days,
         engagement_span: metricsMerged?.engagement_span ?? engagementSpanForPrint,
         attendance_frequency: metricsMerged?.attendance_frequency ?? engagementRecalc.attendance_frequency,

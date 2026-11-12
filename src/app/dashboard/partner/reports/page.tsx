@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import Link from "next/link";
 import ReportForm from "@/components/partners/ReportForm";
+import { displayReportHours } from "@/app/dashboard/student/report/utils/engagementMetrics";
 
 /** List row: NGO impact form (ReportForm) and/or student impact reports returned by the same endpoint. */
 interface Report {
@@ -113,12 +114,11 @@ function getBeneficiaries(r: Report): number {
 }
 
 function getHoursLogged(r: Report): number {
-    return pickNumber(
-        r.hoursLogged,
-        r.hours_logged,
-        r.total_hours,
-        r.verified_hours,
-        r.section1?.metrics?.total_verified_hours
+    // Same hours as the flashcard and certificate: never below the non-rejected logged hours.
+    const logs = (r.section1 as { attendance_logs?: Parameters<typeof displayReportHours>[1] } | null | undefined)?.attendance_logs;
+    return Math.max(
+        pickNumber(r.hoursLogged, r.hours_logged, r.total_hours, r.verified_hours) || 0,
+        displayReportHours(r.section1?.metrics?.total_verified_hours, logs),
     );
 }
 

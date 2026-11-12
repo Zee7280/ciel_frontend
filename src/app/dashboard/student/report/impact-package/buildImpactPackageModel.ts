@@ -7,6 +7,7 @@ import {
     buildIndividualRosterFromSection1,
     calculateEngagementMetrics,
     sumNonRejectedLoggedHours,
+    displayReportHours,
 } from "../utils/engagementMetrics";
 import {
     MEDIA_VISIBILITY_LABELS,
@@ -355,7 +356,7 @@ export function buildImpactPackageModel(
     // Same count as the certificate: the stored metric is an approved-only recount and can be lower
     // than the non-rejected hours the team logged, so the larger of the two is shown.
     const hours =
-        Math.max(pickNumber(data.section1?.metrics?.total_verified_hours) || 0, sumNonRejectedLoggedHours(logs)) ||
+        displayReportHours(data.section1?.metrics?.total_verified_hours, logs) ||
         memberHours(data).reduce((sum, row) => sum + row.hours, 0);
     const acts = (Array.isArray(data.section4?.activity_blocks) ? data.section4.activity_blocks : []).filter((block) =>
         pickString(block.title, block.primary_category),

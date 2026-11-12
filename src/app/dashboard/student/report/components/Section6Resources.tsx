@@ -5,7 +5,7 @@ import {
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
-import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1, displayReportHours } from "../utils/engagementMetrics";
 import { FieldError } from "./ui/FieldError";
 import React, { useMemo, useEffect, useState } from "react";
 import clsx from "clsx";
@@ -354,7 +354,8 @@ export default function Section6Resources({ projectData: _projectData }: { proje
             const req = data.required_hours || 16;
             const rosterIds = buildIndividualRosterFromSection1(section1, section1.team_lead?.id);
             const calc = calculateEngagementMetrics(logs, req, teamSize, undefined, rosterIds);
-            return Number(calc.total_verified_hours.toFixed(1));
+            // Same hours as the flashcard and certificate (larger of the stored count and the logged hours).
+            return Number(Math.max(calc.total_verified_hours, displayReportHours(section1.metrics?.total_verified_hours, logs)).toFixed(1));
         }
         const stored = Number(section1.metrics?.total_verified_hours);
         return Number.isFinite(stored) ? Number(stored.toFixed(1)) : 0;

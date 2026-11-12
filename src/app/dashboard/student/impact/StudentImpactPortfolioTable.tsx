@@ -251,7 +251,7 @@ export default function StudentImpactPortfolioTable() {
                 const extraBadge = Array.isArray(r.awardBadges)
                     ? (r.awardBadges as CommunityAwardBadge[])[0]
                     : undefined;
-                const hours = Number(r.section1?.metrics?.total_verified_hours || r.hours || 0);
+                const hours = Math.max(Number(r.section1?.metrics?.total_verified_hours) || 0, Number(r.hours) || 0);
                 const year = yearOf(r.created_at);
                 const sdgs = sdgNumbers(r.sdgs);
                 const partner = displayOrganizationName(r.organization_name);

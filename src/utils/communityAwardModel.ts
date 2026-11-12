@@ -256,8 +256,9 @@ export function mapCommunityPipelineRow(item: Record<string, unknown>): Communit
     const student = item.student && typeof item.student === "object" ? (item.student as Record<string, unknown>) : {};
     const opportunity =
         item.opportunity && typeof item.opportunity === "object" ? (item.opportunity as Record<string, unknown>) : {};
+    // The server's `hours` already follows the shown-hours rule; a stored metric never lowers it.
     const hoursRaw = metrics.total_verified_hours ?? metrics.total_hours ?? item.hours;
-    const hours = typeof hoursRaw === "number" ? hoursRaw : Number(hoursRaw || 0);
+    const hours = Math.max(Number(item.hours) || 0, typeof hoursRaw === "number" ? hoursRaw : Number(hoursRaw || 0));
     return {
         id,
         student_name: pickStr(item, "student_name", "studentName") || pickStr(student, "name") || "Student",

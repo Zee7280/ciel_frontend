@@ -244,6 +244,24 @@ export function sumNonRejectedLoggedHours(logs: AttendanceLog[]): number {
         .reduce((acc, log) => acc + effectiveHoursFromLog(log), 0);
 }
 
+/**
+ * Hours every screen shows for a report (flashcard, certificate, wall, dossiers, verify pages, lists).
+ * The stored `metrics.total_verified_hours` is an approved-only recount and can be lower than the
+ * non-rejected hours the students logged, so the larger of the two is shown. CII inputs keep their
+ * own count. Backend twin: `resolveReportDisplayHours` (community-award.util.ts).
+ */
+export function displayReportHours(storedHours: unknown, logs: AttendanceLog[] | null | undefined): number {
+    const stored = Number(storedHours);
+    return Math.max(Number.isFinite(stored) && stored > 0 ? stored : 0, sumNonRejectedLoggedHours(Array.isArray(logs) ? logs : []));
+}
+
+/** Session count that goes with {@link displayReportHours}: never below the non-rejected sessions logged. */
+export function displayReportSessionCount(storedCount: unknown, logs: AttendanceLog[] | null | undefined): number {
+    const stored = Number(storedCount);
+    const logged = (Array.isArray(logs) ? logs : []).filter(isLogCountedBeforeFacultyReview).length;
+    return Math.max(Number.isFinite(stored) && stored > 0 ? stored : 0, logged);
+}
+
 export function calculateEngagementMetrics(
     logs: AttendanceLog[], 
     requiredHours: number = 16, 

@@ -3,6 +3,8 @@ import {
     buildIndividualRosterFromSection1,
     calculateEngagementMetrics,
     type IndividualMetric,
+    displayReportHours,
+    displayReportSessionCount,
 } from "@/app/dashboard/student/report/utils/engagementMetrics";
 import { buildParticipationProgramLine } from "@/utils/reportTeamScope";
 import { formatPakistaniCnicDisplay } from "@/utils/section1ParticipantDossierFields";
@@ -216,10 +218,11 @@ export function buildSection1ParticipationDisplay(args: {
     );
 
     const mBase = section1?.metrics;
-    const storedVerified = Number(mBase?.total_verified_hours);
+    // Same hours as the flashcard and certificate (larger of the stored count and the logged hours).
+    const shownHours = displayReportHours(mBase?.total_verified_hours, section1?.attendance_logs);
     const verifiedHours =
-        Number.isFinite(storedVerified) && storedVerified > 0
-            ? Math.round(storedVerified)
+        shownHours > 0
+            ? Math.round(shownHours)
             : engagementRecalc.total_verified_hours > 0
               ? Math.round(engagementRecalc.total_verified_hours)
               : Math.round(
@@ -262,10 +265,11 @@ export function buildSection1ParticipationDisplay(args: {
         s1loose.attendanceVerificationStatus,
     );
 
-    const sessionCountForAttendance =
-        mBase?.verified_session_count && mBase.verified_session_count > 0
-            ? mBase.verified_session_count
-            : engagementRecalc.verified_session_count;
+    // Same sessions the shown hours come from (stored count or non-rejected logs, whichever is larger).
+    const sessionCountForAttendance = Math.max(
+        displayReportSessionCount(mBase?.verified_session_count, section1?.attendance_logs),
+        engagementRecalc.verified_session_count,
+    );
 
     const attendanceVerificationStatus =
         friendlyAttendanceVerificationStatus(dossierAttendanceStatusRaw) ||

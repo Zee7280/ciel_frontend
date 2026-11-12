@@ -75,7 +75,7 @@ export default function FacultyImpactWallPage() {
                         organization_name: typeof item.organization_name === "string" ? item.organization_name : undefined,
                         faculty_status: typeof item.faculty_status === "string" ? item.faculty_status : undefined,
                         status: typeof item.status === "string" ? item.status : undefined,
-                        hours: Number((item.metrics as { total_verified_hours?: number } | undefined)?.total_verified_hours || item.hours || 0),
+                        hours: Math.max(Number((item.metrics as { total_verified_hours?: number } | undefined)?.total_verified_hours) || 0, Number(item.hours) || 0),
                     }))
                     .filter((r: { id: string }) => r.id);
                 const live = reportRows.filter((r: { faculty_status?: string; status?: string }) => isFacultyCommunityLiveCard(r));

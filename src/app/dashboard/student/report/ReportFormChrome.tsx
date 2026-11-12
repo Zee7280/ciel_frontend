@@ -7,7 +7,7 @@ import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, tabIsComplete, wizardStepToDataSections } from "./utils/reportWizardNav";
 import { JOURNEY_STOPS } from "./utils/impactJourney";
-import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
+import { displayReportHours, effectiveHoursFromLog, isLogCountedBeforeFacultyReview, sumNonRejectedLoggedHours } from "./utils/engagementMetrics";
 import { distinctBeneficiaryTotal } from "./utils/activityReach";
 import ImpactPackage from "./impact-package/ImpactPackage";
 import { reportRequiresReportingFee, communityReportReviewerName, communityReportSendCta, isStudentReportAwaitingReview } from "@/utils/reviewQueue";
@@ -121,7 +121,6 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
     const sdgs = mergeReportSdgSnapshotRows({ ...asRecord(projectData), ...data }, data.section3);
     const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
     const metricHours = pickNumber(data.section1?.metrics?.total_verified_hours) || 0;
-    const logHours = sumNonRejectedLoggedHours(logs);
     const rosterHours =
         (pickNumber(data.section1?.team_lead?.hours) || 0) +
         (Array.isArray(data.section1?.team_members)
@@ -134,7 +133,7 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
           )
         : 0;
     // Stored metric is an approved-only recount; the non-rejected logged hours can be higher (same rule as the certificate).
-    const loggedOrMetric = Math.max(metricHours, logHours);
+    const loggedOrMetric = displayReportHours(metricHours, logs);
     const hours = loggedOrMetric > 0 ? loggedOrMetric : individualHours > 0 ? individualHours : rosterHours;
     const members =
         (data.section1?.participation_type === "team"

@@ -47,6 +47,7 @@ import AdminReviewPackageStrip from "@/app/dashboard/admin/reports/verify/AdminR
 import ReportEvidenceGallery, {
     classifyEvidenceGalleryKind,
 } from "@/components/ciel/community-service/ReportEvidenceGallery";
+import { displayReportHours } from "@/app/dashboard/student/report/utils/engagementMetrics";
 
 /** Partner / university review uses Impact Package. Flip to true to restore sections 1–9 + print dossier. */
 const SHOW_PARTNER_LEGACY_DOSSIER = false;
@@ -780,7 +781,7 @@ function ReportDetailPage() {
                                     <div className="mt-4">
                                         <h3 className="font-bold text-slate-800 text-sm mb-3 border-b pb-1 uppercase tracking-widest text-slate-400">Engagement Metrics</h3>
                                         <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                            <LabelValue label="Total Verified Hours" value={report.section1.metrics.total_verified_hours} />
+                                            <LabelValue label="Total Verified Hours" value={displayReportHours(report.section1.metrics.total_verified_hours, report.section1.attendance_logs)} />
                                             <LabelValue label="Verified Session Count" value={report.section1.metrics.verified_session_count} />
                                             <LabelValue label="Total Active Days" value={report.section1.metrics.total_active_days} />
                                             <LabelValue label="Engagement Span" value={report.section1.metrics.engagement_span} />

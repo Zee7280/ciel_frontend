@@ -87,6 +87,7 @@ import ReportEvidenceGallery, {
     classifyEvidenceGalleryKind,
     type ReportEvidenceGalleryItem,
 } from "@/components/ciel/community-service/ReportEvidenceGallery";
+import { displayReportHours } from "@/app/dashboard/student/report/utils/engagementMetrics";
 
 /** Super Admin review uses Impact Package. Flip to true to restore sections 1–9 + print dossier. */
 const SHOW_ADMIN_LEGACY_DOSSIER = false;
@@ -1561,7 +1562,7 @@ function AdminReportDetailPage() {
                                             Engagement metrics
                                         </h3>
                                         <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                            <LabelValue label="Total verified hours" value={report.section1.metrics.total_verified_hours} />
+                                            <LabelValue label="Total verified hours" value={displayReportHours(report.section1.metrics.total_verified_hours, report.section1.attendance_logs)} />
                                             <LabelValue label="Verified session count" value={report.section1.metrics.verified_session_count} />
                                             <LabelValue label="Total active days" value={report.section1.metrics.total_active_days} />
                                             <LabelValue label="Engagement span" value={report.section1.metrics.engagement_span} />

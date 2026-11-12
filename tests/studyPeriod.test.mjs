@@ -44,13 +44,13 @@ test("certificates, dossiers and the detailed report use the semester; hours til
         // The student report context rewrites metrics.total_verified_hours with the approved-only
         // recount (48 for a team whose 80 logged hours were never approved one by one), so the
         // tile must not stop at a stored value.
-        assert.match(src, /Math\.max\(ciiVerifiedHours, Math\.round\(sumNonRejectedLoggedHours\(logs\)\)\)/, file);
+        assert.match(src, /Math\.max\(ciiVerifiedHours, Math\.round\(displayReportHours\(section1\?\.metrics\?\.total_verified_hours, logs\)\)\)/, file);
         assert.doesNotMatch(src, /stored > 0\) return ciiVerifiedHours/, `${file}: stored-first shortcut removed`);
         assert.match(src, /total_verified_hours: ciiVerifiedHours/, `${file}: CII input unchanged`);
     }
     assert.match(
         read("src/app/dashboard/student/report/components/Section11Summary.tsx"),
-        /const verifiedHours = Number\(Math\.max\(Number\(section1\.metrics\?\.total_verified_hours\) \|\| 0, loggedHours\)\.toFixed\(1\)\);/,
+        /const verifiedHours = Number\(displayReportHours\(section1\.metrics\?\.total_verified_hours, section1\.attendance_logs\)\.toFixed\(1\)\);/,
         "report summary tiles match the certificate",
     );
     assert.match(read("src/utils/reportTeamScope.ts"), /composeProgramLine\(base, participantStudyPeriod\(row\)\)/);
