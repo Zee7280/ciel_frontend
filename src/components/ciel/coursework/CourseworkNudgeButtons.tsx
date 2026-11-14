@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Mail, MessageCircle } from "lucide-react";
 import clsx from "clsx";
-import { mailtoHref, whatsappOpenHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { mailtoHref, openWhatsApp as openWhatsAppForDevice, whatsappShareHref } from "@/utils/reminderLinks";
 
 async function copyText(text: string): Promise<boolean> {
     try {
@@ -30,8 +30,8 @@ async function copyText(text: string): Promise<boolean> {
  * The Email + WhatsApp (+ Copy) pair every coursework screen uses to reach a student. Email is a
  * plain `mailto:` (the global bridge offers Gmail/Outlook when no mail app answers). WhatsApp opens
  * the student's own chat when their number is on file, otherwise WhatsApp with the message ready so
- * the teacher picks the contact; the click goes through `whatsappOpenHref`, which is what works on
- * this device (WhatsApp Web on a desktop, the app on a phone). Nothing is sent by CIEL PK.
+ * the teacher picks the contact; the click goes through `openWhatsApp`, which is what works on
+ * this device (the WhatsApp app, else WhatsApp Web on a desktop). Nothing is sent by CIEL PK.
  */
 export function CourseworkNudgeButtons({
     email,
@@ -70,9 +70,7 @@ export function CourseworkNudgeButtons({
     const openWhatsApp = (e: React.MouseEvent<HTMLAnchorElement>) => {
         e.preventDefault();
         e.stopPropagation();
-        const href = whatsappOpenHref(text, digits);
-        const opened = window.open(href, "_blank", "noopener,noreferrer");
-        if (!opened) window.location.href = href;
+        openWhatsAppForDevice(text, digits);
     };
 
     return (

@@ -2,7 +2,7 @@
 
 import { Loader2, Mail, MessageCircle, Trash2 } from "lucide-react";
 import { courseworkStatusLabel, type CourseworkStatusTone } from "@/utils/courseworkSectionReview";
-import { mailtoHref, whatsappOpenHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { mailtoHref, openWhatsApp, whatsappShareHref } from "@/utils/reminderLinks";
 
 /** The minimal shape a "Live Monitor" / "Command Monitor" row needs — deliberately loose so any
  * coursework list row (MeritEntry, AdminCourseProjectRow, …) can be passed straight through. */
@@ -127,9 +127,7 @@ export function CourseworkMonitorRow({
                             onClick={(e) => {
                                 // Open the form that works on this device (WhatsApp Web on a desktop, the app on a phone).
                                 e.preventDefault();
-                                const href = whatsappOpenHref(`${contact.subject}\n\n${contact.body}`, contact.whatsappDigits || "");
-                                const opened = window.open(href, "_blank", "noopener,noreferrer");
-                                if (!opened) window.location.href = href;
+                                openWhatsApp(`${contact.subject}\n\n${contact.body}`, contact.whatsappDigits || "");
                             }}
                             title={contact.whatsappDigits ? `WhatsApp ${contact.name}` : `WhatsApp ${contact.name} (pick the contact)`}
                             className="rounded-full border border-[#dde5ea] bg-white p-1.5 text-[#1d765d] hover:border-[#1d765d]"

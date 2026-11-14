@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Copy, MessageCircle } from "lucide-react";
-import { whatsappDigits, whatsappOpenHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { openWhatsApp, whatsappDigits, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     APPROVAL_SHOWCASE_WHATSAPP_TEXT,
     approvalWhatsappRecipients,
@@ -10,9 +10,7 @@ import {
 
 /** Opens the participant's WhatsApp chat (or the contact picker) with the approval message prefilled. */
 export function openApprovalWhatsApp(phone: string): void {
-    const href = whatsappOpenHref(APPROVAL_SHOWCASE_WHATSAPP_TEXT, whatsappDigits(phone));
-    const opened = window.open(href, "_blank", "noopener,noreferrer");
-    if (!opened) window.location.href = href;
+    openWhatsApp(APPROVAL_SHOWCASE_WHATSAPP_TEXT, whatsappDigits(phone));
 }
 
 /**

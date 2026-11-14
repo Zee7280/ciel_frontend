@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
-import { mailtoHref, whatsappDigits, whatsappHrefForPhone, whatsappOpenHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { mailtoHref, openWhatsApp, whatsappDigits, whatsappHrefForPhone, whatsappShareHref } from "@/utils/reminderLinks";
 import type { ReminderMessage } from "@/utils/quickWorkReminders";
 import {
     activityLabel,
@@ -112,7 +112,7 @@ export function QuickWorkReminder({
                 rel="noreferrer"
                 onClick={(e) => {
                     e.preventDefault();
-                    window.open(whatsappOpenHref(text, whatsappDigits(phone)), "_blank", "noopener,noreferrer");
+                    openWhatsApp(text, whatsappDigits(phone));
                 }}
                 title={direct ? undefined : "No WhatsApp number on file: WhatsApp opens with the message so you can pick the contact"}
                 className="rounded-md bg-[#e8f8ee] px-2 py-1 text-[11px] font-bold text-[#1f7a46] hover:bg-[#d6f1e0]"

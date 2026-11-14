@@ -68,3 +68,31 @@ test("report-card Email / WhatsApp chips are prefilled links for every notify no
     assert.match(ws, /mailtoHref\("", subject, body\)/);
     assert.match(ws, /whatsappHrefFromE164\(CIEL_PK_ADMIN_WHATSAPP/);
 });
+
+test("desktop opens the WhatsApp app first; no click ever opens a tab AND moves the current page", async () => {
+    const { whatsappAppHref, parseWhatsAppHref } = await import("../src/utils/reminderLinks.ts");
+    const enc = encodeURIComponent("Hi Ali, about \"Campus garden\"");
+    assert.equal(whatsappAppHref('Hi Ali, about "Campus garden"', "923001234567"), `whatsapp://send?phone=923001234567&text=${enc}`);
+    assert.equal(whatsappAppHref("Hi", ""), "whatsapp://send?text=Hi");
+    assert.deepEqual(parseWhatsAppHref(`https://wa.me/923001234567?text=${enc}`), { digits: "923001234567", text: 'Hi Ali, about "Campus garden"' });
+    assert.equal(parseWhatsAppHref("https://www.cielpk.com"), null);
+
+    const lib = read("src/utils/reminderLinks.ts");
+    // noopener makes window.open return null even on success; the helper cuts the opener by hand.
+    assert.match(lib, /const opened = window\.open\(url, "_blank"\);/);
+    assert.match(lib, /opened\.opener = null;/);
+    assert.match(lib, /window\.location\.href = whatsappAppHref\(text, digits\);/);
+    assert.match(lib, /if \(handedOff\) return;/);
+
+    const bridge = read("src/components/WhatsAppLinkBridge.tsx");
+    assert.match(bridge, /openWhatsApp\(parts\.text, parts\.digits\);/);
+    assert.doesNotMatch(bridge, /noopener/);
+    for (const f of [
+        "src/app/dashboard/admin/reports/verify/ApprovalWhatsAppPanel.tsx",
+        "src/components/ciel/coursework/CourseworkMonitorRow.tsx",
+        "src/components/ciel/coursework/CourseworkNudgeButtons.tsx",
+        "src/components/ciel/community-service/quick-work/QuickWorkShared.tsx",
+    ]) {
+        assert.doesNotMatch(read(f), /window\.open\([^)]*noopener/, f);
+    }
+});

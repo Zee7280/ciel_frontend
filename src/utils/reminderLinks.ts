@@ -35,13 +35,8 @@ export function whatsappOpenHref(text: string, digits = "", nav?: NavigatorLike 
     return digits ? `https://web.whatsapp.com/send?phone=${digits}&text=${encoded}` : `https://web.whatsapp.com/send?text=${encoded}`;
 }
 
-/**
- * Rewrites any WhatsApp link (`wa.me/…`, `api.whatsapp.com/send…`, `web.whatsapp.com/send…`) to the
- * form that works on THIS device — see `whatsappOpenHref`. Returns null for a non-WhatsApp link, and the
- * same string when nothing needs to change. Pure, so the page can keep its static `href` (no hydration
- * mismatch) and only swap at click time.
- */
-export function rewriteWhatsAppHrefForDevice(href: string, nav?: NavigatorLike | null): string | null {
+/** Phone number (digits) and prefilled text of a WhatsApp link; null for a non-WhatsApp link. */
+export function parseWhatsAppHref(href: string): { digits: string; text: string } | null {
     let url: URL;
     try {
         url = new URL(href);
@@ -53,8 +48,76 @@ export function rewriteWhatsAppHrefForDevice(href: string, nav?: NavigatorLike |
     const text = url.searchParams.get("text") ?? "";
     let digits = (url.searchParams.get("phone") ?? "").replace(/\D/g, "");
     if (!digits && host.endsWith("wa.me")) digits = url.pathname.replace(/\D/g, "");
-    if (!digits && !text) return href; // e.g. the bare support link: nothing to prefill, leave it alone
-    return whatsappOpenHref(text, digits, nav);
+    return { digits, text };
+}
+
+/**
+ * Rewrites any WhatsApp link (`wa.me/…`, `api.whatsapp.com/send…`, `web.whatsapp.com/send…`) to the
+ * form that works on THIS device — see `whatsappOpenHref`. Returns null for a non-WhatsApp link, and the
+ * same string when nothing needs to change. Pure, so the page can keep its static `href` (no hydration
+ * mismatch) and only swap at click time.
+ */
+export function rewriteWhatsAppHrefForDevice(href: string, nav?: NavigatorLike | null): string | null {
+    const parts = parseWhatsAppHref(href);
+    if (!parts) return null;
+    if (!parts.digits && !parts.text) return href; // e.g. the bare support link: nothing to prefill, leave it alone
+    return whatsappOpenHref(parts.text, parts.digits, nav);
+}
+
+/** The installed WhatsApp desktop app's own link (opens the chat, or the contact picker without a number). */
+export function whatsappAppHref(text: string, digits = ""): string {
+    return `whatsapp://send?${digits ? `phone=${digits}&` : ""}text=${encodeURIComponent(text)}`;
+}
+
+/**
+ * Opens a URL in a new tab and reports whether it opened. `window.open(…, "noopener")` returns null
+ * even when the tab DID open, which made callers think a popup blocker fired and also navigate the
+ * current page — so the opener link is cut by hand instead.
+ */
+export function openInNewTab(url: string): boolean {
+    if (typeof window === "undefined") return false;
+    const opened = window.open(url, "_blank");
+    if (!opened) return false;
+    try {
+        opened.opener = null;
+    } catch {
+        /* cross-origin: nothing to cut */
+    }
+    return true;
+}
+
+/** How long the desktop app gets to take focus before WhatsApp Web opens instead. */
+export const WHATSAPP_APP_FALLBACK_MS = 1500;
+
+/**
+ * Opens WhatsApp for this device. A phone opens the WhatsApp app (wa.me). A computer first asks the
+ * installed WhatsApp desktop app (`whatsapp://`); when nothing takes focus in time (no app, or the
+ * browser ignored the link), WhatsApp Web opens in ONE new tab. The current page never navigates away
+ * unless a popup blocker stops that tab.
+ */
+export function openWhatsApp(text: string, digits = ""): void {
+    if (typeof window === "undefined") return;
+    const fallback = whatsappOpenHref(text, digits);
+    if (isMobileBrowser()) {
+        if (!openInNewTab(fallback)) window.location.href = fallback;
+        return;
+    }
+    let handedOff = false;
+    const mark = () => {
+        handedOff = true;
+    };
+    const onVisibility = () => {
+        if (document.visibilityState === "hidden") mark();
+    };
+    window.addEventListener("blur", mark);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.location.href = whatsappAppHref(text, digits);
+    window.setTimeout(() => {
+        window.removeEventListener("blur", mark);
+        document.removeEventListener("visibilitychange", onVisibility);
+        if (handedOff) return;
+        if (!openInNewTab(fallback)) window.location.href = fallback;
+    }, WHATSAPP_APP_FALLBACK_MS);
 }
 
 export type MailtoParts = { to: string; cc: string; bcc: string; subject: string; body: string };

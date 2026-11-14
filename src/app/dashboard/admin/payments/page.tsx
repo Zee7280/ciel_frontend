@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { authenticatedFetch } from '@/utils/api';
+import { openInNewTab } from '@/utils/reminderLinks';
 import { downloadCsv } from "../_shared/csv";
 import { toast } from 'sonner';
 import { Button } from '../../student/report/components/ui/button';
@@ -521,8 +522,7 @@ export default function AdminPaymentsPage() {
         } catch (error) {
             // Cross-origin storage buckets can block the blob fetch; fall back to opening the file.
             console.error("Proof download failed", error);
-            const opened = window.open(proofUrl, '_blank', 'noopener');
-            if (!opened) {
+            if (!openInNewTab(proofUrl)) {
                 toast.error("Couldn't open the proof file — your browser may be blocking the popup. Allow popups for this site and try again.");
             }
         }

@@ -66,9 +66,9 @@ test("every faculty coursework screen renders the nudge pair with the student's 
     const card = read("src/components/ciel/CourseworkCard.tsx");
     assert.match(card, /studentNudge \? \(\s*<CourseworkNudgeButtons/);
     const buttons = read("src/components/ciel/coursework/CourseworkNudgeButtons.tsx");
-    assert.match(buttons, /whatsappOpenHref\(text, digits\)/, "device-aware WhatsApp open");
+    assert.match(buttons, /openWhatsAppForDevice\(text, digits\)/, "device-aware WhatsApp open");
     assert.match(buttons, /"WhatsApp \(pick contact\)"/);
     assert.match(buttons, /mailtoHref\(to, subject, body\)/);
     const monitor = read("src/components/ciel/coursework/CourseworkMonitorRow.tsx");
-    assert.match(monitor, /whatsappOpenHref\(`\$\{contact\.subject\}\\n\\n\$\{contact\.body\}`, contact\.whatsappDigits \|\| ""\)/);
+    assert.match(monitor, /openWhatsApp\(`\$\{contact\.subject\}\\n\\n\$\{contact\.body\}`, contact\.whatsappDigits \|\| ""\)/);
 });
