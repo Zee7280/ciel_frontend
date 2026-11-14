@@ -1139,7 +1139,7 @@ function FacultyCommunityServiceHub() {
                                                     void reviewActions.openOpportunityDetail(row.id, { showActions: false })
                                                 }
                                             >
-                                                History
+                                                View Flashcard
                                             </button>
                                         }
                                     />
