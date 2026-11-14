@@ -8,6 +8,7 @@ import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, EyeOff, FileDown,
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import ConfirmModal from "@/app/dashboard/admin/_shared/ConfirmModal";
+import ApprovalInstructionsField from "@/app/dashboard/admin/_shared/ApprovalInstructionsField";
 import { downloadCsv } from "@/app/dashboard/admin/_shared/csv";
 import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
 import { extractDepartments } from "@/app/dashboard/admin/projects/projectJourney";
@@ -1764,12 +1765,14 @@ export default function AdminProjectsPage() {
           };
     const [workflowAction, setWorkflowAction] = useState<WorkflowAction | null>(null);
     const [workflowBusy, setWorkflowBusy] = useState(false);
+    const [approveInstructions, setApproveInstructions] = useState("");
     const [debugInspector, setDebugInspector] = useState<AdminProjectRow | null>(null);
     const [reportingReopen, setReportingReopen] = useState<{ id: string; title: string; until: string } | null>(null);
     const [reportingBusy, setReportingBusy] = useState(false);
 
     const requestWorkflowAction = (kind: WorkflowAction["kind"], row: AdminProjectRow) => {
         setActiveMenu(null);
+        if (kind === "approve") setApproveInstructions("");
         setWorkflowAction({ kind, id: row.id, title: row.title });
     };
 
@@ -1784,8 +1787,12 @@ export default function AdminProjectsPage() {
             let okMsg = "Updated";
             let failMsg = "Could not update opportunity";
             if (kind === "approve") {
-                res = await authenticatedFetch(`${base}/approve`, { method: "POST" });
-                okMsg = "Opportunity approved";
+                const note = approveInstructions.trim();
+                res = await authenticatedFetch(`${base}/approve`, {
+                    method: "POST",
+                    ...(note ? { body: JSON.stringify({ instructions: note }) } : {}),
+                });
+                okMsg = note ? "Opportunity approved. Instructions sent to the creator." : "Opportunity approved";
                 failMsg = "Could not approve opportunity";
             } else if (kind === "reject" || kind === "revise") {
                 res = await authenticatedFetch(`${base}/${kind}`, {
@@ -2630,6 +2637,15 @@ export default function AdminProjectsPage() {
                     >
                         <p className="break-words font-semibold text-gray-800">&ldquo;{wa.title}&rdquo;</p>
                         <p className="mt-1">{c.text}</p>
+                        {wa.kind === "approve" ? (
+                            <div className="mt-4">
+                                <ApprovalInstructionsField
+                                    value={approveInstructions}
+                                    onChange={setApproveInstructions}
+                                    disabled={workflowBusy}
+                                />
+                            </div>
+                        ) : null}
                         {wa.kind === "delete" ? (
                             <ul className="mt-2 list-disc space-y-0.5 pl-5">
                                 <li>

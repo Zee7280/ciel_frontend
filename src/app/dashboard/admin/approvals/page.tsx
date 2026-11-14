@@ -34,6 +34,7 @@ import { OpportunityWhatsAppLinks } from "@/components/opportunities/Opportunity
 import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import ApprovalInstructionsField from "@/app/dashboard/admin/_shared/ApprovalInstructionsField";
 import AgingChip from "@/components/admin/AgingChip";
 import { useAbortableFetch, isAbortError, readErrorMessage } from "@/components/admin/useAbortableFetch";
 
@@ -537,6 +538,8 @@ export default function AdminApprovalsPage() {
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [opportunityReviewMode, setOpportunityReviewMode] = useState<"revise" | "reject_permanent">("revise");
     const [approveSubmittingKey, setApproveSubmittingKey] = useState<string | null>(null);
+    const [approveTarget, setApproveTarget] = useState<{ id: string; title: string } | null>(null);
+    const [approveInstructions, setApproveInstructions] = useState("");
     const autoOpenedIdRef = useRef<string | null>(null);
     const { begin } = useAbortableFetch();
     const [pendingRows, setPendingRows] = useState<any[]>([]);
@@ -696,12 +699,16 @@ export default function AdminApprovalsPage() {
         setIsDetailModalOpen(true);
     }, [isLoading, opportunities]);
 
-    const handleApprove = async (id: string, type: 'opportunity' | 'user' = 'opportunity') => {
+    const handleApprove = async (
+        id: string,
+        type: 'opportunity' | 'user' = 'opportunity',
+        instructions = "",
+    ): Promise<boolean> => {
         const submittingKey = `${type}:${id}`;
-        if (approveSubmittingKey === submittingKey || bulkRunning) return;
+        if (approveSubmittingKey === submittingKey || bulkRunning) return false;
         if (type === "opportunity") {
             const row = opportunities.find((o) => String(o?.id) === String(id)) as Record<string, unknown> | undefined;
-            if (row && !readAdminCanApprove(row)) return;
+            if (row && !readAdminCanApprove(row)) return false;
         }
         const endpoint = type === 'opportunity'
             ? `/api/v1/admin/opportunities/${id}/approve`
@@ -709,16 +716,25 @@ export default function AdminApprovalsPage() {
 
         setApproveSubmittingKey(submittingKey);
         try {
+            const note = type === "opportunity" ? instructions.trim() : "";
             const res = await authenticatedFetch(endpoint, {
-                method: 'POST'
+                method: 'POST',
+                ...(note ? { body: JSON.stringify({ instructions: note }) } : {}),
             });
             if (res && res.ok) {
-                toast.success(type === "opportunity" ? "Project approved." : "User approved.");
+                toast.success(
+                    type === "opportunity"
+                        ? note
+                            ? "Project approved. Instructions sent to the creator."
+                            : "Project approved."
+                        : "User approved.",
+                );
                 if (type === 'opportunity') {
                     await fetchPendingOpportunities({ withLoading: false });
                 } else {
                     setPendingUsers(prev => prev.filter(c => c.id !== id));
                 }
+                return true;
             } else if (res?.status === 403) {
                 toast.error("Not authorized to perform this approval.");
             } else if (res) {
@@ -729,6 +745,28 @@ export default function AdminApprovalsPage() {
             toast.error("Approval request failed.");
         } finally {
             setApproveSubmittingKey((prev) => (prev === submittingKey ? null : prev));
+        }
+        return false;
+    };
+
+    /** Opportunity approve goes through a short modal so CIEL PK can add instructions for the creator. */
+    const openApproveModal = (row: Record<string, unknown> | null | undefined, id: string) => {
+        if (bulkRunning) return;
+        setApproveInstructions("");
+        setApproveTarget({ id: String(id), title: rowTitle(row) });
+    };
+
+    const closeApproveModal = () => {
+        if (approveTarget && approveSubmittingKey === `opportunity:${approveTarget.id}`) return;
+        setApproveTarget(null);
+    };
+
+    const confirmApproveWithInstructions = async () => {
+        if (!approveTarget) return;
+        const ok = await handleApprove(approveTarget.id, "opportunity", approveInstructions);
+        if (ok) {
+            setApproveTarget(null);
+            setApproveInstructions("");
         }
     };
 
@@ -1589,7 +1627,7 @@ export default function AdminApprovalsPage() {
                                 ) : null}
                                 {showApproveButton ? (
                                 <button
-                                    onClick={() => handleApprove(proj.id, 'opportunity')}
+                                    onClick={() => openApproveModal(proj as Record<string, unknown>, proj.id)}
                                     disabled={
                                         !canAdminApprove || bulkRunning || approveSubmittingKey === `opportunity:${proj.id}`
                                     }
@@ -2074,7 +2112,7 @@ export default function AdminApprovalsPage() {
                                 </button>
                                 <button
                                     onClick={() => {
-                                        handleApprove(selectedOpportunity.id, "opportunity");
+                                        openApproveModal(selectedOpportunity as Record<string, unknown>, selectedOpportunity.id);
                                         setIsDetailModalOpen(false);
                                         setOpportunityDetail(null);
                                     }}
@@ -2108,6 +2146,63 @@ export default function AdminApprovalsPage() {
                         </div>
                     </div>
                 )}
+
+            {/* Approve + optional instructions for the creator */}
+            {approveTarget ? (
+                <div
+                    className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Approve opportunity"
+                >
+                    <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-start gap-3 mb-4">
+                            <div className="min-w-0">
+                                <h2 className="text-xl font-bold text-slate-900">Approve opportunity</h2>
+                                <p className="mt-1 break-words text-sm text-slate-500">
+                                    &ldquo;{approveTarget.title}&rdquo; goes live and the creator is emailed.
+                                </p>
+                            </div>
+                            <button
+                                onClick={closeApproveModal}
+                                disabled={approveSubmittingKey === `opportunity:${approveTarget.id}`}
+                                aria-label="Close"
+                                className="text-slate-400 hover:text-slate-600 p-2 disabled:opacity-50"
+                            >
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <ApprovalInstructionsField
+                            value={approveInstructions}
+                            onChange={setApproveInstructions}
+                            disabled={approveSubmittingKey === `opportunity:${approveTarget.id}`}
+                        />
+
+                        <div className="mt-5 flex justify-end gap-3">
+                            <button
+                                onClick={closeApproveModal}
+                                disabled={approveSubmittingKey === `opportunity:${approveTarget.id}`}
+                                className="px-4 py-2 text-slate-500 font-bold hover:text-slate-700 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => void confirmApproveWithInstructions()}
+                                disabled={bulkRunning || approveSubmittingKey === `opportunity:${approveTarget.id}`}
+                                className="px-4 py-2.5 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                            >
+                                {approveSubmittingKey === `opportunity:${approveTarget.id}` ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <CheckCircle className="w-4 h-4" />
+                                )}
+                                {approveInstructions.trim() ? "Approve & send instructions" : "Approve"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {/* Reject Reason Modal */}
             {

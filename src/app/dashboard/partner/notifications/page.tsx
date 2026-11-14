@@ -171,7 +171,7 @@ export default function PartnerNotificationsPage() {
                                             {new Date(notification.createdAt).toLocaleDateString()}
                                         </span>
                                     </div>
-                                    <p className="text-slate-600 text-sm mb-3">{notification.message}</p>
+                                    <p className="text-slate-600 text-sm mb-3 whitespace-pre-line">{notification.message}</p>
                                     <div className="flex gap-2">
                                         {!notification.isRead && (
                                             <button

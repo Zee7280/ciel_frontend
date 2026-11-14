@@ -275,7 +275,7 @@ export default function StudentNotificationsPage() {
                                                     {formatDate(notification.createdAt)}
                                                 </time>
                                             </div>
-                                            <p className="mt-2 text-sm leading-relaxed text-slate-600">{notification.message}</p>
+                                            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">{notification.message}</p>
                                             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
                                                 {unread ? (
                                                     <button
