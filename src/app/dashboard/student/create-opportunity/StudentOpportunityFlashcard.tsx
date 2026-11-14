@@ -251,7 +251,7 @@ export function buildOpportunityRecordFlashcard(
         creatorName: pickStr(people?.studentName, creator.name, supervision.supervisor_name) || "Creator",
         creatorEmail: pickStr(people?.creatorEmail, creator.email),
         creatorWhatsapp: pickStr(people?.creatorPhone, creator.phone),
-        orgLabel: flashOrgLabel(pickStr(people?.university, supervision.faculty_university_name)),
+        orgLabel: flashOrgLabel(pickStr(people?.university, supervision.faculty_university_name, creator.university)),
         unitLabel: pickStr(supervision.faculty_department, supervision.role),
         badgeLabel: "Student created",
         privateCandidate: supervision.private_candidate === true,
