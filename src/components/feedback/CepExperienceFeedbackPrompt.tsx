@@ -33,6 +33,159 @@ const REFLECT_OPTIONS = [
     { value: "no", label: "No" },
 ] as const;
 
+export type CepFeedbackAnswers = {
+    rating: number | null;
+    sectionsEase: string;
+    reflectImpact: string;
+    mostUseful: string;
+    improvement: string;
+};
+
+export const EMPTY_CEP_ANSWERS: CepFeedbackAnswers = { rating: null, sectionsEase: "", reflectImpact: "", mostUseful: "", improvement: "" };
+
+/** First missing required answer, as the message to show; null when complete. */
+export function cepAnswersProblem(a: CepFeedbackAnswers): string | null {
+    if (a.rating == null || a.rating < 1 || a.rating > 5) return "Please rate your overall experience (1–5).";
+    if (!a.sectionsEase) return "Please select how easy it was to fill the report sections.";
+    if (!a.reflectImpact) return "Please answer whether the platform helped you reflect on your impact.";
+    return null;
+}
+
+/** POSTs the survey; resolves true on success, false otherwise (toasts the server message). */
+export async function submitCepFeedback(a: CepFeedbackAnswers, reportId?: string | null): Promise<boolean> {
+    try {
+        const res = await authenticatedFetch(`/api/v1/feedback/cep-experience`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                overallRating: a.rating,
+                sectionsEase: a.sectionsEase,
+                reflectImpact: a.reflectImpact,
+                mostUsefulText: a.mostUseful.trim() || undefined,
+                improvementText: a.improvement.trim() || undefined,
+                ...(reportId ? { reportId } : {}),
+            }),
+        });
+        if (!res) return false;
+        const j = (await res.json().catch(() => ({}))) as { success?: boolean; message?: string };
+        if (res.ok && j.success !== false) {
+            window.localStorage.setItem(STORAGE_SUBMITTED, "1");
+            window.localStorage.removeItem(STORAGE_SNOOZE_UNTIL);
+            return true;
+        }
+        toast.error(typeof j.message === "string" && j.message.trim() ? j.message : "Could not send feedback.");
+        return false;
+    } catch {
+        toast.error("Could not send feedback. Try again later.");
+        return false;
+    }
+}
+
+/** The five survey questions (three required). Shared by the dashboard prompt and the result-package gate. */
+export function CepFeedbackQuestions({
+    answers,
+    onChange,
+    idPrefix = "cep",
+}: {
+    answers: CepFeedbackAnswers;
+    onChange: (next: CepFeedbackAnswers) => void;
+    idPrefix?: string;
+}) {
+    const set = (patch: Partial<CepFeedbackAnswers>) => onChange({ ...answers, ...patch });
+    return (
+        <div className="space-y-5 py-2">
+            <div>
+                <Label className="text-slate-800">
+                    How would you rate your overall experience of completing the Community Engagement report?
+                </Label>
+                <p className="text-xs text-slate-500 mb-2">1 = lowest, 5 = highest</p>
+                <div className="flex flex-wrap gap-2">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                            key={n}
+                            type="button"
+                            onClick={() => set({ rating: n })}
+                            className={`h-10 w-10 rounded-lg border text-sm font-bold transition ${
+                                answers.rating === n
+                                    ? "border-emerald-600 bg-emerald-600 text-white"
+                                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                            }`}
+                        >
+                            {n}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <Label className="text-slate-800">How easy was it to understand and fill the report sections?</Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                    {EASE_OPTIONS.map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => set({ sectionsEase: opt.value })}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold sm:text-sm ${
+                                answers.sectionsEase === opt.value
+                                    ? "border-emerald-600 bg-emerald-50 text-emerald-900"
+                                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                            }`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <Label className="text-slate-800">
+                    Did the platform help you reflect on the impact of your community service work?
+                </Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                    {REFLECT_OPTIONS.map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => set({ reflectImpact: opt.value })}
+                            className={`rounded-lg border px-3 py-1.5 text-sm font-semibold ${
+                                answers.reflectImpact === opt.value
+                                    ? "border-emerald-600 bg-emerald-50 text-emerald-900"
+                                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                            }`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <Label htmlFor={`${idPrefix}-useful`}>What was the most useful part of the report or dashboard experience?</Label>
+                <Textarea
+                    id={`${idPrefix}-useful`}
+                    value={answers.mostUseful}
+                    onChange={(e) => set({ mostUseful: e.target.value })}
+                    placeholder="Optional — a sentence or two is enough."
+                    className="mt-1 min-h-[72px]"
+                    maxLength={2000}
+                />
+            </div>
+
+            <div>
+                <Label htmlFor={`${idPrefix}-improve`}>What improvement would you suggest for CIEL PK / CEPK?</Label>
+                <Textarea
+                    id={`${idPrefix}-improve`}
+                    value={answers.improvement}
+                    onChange={(e) => set({ improvement: e.target.value })}
+                    placeholder="Optional"
+                    className="mt-1 min-h-[72px]"
+                    maxLength={2000}
+                />
+            </div>
+        </div>
+    );
+}
+
 function readShouldOfferPrompt(): boolean {
     if (typeof window === "undefined") return false;
     if (window.localStorage.getItem(STORAGE_SUBMITTED) === "1") return false;
@@ -60,11 +213,7 @@ export function CepExperienceFeedbackPrompt({
 }: CepExperienceFeedbackPromptProps) {
     const [eligible, setEligible] = useState(false);
     const [open, setOpen] = useState(false);
-    const [rating, setRating] = useState<number | null>(null);
-    const [sectionsEase, setSectionsEase] = useState<string>("");
-    const [reflectImpact, setReflectImpact] = useState<string>("");
-    const [mostUseful, setMostUseful] = useState("");
-    const [improvement, setImprovement] = useState("");
+    const [answers, setAnswers] = useState<CepFeedbackAnswers>(EMPTY_CEP_ANSWERS);
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
@@ -88,50 +237,22 @@ export function CepExperienceFeedbackPrompt({
     }, []);
 
     const submit = useCallback(async () => {
-        if (rating == null || rating < 1 || rating > 5) {
-            toast.error("Please rate your overall experience (1–5).");
-            return;
-        }
-        if (!sectionsEase) {
-            toast.error("Please select how easy it was to fill the report sections.");
-            return;
-        }
-        if (!reflectImpact) {
-            toast.error("Please answer whether the platform helped you reflect on your impact.");
+        const problem = cepAnswersProblem(answers);
+        if (problem) {
+            toast.error(problem);
             return;
         }
         setSubmitting(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/feedback/cep-experience`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    overallRating: rating,
-                    sectionsEase,
-                    reflectImpact,
-                    mostUsefulText: mostUseful.trim() || undefined,
-                    improvementText: improvement.trim() || undefined,
-                }),
-            });
-            if (!res) {
-                return;
-            }
-            const j = (await res.json().catch(() => ({}))) as { success?: boolean; message?: string };
-            if (res.ok && j.success !== false) {
-                window.localStorage.setItem(STORAGE_SUBMITTED, "1");
-                window.localStorage.removeItem(STORAGE_SNOOZE_UNTIL);
+            if (await submitCepFeedback(answers)) {
                 toast.success("Thank you — your feedback helps us improve CIEL PK.");
                 setOpen(false);
                 setEligible(false);
-            } else {
-                toast.error(typeof j.message === "string" && j.message.trim() ? j.message : "Could not send feedback.");
             }
-        } catch {
-            toast.error("Could not send feedback. Try again later.");
         } finally {
             setSubmitting(false);
         }
-    }, [rating, sectionsEase, reflectImpact, mostUseful, improvement]);
+    }, [answers]);
 
     if (!eligible) return null;
 
@@ -158,100 +279,7 @@ export function CepExperienceFeedbackPrompt({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-5 py-2">
-                        <div>
-                            <Label className="text-slate-800">
-                                How would you rate your overall experience of completing the Community Engagement report?
-                            </Label>
-                            <p className="text-xs text-slate-500 mb-2">1 = lowest, 5 = highest</p>
-                            <div className="flex flex-wrap gap-2">
-                                {[1, 2, 3, 4, 5].map((n) => (
-                                    <button
-                                        key={n}
-                                        type="button"
-                                        onClick={() => setRating(n)}
-                                        className={`h-10 w-10 rounded-lg border text-sm font-bold transition ${
-                                            rating === n
-                                                ? "border-emerald-600 bg-emerald-600 text-white"
-                                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                                        }`}
-                                    >
-                                        {n}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <Label className="text-slate-800">
-                                How easy was it to understand and fill the report sections?
-                            </Label>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {EASE_OPTIONS.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => setSectionsEase(opt.value)}
-                                        className={`rounded-lg border px-3 py-1.5 text-xs font-semibold sm:text-sm ${
-                                            sectionsEase === opt.value
-                                                ? "border-emerald-600 bg-emerald-50 text-emerald-900"
-                                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                                        }`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <Label className="text-slate-800">
-                                Did the platform help you reflect on the impact of your community service work?
-                            </Label>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {REFLECT_OPTIONS.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => setReflectImpact(opt.value)}
-                                        className={`rounded-lg border px-3 py-1.5 text-sm font-semibold ${
-                                            reflectImpact === opt.value
-                                                ? "border-emerald-600 bg-emerald-50 text-emerald-900"
-                                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                                        }`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <Label htmlFor="cep-useful">
-                                What was the most useful part of the report or dashboard experience?
-                            </Label>
-                            <Textarea
-                                id="cep-useful"
-                                value={mostUseful}
-                                onChange={(e) => setMostUseful(e.target.value)}
-                                placeholder="Optional — a sentence or two is enough."
-                                className="mt-1 min-h-[72px]"
-                                maxLength={2000}
-                            />
-                        </div>
-
-                        <div>
-                            <Label htmlFor="cep-improve">What improvement would you suggest for CIEL PK / CEPK?</Label>
-                            <Textarea
-                                id="cep-improve"
-                                value={improvement}
-                                onChange={(e) => setImprovement(e.target.value)}
-                                placeholder="Optional"
-                                className="mt-1 min-h-[72px]"
-                                maxLength={2000}
-                            />
-                        </div>
-                    </div>
+                    <CepFeedbackQuestions answers={answers} onChange={setAnswers} />
 
                     <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between sm:gap-2">
                         <div className="flex flex-wrap gap-2">

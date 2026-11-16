@@ -63,6 +63,7 @@ import {
     StudentOpportunityFlashcard,
 } from '../create-opportunity/StudentOpportunityFlashcard';
 import PreReportGuide from './components/PreReportGuide';
+import ResultPackageFeedbackGate from '@/components/feedback/ResultPackageFeedbackGate';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
 import { ReportLiveBanner, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote, ReportRevisionNotice } from './ReportFormChrome';
 import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
@@ -1246,16 +1247,27 @@ function ReportFormContent() {
                     {activeStep === 9 && <Section10Sustainability projectData={projectDetails} />}
                     {isFlashCardStep(activeStep) && (
                         <>
-                            <ReportFlashCard
-                                data={data}
-                                projectData={projectDetails}
-                                sectionsComplete={sectionsCompleteCount}
-                                missingLabels={sendBlockLabels}
-                                canSend={(canFinalizeSubmit || needsRevision) && !isReadOnly && !isTeamMemberAttendanceOnly}
-                                onSend={!isReadOnly && !isTeamMemberAttendanceOnly ? handleSubmit : undefined}
-                                sending={isSaving}
-                                paymentHref={paymentHref || undefined}
-                            />
+                            {(() => {
+                                const flashCard = (
+                                    <ReportFlashCard
+                                        data={data}
+                                        projectData={projectDetails}
+                                        sectionsComplete={sectionsCompleteCount}
+                                        missingLabels={sendBlockLabels}
+                                        canSend={(canFinalizeSubmit || needsRevision) && !isReadOnly && !isTeamMemberAttendanceOnly}
+                                        onSend={!isReadOnly && !isTeamMemberAttendanceOnly ? handleSubmit : undefined}
+                                        sending={isSaving}
+                                        paymentHref={paymentHref || undefined}
+                                    />
+                                );
+                                // Verified result: the team lead gives feedback once before the result package opens.
+                                const resultReportId = String(data.id || data.report_id || "").trim();
+                                return ciiVerifiedSummaryLock && !isTeamMemberAttendanceOnly && resultReportId ? (
+                                    <ResultPackageFeedbackGate reportId={resultReportId}>{flashCard}</ResultPackageFeedbackGate>
+                                ) : (
+                                    flashCard
+                                );
+                            })()}
                             {isTeamMemberAttendanceOnly ? (
                                 <div className="mt-4 flex flex-wrap items-center gap-5 rounded-2xl border border-[var(--line)] bg-gradient-to-br from-[var(--teal-soft)] via-white to-white p-6">
                                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--teal-soft)]">
