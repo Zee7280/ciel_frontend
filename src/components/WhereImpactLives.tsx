@@ -172,7 +172,7 @@ export default function WhereImpactLives() {
                                 <b className="block text-[26px] font-black leading-none text-white">
                                     {fmtInt(reports)}
                                 </b>
-                                <span className="text-xs font-bold text-[#9CC9C2]">verified reports</span>
+                                <span className="text-xs font-bold text-[#9CC9C2]">verified records</span>
                             </div>
                             <div>
                                 <b className="block text-[26px] font-black leading-none text-white">

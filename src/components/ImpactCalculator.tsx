@@ -51,7 +51,7 @@ export default function ImpactCalculator() {
                     What would one semester look like at your university?
                 </h2>
                 <p className="mt-1 max-w-[70ch] text-sm text-[#3C5560]">
-                    Ratios come from the verified ledger; the dividend uses CIEL&apos;s PKR {rate} per hour
+                    Ratios come from the verified ledger (structured reports + Quick Community Impact); the dividend uses CIEL&apos;s PKR {rate} per hour
                     benchmark.
                 </p>
 

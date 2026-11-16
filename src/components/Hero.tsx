@@ -51,9 +51,9 @@ export default function Hero() {
     const dividendSub = `${fmt(hours)} hrs × PKR ${rate.toLocaleString("en-US", { maximumFractionDigits: 2 })} + PKR ${fmt(outOfPocket)} out-of-pocket`;
 
     const tiles = [
-        { key: "serving", value: peopleServing, label: "People serving", sub: "students on submitted reports", sparkColor: "#4CC38A", sparkPoints: "0,26 12,24 24,21 36,22 48,15 60,12 72,8 88,4" },
-        { key: "hours", value: verifiedHours, label: "Verified hours", sub: "logged on verified reports" },
-        { key: "served", value: peopleReached, label: "People in communities served", sub: "beneficiaries summed from reports", sparkColor: "#3B55C7", sparkPoints: "0,27 12,25 24,24 36,18 48,17 60,11 72,9 88,3" },
+        { key: "serving", value: peopleServing, label: "People serving", sub: "students on verified reports + quick community work", sparkColor: "#4CC38A", sparkPoints: "0,26 12,24 24,21 36,22 48,15 60,12 72,8 88,4" },
+        { key: "hours", value: verifiedHours, label: "Verified hours", sub: "verified reports + quick community work" },
+        { key: "served", value: peopleReached, label: "People in communities served", sub: "summed from reports + quick community work", sparkColor: "#3B55C7", sparkPoints: "0,27 12,25 24,24 36,18 48,17 60,11 72,9 88,3" },
         { key: "resources", value: resourcesDeployed, label: "Resources deployed", sub: "cash amounts from reports", prefix: "PKR " },
     ];
 
