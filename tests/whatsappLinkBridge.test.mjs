@@ -81,12 +81,15 @@ test("desktop opens the WhatsApp app first; no click ever opens a tab AND moves 
     // noopener makes window.open return null even on success; the helper cuts the opener by hand.
     assert.match(lib, /const opened = window\.open\(url, "_blank"\);/);
     assert.match(lib, /opened\.opener = null;/);
-    assert.match(lib, /window\.location\.href = whatsappAppHref\(text, digits\);/);
+    // A real (hidden) anchor click hands whatsapp:// to the OS; the chooser event covers the no-app case.
+    assert.match(lib, /clickHref\(appHref\);/);
+    assert.match(lib, /WHATSAPP_FALLBACK_EVENT = "ciel:whatsapp-fallback"/);
     assert.match(lib, /if \(handedOff\) return;/);
 
     const bridge = read("src/components/WhatsAppLinkBridge.tsx");
     assert.match(bridge, /openWhatsApp\(parts\.text, parts\.digits\);/);
-    assert.doesNotMatch(bridge, /noopener/);
+    // The chooser uses real anchors (rel="noopener" is fine there); no window.open(…, "noopener") anywhere.
+    assert.doesNotMatch(bridge, /window\.open\([^)]*noopener/);
     for (const f of [
         "src/app/dashboard/admin/reports/verify/ApprovalWhatsAppPanel.tsx",
         "src/components/ciel/coursework/CourseworkMonitorRow.tsx",

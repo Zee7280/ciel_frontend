@@ -656,6 +656,15 @@ export function buildImpactPackageDetailedReport(
                             sources: [...(item.sources || []), text(item.source_other)].filter((value) => text(value)),
                             purpose: text(item.purpose),
                             verification: [...(item.verification || []), text(rec(item).verification_other)].filter((value) => text(value)),
+                            pkr_value: text(rec(item).pkr_value),
+                            contributor: [
+                                text(rec(item).contributor_name),
+                                text(rec(item).contributor_email),
+                                [text(rec(item).contributor_phone_code), text(rec(item).contributor_phone)].filter(Boolean).join(" "),
+                            ]
+                                .filter(Boolean)
+                                .join(" · "),
+                            evidence_trail: text(rec(item).evidence_trail),
                         })),
                     ),
                 ],
@@ -669,6 +678,13 @@ export function buildImpactPackageDetailedReport(
                         resources.reduce((sum, item) => {
                             if (String(item.unit || "").toUpperCase() !== "PKR") return sum;
                             const n = Number(String(item.amount || "").replace(/,/g, ""));
+                            return sum + (Number.isFinite(n) ? n : 0);
+                        }, 0),
+                    ),
+                    row(
+                        "Total PKR value of all contributions (cash + valued in-kind)",
+                        resources.reduce((sum, item) => {
+                            const n = Number(String(rec(item).pkr_value || "").replace(/[^\d.]/g, ""));
                             return sum + (Number.isFinite(n) ? n : 0);
                         }, 0),
                     ),

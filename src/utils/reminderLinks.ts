@@ -86,20 +86,41 @@ export function openInNewTab(url: string): boolean {
     return true;
 }
 
-/** How long the desktop app gets to take focus before WhatsApp Web opens instead. */
+/** How long the desktop app gets to take focus before the fallback appears. */
 export const WHATSAPP_APP_FALLBACK_MS = 1500;
 
+/** Fired on `window` when the WhatsApp app did not take over; WhatsAppLinkBridge shows the chooser. */
+export const WHATSAPP_FALLBACK_EVENT = "ciel:whatsapp-fallback";
+export type WhatsAppFallbackDetail = { appHref: string; webHref: string; text: string; digits: string };
+
+/** Clicks a real (hidden) link: the most reliable way to hand a custom scheme to the OS. */
+export function clickHref(href: string, newTab = false): void {
+    const a = document.createElement("a");
+    a.href = href;
+    if (newTab) {
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+    }
+    a.setAttribute("data-ciel-whatsapp-direct", "1");
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
 /**
- * Opens WhatsApp for this device. A phone opens the WhatsApp app (wa.me). A computer first asks the
- * installed WhatsApp desktop app (`whatsapp://`); when nothing takes focus in time (no app, or the
- * browser ignored the link), WhatsApp Web opens in ONE new tab. The current page never navigates away
- * unless a popup blocker stops that tab.
+ * Opens WhatsApp for this device. A phone opens the WhatsApp app (wa.me). A computer clicks a real
+ * `whatsapp://send` link so the installed desktop app opens (Chrome asks "Open WhatsApp?" the
+ * first time); when nothing takes focus within 1.5s the bridge shows a small chooser — open the
+ * app again, or WhatsApp Web in a new tab — instead of guessing. The current page never navigates
+ * away unless a popup blocker stops that tab.
  */
 export function openWhatsApp(text: string, digits = ""): void {
     if (typeof window === "undefined") return;
-    const fallback = whatsappOpenHref(text, digits);
+    const webHref = whatsappOpenHref(text, digits);
+    const appHref = whatsappAppHref(text, digits);
     if (isMobileBrowser()) {
-        if (!openInNewTab(fallback)) window.location.href = fallback;
+        if (!openInNewTab(webHref)) window.location.href = webHref;
         return;
     }
     let handedOff = false;
@@ -111,12 +132,15 @@ export function openWhatsApp(text: string, digits = ""): void {
     };
     window.addEventListener("blur", mark);
     document.addEventListener("visibilitychange", onVisibility);
-    window.location.href = whatsappAppHref(text, digits);
+    clickHref(appHref);
     window.setTimeout(() => {
         window.removeEventListener("blur", mark);
         document.removeEventListener("visibilitychange", onVisibility);
         if (handedOff) return;
-        if (!openInNewTab(fallback)) window.location.href = fallback;
+        const detail: WhatsAppFallbackDetail = { appHref, webHref, text, digits };
+        // A listener (the bridge) that shows the chooser calls preventDefault; with nobody listening, open the web client.
+        const unhandled = window.dispatchEvent(new CustomEvent(WHATSAPP_FALLBACK_EVENT, { detail, cancelable: true }));
+        if (unhandled && !openInNewTab(webHref)) window.location.href = webHref;
     }, WHATSAPP_APP_FALLBACK_MS);
 }
 

@@ -1490,6 +1490,7 @@ function ReportFormContent() {
                 sectionStep={activeStep}
                 enabled={!summaryOnlyWorkspace && !ciiVerifiedSummaryLock}
                 openSignal={helpSignal}
+                autoOpenKey={projectId || null}
             />
         </div>
     );

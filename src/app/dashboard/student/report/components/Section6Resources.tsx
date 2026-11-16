@@ -14,6 +14,7 @@ import { EvidenceMediaPreview } from "./ui/EvidenceMediaPreview";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
+import { isExternalResourceSource, parsePkrValue } from "../utils/resourceContributors";
 
 function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
     const { accepted, rejected } = splitReportFilesByImageSize(files);
@@ -67,6 +68,7 @@ const evidenceDocTypes = [
 const emptyResource = () => ({
     type: "", type_other: "", amount: "", unit: "", unit_other: "",
     sources: [] as string[], source_other: "", purpose: "", verification: [] as string[],
+    pkr_value: "", contributor_name: "", contributor_email: "", contributor_phone_code: "+92", contributor_phone: "", evidence_trail: "",
 });
 
 const inputClasses =
@@ -192,6 +194,8 @@ function ResourceCard({
     const toggleVerification = (v: string) => {
         onUpdate("verification", verifications.includes(v) ? verifications.filter(x => x !== v) : [...verifications, v]);
     };
+    const external = isExternalResourceSource(sources);
+    const isCash = /cash|funding|financial/i.test(String(res.type || "")) || ["PKR", "USD", "EUR", "GBP"].includes(res.unit);
 
     return (
         <div className="overflow-hidden rounded-[14px] border border-[#dcebee] bg-white">
@@ -319,6 +323,92 @@ function ResourceCard({
                     />
                 ) : null}
             </div>
+
+            {/* Contributor & accountability — every contribution needs a value, a person and a trail */}
+            <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">
+                        Contributor &amp; accountability
+                    </p>
+                    <span className="text-[11px] text-amber-800/80">
+                        {external
+                            ? "Required — this resource came from outside your team."
+                            : "Required fields apply when a resource comes from outside your team."}
+                    </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-1.5">
+                        <Label className={fieldLabel}>
+                            PKR value of this contribution {external || isCash ? <span className="text-rose-500">*</span> : null}
+                        </Label>
+                        <Input
+                            inputMode="numeric"
+                            placeholder="e.g. 5000 — 50 notebooks × PKR 100"
+                            value={res.pkr_value || ""}
+                            onChange={e => onUpdate("pkr_value", e.target.value)}
+                            className={inputClasses}
+                        />
+                        <FieldError message={getFieldError(`resources.${idx}.pkr_value`)} />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label className={fieldLabel}>Contributor name {external ? <span className="text-rose-500">*</span> : null}</Label>
+                        <Input
+                            placeholder="Person or organisation who gave it"
+                            value={res.contributor_name || ""}
+                            onChange={e => onUpdate("contributor_name", e.target.value)}
+                            className={inputClasses}
+                        />
+                        <FieldError message={getFieldError(`resources.${idx}.contributor_name`)} />
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-1.5">
+                        <Label className={fieldLabel}>Contributor email {external ? <span className="text-rose-500">*</span> : null}</Label>
+                        <Input
+                            type="email"
+                            placeholder="name@example.com"
+                            value={res.contributor_email || ""}
+                            onChange={e => onUpdate("contributor_email", e.target.value)}
+                            className={inputClasses}
+                        />
+                        <FieldError message={getFieldError(`resources.${idx}.contributor_email`)} />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label className={fieldLabel}>Contributor mobile · with country code {external ? <span className="text-rose-500">*</span> : null}</Label>
+                        <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2">
+                            <Input
+                                inputMode="tel"
+                                placeholder="+92"
+                                value={res.contributor_phone_code ?? "+92"}
+                                onChange={e => onUpdate("contributor_phone_code", e.target.value)}
+                                className={inputClasses}
+                            />
+                            <Input
+                                inputMode="tel"
+                                placeholder="300 1234567"
+                                value={res.contributor_phone || ""}
+                                onChange={e => onUpdate("contributor_phone", e.target.value)}
+                                className={inputClasses}
+                            />
+                        </div>
+                        <FieldError message={getFieldError(`resources.${idx}.contributor_phone`)} />
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <Label className={fieldLabel}>Evidence trail {external ? <span className="text-rose-500">*</span> : null}</Label>
+                    <textarea
+                        rows={2}
+                        placeholder="Where it came from, how it was used, who received it — e.g. bank transfer receipt from the donor, purchase receipts for 50 notebooks, photos of the handover to Class 4 students"
+                        value={res.evidence_trail || ""}
+                        onChange={e => onUpdate("evidence_trail", e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                    />
+                    <FieldError message={getFieldError(`resources.${idx}.evidence_trail`)} />
+                    <p className="text-[11px] text-slate-500">
+                        Upload the receipts, transfer proofs, photos and delivery records you name here in 5.3 below.
+                    </p>
+                </div>
+            </div>
             </div>
         </div>
     );
@@ -399,6 +489,10 @@ export default function Section6Resources({ projectData: _projectData }: { proje
         });
         return totals;
     }, [resources]);
+    const totalPkrValue = useMemo(
+        () => resources.reduce((sum, r) => sum + (Number.isFinite(parsePkrValue(r.pkr_value)) ? parsePkrValue(r.pkr_value) : 0), 0),
+        [resources],
+    );
 
     return (
         <div className="mx-auto max-w-6xl space-y-3 pb-10">
@@ -420,14 +514,22 @@ export default function Section6Resources({ projectData: _projectData }: { proje
                         Purpose of this section
                     </p>
                     <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
-                        This section records the{" "}
-                        <span className="font-semibold text-slate-900">
-                            resources and implementation support
-                        </span>{" "}
-                        that made your activities possible. List each resource type, amount, and
-                        source, explain what it enabled, and note how it was verified (evidence,
-                        partner confirmation, or official documentation).
+                        Record <span className="font-semibold text-slate-900">every resource used</span>, whether
+                        self-funded, donated or sponsored: cash, educational materials, medical supplies, equipment
+                        and other contributions. For each one give the quantity, unit and PKR value, who contributed
+                        it (name, email, mobile with country code), what it made possible, and the evidence trail.
                     </p>
+                    <p className="mt-2 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Example:</span> 50 notebooks × PKR 100 = PKR 5,000 ·
+                        contributed by a local bookshop · delivered to Class 4 (purchase receipt + handover photos).
+                    </p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900 sm:px-5">
+                    <span className="font-bold">Evidence and accountability:</span> every contribution must have a clear,
+                    verifiable trail — where the resource came from, how it was used and who received it. A cash gift needs
+                    a bank transfer or payment proof plus proof of how it was spent; donated books or supplies need receipts
+                    (where available), photos of the items and evidence of delivery. Claims without receipts, delivery
+                    records or other credible evidence weaken the report and may affect approval.
                 </div>
             </div>
 
@@ -561,10 +663,10 @@ export default function Section6Resources({ projectData: _projectData }: { proje
                     <section className="cer-card space-y-4">
                         <div className="flex items-center gap-2.5">
                             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d2b33] text-[11px] font-bold text-white">
-                                6.3
+                                5.3
                             </span>
                             <h3 className="text-base font-semibold text-slate-900">
-                                Step 3 — Optional evidence upload
+                                Evidence for each contribution
                             </h3>
                         </div>
 
@@ -572,7 +674,9 @@ export default function Section6Resources({ projectData: _projectData }: { proje
                             <div className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
                                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
                                 <p className="text-sm leading-relaxed text-indigo-900/90">
-                                    Upload supporting documentation. Max 5 files per resource entry. Max 10MB per file.
+                                    Upload the proof you named in each evidence trail: receipts, bank transfer / payment proof,
+                                    photos of the items, delivery or handover records, sponsorship letters. Max 5 files per
+                                    resource entry, {MAX_REPORT_UPLOAD_LABEL} per file.
                                 </p>
                             </div>
 
@@ -689,6 +793,12 @@ export default function Section6Resources({ projectData: _projectData }: { proje
                             ))}
                         </div>
 
+                        {totalPkrValue > 0 ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-5 py-3.5 text-sm font-bold text-amber-800">
+                                <span>🧾 Total PKR value of contributions</span>
+                                <span>PKR {totalPkrValue.toLocaleString()}</span>
+                            </div>
+                        ) : null}
                         {Object.keys(moneyByUnit).length > 0 ? (
                             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50 px-5 py-3.5 text-sm font-bold text-indigo-700">
                                 <span>💵 Total money used</span>

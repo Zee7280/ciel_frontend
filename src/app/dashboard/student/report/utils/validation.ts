@@ -7,6 +7,7 @@ import { outputRowOk, step3Ok, stepNeedText, SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MA
 import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
 import { riskBlockErrors } from './riskSafeguarding';
 import { followupBlockErrors } from './sustainabilityFollowup';
+import { contributorEmailLooksValid, contributorPhoneLooksValid, isExternalResourceSource, parsePkrValue } from './resourceContributors';
 
 export interface ValidationError {
     field: string;
@@ -426,6 +427,39 @@ export function validateSection6(data: any): ValidationResult {
                 const sources = asList(row.sources);
                 if (sources.some((item: string) => item === 'Other (Specify)' || item === 'Other / Custom Source') && !String(row.source_other || '').trim()) {
                     errors.push({ field: `resources.${index}.source_other`, message: 'Please specify the source' });
+                }
+
+                // Accountability: a contribution from outside the team names its contributor, carries a
+                // PKR value and an evidence trail (mirrors the backend submit gate).
+                const external = isExternalResourceSource(sources);
+                const isCash = /cash|funding|financial/i.test(String(row.type || '')) || ['PKR', 'USD', 'EUR', 'GBP'].includes(String(row.unit || ''));
+                const pkr = parsePkrValue(row.pkr_value);
+                const pkrGiven = String(row.pkr_value || '').trim() !== '';
+                if ((external || isCash) && (!pkrGiven || !Number.isFinite(pkr) || pkr <= 0)) {
+                    errors.push({ field: `resources.${index}.pkr_value`, message: 'Give the PKR value of this contribution (e.g. 50 × PKR 100 = 5,000)' });
+                } else if (pkrGiven && (!Number.isFinite(pkr) || pkr < 0)) {
+                    errors.push({ field: `resources.${index}.pkr_value`, message: 'PKR value must be a number' });
+                }
+                if (!contributorEmailLooksValid(row.contributor_email)) {
+                    errors.push({ field: `resources.${index}.contributor_email`, message: 'Enter a valid email address' });
+                }
+                const phoneGiven = String(row.contributor_phone || '').trim() !== '';
+                if (phoneGiven && !contributorPhoneLooksValid(row.contributor_phone_code, row.contributor_phone)) {
+                    errors.push({ field: `resources.${index}.contributor_phone`, message: 'Mobile number needs a country code, e.g. +92 300 1234567' });
+                }
+                if (external) {
+                    if (!String(row.contributor_name || '').trim()) {
+                        errors.push({ field: `resources.${index}.contributor_name`, message: 'Name the contributor of this resource' });
+                    }
+                    if (!String(row.contributor_email || '').trim()) {
+                        errors.push({ field: `resources.${index}.contributor_email`, message: "Add the contributor's email" });
+                    }
+                    if (!phoneGiven) {
+                        errors.push({ field: `resources.${index}.contributor_phone`, message: "Add the contributor's mobile number with country code" });
+                    }
+                    if (!String(row.evidence_trail || '').trim()) {
+                        errors.push({ field: `resources.${index}.evidence_trail`, message: 'Describe the evidence trail: where it came from, how it was used, who received it' });
+                    }
                 }
             });
         }

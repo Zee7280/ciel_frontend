@@ -35,9 +35,7 @@ import {
     NGO_CS_APPROVALS as APPROVALS,
     NGO_CS_BASE as CS_BASE,
     NGO_CS_CREATE_FORM as CREATE_FORM,
-    NGO_CS_HOURS as HOURS,
     NGO_CS_MY_OPPS as MY_OPPS,
-    NGO_CS_REPORTS as REPORTS,
     ngoMineBucket as mineBucket,
     ngoPickNum as pickNum,
     ngoPickStr as pickStr,
@@ -656,16 +654,6 @@ export default function NgoCommunityServiceHub() {
                             );
                         })()
                     )}
-                    <p className="mt-4 text-[11px] text-[#7a919a]">
-                        Monitoring does not expose raw private student phone numbers.{" "}
-                        <Link href={HOURS} className="font-extrabold text-[#0e7d74] hover:underline">
-                            Review member hours
-                        </Link>
-                        {" · "}
-                        <Link href={REPORTS} className="font-extrabold text-[#0e7d74] hover:underline">
-                            Open reports
-                        </Link>
-                    </p>
                 </div>
             )}
 

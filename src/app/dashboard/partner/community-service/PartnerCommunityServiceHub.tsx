@@ -46,8 +46,6 @@ const CS_BASE = "/dashboard/partner/community-service";
 const CREATE_FORM = "/dashboard/partner/requests/new";
 const MY_OPPS = "/dashboard/partner/requests";
 const APPROVALS = "/dashboard/partner/verify";
-const REPORTS = "/dashboard/partner/reports";
-const HOURS = "/dashboard/partner/attendance-review";
 const ANALYTICS = "/dashboard/partner/analytics";
 const HOME = "/dashboard/partner";
 
@@ -879,16 +877,6 @@ export default function PartnerCommunityServiceHub() {
                             );
                         })()
                     )}
-                    <p className="mt-4 text-[11px] text-[#7a919a]">
-                        Monitoring does not expose raw private student phone numbers.{" "}
-                        <Link href={HOURS} className="font-extrabold text-[#0e7d74] hover:underline">
-                            Review member hours
-                        </Link>
-                        {" · "}
-                        <Link href={REPORTS} className="font-extrabold text-[#0e7d74] hover:underline">
-                            Open reports
-                        </Link>
-                    </p>
                 </div>
             )}
 
