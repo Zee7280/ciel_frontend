@@ -27,6 +27,7 @@ import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { mailtoHref, whatsappHrefFromE164, whatsappShareHref } from "@/utils/reminderLinks";
 import { CIEL_PK_ADMIN_WHATSAPP } from "@/components/opportunities/OpportunityWhatsAppLinks";
+import StudentReportReminderBar from "@/components/ciel/community-service/StudentReportReminderBar";
 
 const HUB = "/dashboard/student/paths/community-service";
 const GUIDE = `${HUB}?view=guide`;
@@ -623,6 +624,7 @@ export default function CommunityServiceWorkspace({
                 ]}
                 rule="Opportunity drafts and opportunity approvals never belong here — use My Opportunities."
             />
+            <StudentReportReminderBar className="mb-4" />
 
             <div className="flex flex-col justify-between gap-3 rounded-[20px] border border-[#dce6ea] bg-white px-5 py-5 sm:flex-row sm:items-center">
                 <div>

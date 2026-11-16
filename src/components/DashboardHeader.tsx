@@ -37,6 +37,7 @@ function facultyPageKicker(pathname: string): string {
     if (p.startsWith("/dashboard/faculty/my-opportunities")) return "My Opportunities";
     if (p.startsWith("/dashboard/faculty/create-opportunity")) return "Create Opportunity";
     if (p.startsWith("/dashboard/faculty/attendance-review")) return "Attendance";
+    if (p.startsWith("/dashboard/faculty/browse")) return "Browse Opportunities";
     if (p.startsWith("/dashboard/faculty/messages")) return "Messages";
     if (p.startsWith("/dashboard/faculty/notifications")) return "Notifications";
     if (p.startsWith("/dashboard/faculty/tutorials")) return "Platform tutorial";
@@ -61,6 +62,7 @@ function partnerPageKicker(pathname: string): string {
     if (p.startsWith("/dashboard/partner/verification") || p.startsWith("/dashboard/partner/verify")) return "Verify Work";
     if (p.startsWith("/dashboard/partner/reports")) return "Reports";
     if (p.startsWith("/dashboard/partner/attendance-review")) return "Attendance";
+    if (p.startsWith("/dashboard/partner/browse")) return "Browse Opportunities";
     if (p.startsWith("/dashboard/partner/messages")) return "Messages";
     if (p.startsWith("/dashboard/partner/notifications")) return "Notifications";
     if (p.startsWith("/dashboard/partner/funding")) return "Funding";

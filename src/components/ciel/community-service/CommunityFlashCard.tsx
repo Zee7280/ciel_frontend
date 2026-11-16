@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import { awardPartnerLabel, type CommunityAwardCard } from "@/utils/communityAwardModel";
+import { awardCardSdgLine, awardPartnerLabel, type CommunityAwardCard } from "@/utils/communityAwardModel";
 import { IMPACT_WALL_PACKAGE, type ImpactWallPackageHrefs, type ImpactWallViewer } from "@/utils/impactWallDistribution";
 import ImpactWallCiiRing from "@/components/ciel/community-service/ImpactWallCiiRing";
 
@@ -37,7 +37,7 @@ export default function CommunityFlashCard({
     const hours = Number(card.hours || 0);
     const uni = card.university || awardPartnerLabel(card.organization_name) || "Community Service";
     const badge = card.level || "Verified";
-    const sdg = card.sdg?.trim() || "—";
+    const sdg = awardCardSdgLine(card);
 
     return (
         <article className="flex flex-col overflow-hidden rounded-[22px] border border-[#dde8e5] bg-white shadow-[0_8px_24px_rgba(20,63,59,.06)]">

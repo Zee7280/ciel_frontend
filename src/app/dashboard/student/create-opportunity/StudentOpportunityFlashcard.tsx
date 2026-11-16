@@ -48,6 +48,8 @@ export type StudentFlashcardModel = {
     target: string;
     secondarySdg: string;
     secondaryTarget: string;
+    /** Every supporting SDG chosen at create (when more than one); falls back to `secondarySdg`. */
+    supportingSdgs?: Array<{ sdg: string; target: string }>;
     objective: string;
     outputs: string;
     creatorName: string;
@@ -246,6 +248,12 @@ export function buildOpportunityRecordFlashcard(
         target: pickStr(sdgInfo.target_id),
         secondarySdg: pickStr(secondary.sdg_id),
         secondaryTarget: pickStr(secondary.target_id),
+        supportingSdgs: (Array.isArray(raw.secondary_sdgs) ? raw.secondary_sdgs : [])
+            .map((row) => {
+                const r = asRecord(row);
+                return { sdg: pickStr(r.sdg_id, r.id, r.goal_number), target: pickStr(r.target_id) };
+            })
+            .filter((row) => Boolean(row.sdg)),
         objective: pickStr(objectives.description, sdgInfo.why_relevant),
         outputs: pickStr(objectives.outputs, objectives.outcome),
         creatorName: pickStr(people?.studentName, creator.name, supervision.supervisor_name) || "Creator",
@@ -375,9 +383,21 @@ export function StudentOpportunityFlashcard({
     const sdg = findSdgById(model.sdg);
     const sdgName = sdg?.title || "SDG";
     const sdgNum = sdg?.number != null ? String(sdg.number) : model.sdg || "—";
-    const secondarySdg = model.secondarySdg ? findSdgById(model.secondarySdg) : null;
-    const secondarySdgName = secondarySdg?.title || "SDG";
-    const secondarySdgNum = secondarySdg?.number != null ? String(secondarySdg.number) : model.secondarySdg || "—";
+    // Every supporting SDG chosen at create, not only the first; the primary is never repeated.
+    const supportingSdgs = (
+        model.supportingSdgs?.length
+            ? model.supportingSdgs
+            : model.secondarySdg
+              ? [{ sdg: model.secondarySdg, target: model.secondaryTarget }]
+              : []
+    )
+        .map((row) => ({ ...row, info: findSdgById(row.sdg) }))
+        .filter(
+            (row, i, all): row is typeof row & { info: NonNullable<typeof row.info> } =>
+                Boolean(row.info) &&
+                row.info!.number !== sdg?.number &&
+                all.findIndex((other) => other.info?.number === row.info!.number) === i,
+        );
 
     const days = daysUntil(String(model.deadline || ""));
     const catalogClosed = Boolean(model.applyForcedClosed);
@@ -632,7 +652,7 @@ export function StudentOpportunityFlashcard({
             <section className="co-flash-sdg">
                 <div className="co-flash-sdg-head">
                     <b>SDG alignment</b>
-                    <span>Primary{secondarySdg ? " + supporting" : ""}</span>
+                    <span>Primary{supportingSdgs.length ? " + supporting" : ""}</span>
                 </div>
                 <div className="co-flash-sdg-row">
                     <div className="co-flash-sdg-card">
@@ -647,20 +667,20 @@ export function StudentOpportunityFlashcard({
                             </b>
                         </div>
                     </div>
-                    {secondarySdg ? (
-                        <div className="co-flash-sdg-card">
-                            <span className="co-flash-sdg-badge" style={{ background: secondarySdg.color || "#15988b" }}>
-                                {esc(secondarySdgNum)}
+                    {supportingSdgs.map((row) => (
+                        <div key={row.info.number} className="co-flash-sdg-card">
+                            <span className="co-flash-sdg-badge" style={{ background: row.info.color || "#15988b" }}>
+                                {esc(String(row.info.number))}
                             </span>
                             <div>
                                 <small>Supporting SDG</small>
                                 <b>
-                                    SDG {esc(secondarySdgNum)}
-                                    {model.secondaryTarget ? ` · Target ${model.secondaryTarget}` : ""} · {esc(secondarySdgName)}
+                                    SDG {esc(String(row.info.number))}
+                                    {row.target ? ` · Target ${row.target}` : ""} · {esc(row.info.title || "SDG")}
                                 </b>
                             </div>
                         </div>
-                    ) : null}
+                    ))}
                 </div>
                 {sdgWhy ? <p className="co-flash-sdg-why">{sdgWhy}</p> : null}
                 {reachBits.length > 0 ? (

@@ -39,6 +39,7 @@ export default function MarketplaceOpportunityCard({
     adminExpired,
     applicationsOpen,
     applyBlockedReason,
+    openInNewTab = false,
 }: {
     id: string;
     title: string;
@@ -59,6 +60,8 @@ export default function MarketplaceOpportunityCard({
     adminExpired: boolean;
     applicationsOpen: boolean;
     applyBlockedReason: string | null;
+    /** Dashboard browse: open the detail page in a new tab so the dashboard stays put. */
+    openInNewTab?: boolean;
 }) {
     const listing = {
         start_date: startDate,
@@ -126,7 +129,7 @@ export default function MarketplaceOpportunityCard({
 
                 {sdgs.length ? (
                     <div className="mt-2.5 flex flex-wrap gap-1">
-                        {sdgs.slice(0, 4).map((sdg) => (
+                        {sdgs.map((sdg) => (
                             <span
                                 key={sdg.number}
                                 title={`SDG ${sdg.number} · ${sdg.title}`}
@@ -160,6 +163,7 @@ export default function MarketplaceOpportunityCard({
 
                 <Link
                     href={`/projects/${encodeURIComponent(id)}`}
+                    {...(openInNewTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                     className="mt-auto inline-flex h-11 items-center justify-center rounded-full bg-[#1aa36a] px-4 text-[13px] font-extrabold text-white transition hover:bg-[#158a59]"
                 >
                     View Details →

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { clearPathSessionCache } from "@/utils/student-path-session-cache";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, type ComponentType } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, Globe2, PlayCircle, Mail, Archive, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, X, Tent, GraduationCap, Rocket, Leaf, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, Globe2, PlayCircle, Mail, Archive, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, X, Tent, GraduationCap, Rocket, Leaf, Search, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -665,6 +665,7 @@ export default function Sidebar() {
         () =>
             withCounts([
                 { label: "My Organization", href: "/dashboard/partner/organization", icon: Building2 },
+                { label: "Browse Opportunities", href: "/dashboard/partner/browse", icon: Search },
                 ...(partnerMembershipNav
                     ? [{ label: "Membership fee", href: "/dashboard/partner/membership-payment", icon: CreditCard }]
                     : []),
@@ -707,6 +708,7 @@ export default function Sidebar() {
         () =>
             withCounts([
                 // { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
+                { label: "Browse Opportunities", href: "/dashboard/faculty/browse", icon: Search },
                 { label: "Join Application Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
                 { label: "Quick Community Impact", href: "/dashboard/faculty/quick-work", icon: Leaf },
                 { label: "Report Supervision", href: "/dashboard/faculty/report-supervision", icon: CheckCircle },

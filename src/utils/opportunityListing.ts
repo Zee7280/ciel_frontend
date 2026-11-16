@@ -1,4 +1,4 @@
-import { findSdgById } from "@/utils/sdgData";
+import { findSdgById, sdgData } from "@/utils/sdgData";
 
 export type CreatorBucket = "student" | "faculty" | "partner" | "unspecified";
 export type VisibilityBucket = "open" | "restricted" | "unspecified";
@@ -137,6 +137,23 @@ export function pickOpportunityTypes(raw: Record<string, unknown>): string[] {
     const t = raw.types;
     if (!Array.isArray(t)) return [];
     return t.map((x) => str(x)).filter(Boolean);
+}
+
+/** Every SDG (1–17) as a filter option, in the same "12. Title" form as `buildSdgFilterLabel`. */
+export const ALL_SDG_FILTER_OPTIONS: string[] = [...sdgData]
+    .sort((a, b) => a.number - b.number)
+    .map((sdg) => `${sdg.number}. ${sdg.title}`);
+
+/**
+ * SDG filter test: true when the chosen goal is the opportunity's primary SDG OR any of its
+ * supporting SDGs (`sdg_ids` carries all of them). `filter` is an `ALL_SDG_FILTER_OPTIONS` label.
+ */
+export function matchesSdgFilter(filter: string, sdgIds: ReadonlyArray<unknown>, primaryLabel?: string | null): boolean {
+    if (!filter || filter === "all") return true;
+    if (primaryLabel && primaryLabel === filter) return true;
+    const goal = Number((filter.match(/^(\d{1,2})\./) || [])[1]);
+    if (!Number.isFinite(goal)) return false;
+    return sdgIds.some((id) => findSdgById(id as string | number | null | undefined)?.number === goal);
 }
 
 export function buildSdgFilterLabel(raw: Record<string, unknown>): string {

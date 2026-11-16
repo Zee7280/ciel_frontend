@@ -14,7 +14,10 @@ export default function CommunityAwardAnalytics({ cards, groupBy }: { cards: Com
         }))
         .sort((a, b) => b.h - a.h);
     const maxH = groups[0]?.h || 1;
-    const sdgs = new Set(cards.map((c) => c.sdg).filter((s) => s && s !== "—"));
+    // Distinct goals across every card's SDGs (report + opportunity), not only each primary.
+    const sdgs = new Set(
+        cards.flatMap((c) => (c.sdg_goals?.length ? c.sdg_goals.map((n) => `SDG ${n}`) : [c.sdg])).filter((s) => s && s !== "—"),
+    );
     const ev = cards.reduce((s, c) => s + c.evidenceCount, 0);
 
     const stat = (v: string, k: string) => (

@@ -61,7 +61,7 @@ function SdgLine({ sdgs }: { sdgs: BrowseCardSdg[] }) {
     if (!sdgs.length) return <span className="text-[#8aa0a6]">—</span>;
     return (
         <span className="font-semibold text-[#16313d]">
-            {sdgs.slice(0, 2).map((s) => `SDG ${s.number}`).join(", ")}
+            {sdgs.map((s) => `SDG ${s.number}`).join(", ")}
         </span>
     );
 }

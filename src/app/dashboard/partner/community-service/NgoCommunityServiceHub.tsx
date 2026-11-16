@@ -20,6 +20,8 @@ import CommunityAwardAnalytics from "@/components/ciel/community-service/Communi
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import QuickImpactPartnerWall from "@/components/ciel/community-service/quick-work/QuickImpactPartnerWall";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import ProjectTrackingPanel from "@/components/ciel/community-service/ProjectTrackingPanel";
+import { projectReportHref } from "@/components/ciel/community-service/ProjectMonitorCard";
 import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
@@ -273,7 +275,7 @@ export default function NgoCommunityServiceHub() {
         | "published"
         | "closed";
     const approvalTab = ["linked", "waiting", "pending", "rev", "done"].includes(innerTab) ? innerTab : "pending";
-    const projectTab = ["active", "verified", "all"].includes(innerTab) ? innerTab : "active";
+    const projectTab = ["active", "tracking", "verified", "all"].includes(innerTab) ? innerTab : "active";
     const crumb = VIEW_CRUMB[view];
     const guideKey = view === "pending" ? "approvals" : view === "approved" ? "impact" : view;
     const guide = GUIDES[guideKey] || GUIDES.home;
@@ -606,6 +608,7 @@ export default function NgoCommunityServiceHub() {
                     <HubTabs
                         tabs={[
                             { id: "active", label: "Active", count: waiting.length },
+                            { id: "tracking", label: "Live progress" },
                             { id: "verified", label: "Verified", count: liveRows.length },
                             { id: "all", label: "All", count: pipeline.length },
                         ]}
@@ -614,6 +617,17 @@ export default function NgoCommunityServiceHub() {
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading projects…</p>
+                    ) : projectTab === "tracking" ? (
+                        <ProjectTrackingPanel
+                            role="partner"
+                            roleLabel="your linked organization"
+                            reportHrefFor={(r) => {
+                                const base = projectReportHref(r, "/dashboard/partner/verify");
+                                return base ? `${base}?package=1` : undefined;
+                            }}
+                            hoursHrefFor={(projectId) => `/dashboard/partner/attendance-review?projectId=${encodeURIComponent(projectId)}`}
+                            emptyText="Assigned students on your linked projects appear here with live hours and report progress."
+                        />
                     ) : (
                         (() => {
                             const list = projectTab === "verified" ? liveRows : projectTab === "all" ? pipeline : waiting;

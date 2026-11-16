@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { authenticatedFetch } from "@/utils/api";
 import { formatOpportunityCode } from "@/utils/displayIds";
 import { partnerQueueBucket } from "@/utils/partnerOpportunityQueue";
@@ -120,6 +121,8 @@ export function useNgoCommunityServiceData() {
     /** Bumped after an approve / revision / rejection so the queues refresh in place. */
     const [reloadKey, setReloadKey] = useState(0);
     const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+    // Live sync: linked opportunities and reports refresh while the hub is open.
+    useLiveRefresh(reload);
 
     useEffect(() => {
         setOrgName(readNgoOrgName());

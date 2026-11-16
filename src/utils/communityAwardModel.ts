@@ -67,6 +67,8 @@ export type CommunityAwardCard = {
     faculty_name: string;
     hours: number;
     sdg: string;
+    /** Every SDG on the report (its own mapping + the opportunity's), primary first. */
+    sdg_goals?: number[];
     evidenceCount: number;
     story: string;
     change: string;
@@ -291,4 +293,13 @@ export function mergeCommunityLiveDeck(
         if (!byId.has(row.id)) byId.set(row.id, reportRowToAwardCard(row));
     }
     return Array.from(byId.values());
+}
+
+/** "SDG 12, 11, 13" — every SDG on an award card; falls back to the primary-only `sdg` text. */
+export function awardCardSdgLine(card: Pick<CommunityAwardCard, "sdg" | "sdg_goals">): string {
+    const goals = Array.isArray(card.sdg_goals)
+        ? card.sdg_goals.filter((n) => Number.isInteger(n) && n >= 1 && n <= 17)
+        : [];
+    if (goals.length) return `SDG ${goals.join(", ")}`;
+    return card.sdg?.trim() || "—";
 }

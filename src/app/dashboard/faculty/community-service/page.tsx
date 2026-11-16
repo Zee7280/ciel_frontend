@@ -21,7 +21,9 @@ import {
     type FacultyCsMineRow,
     type FacultyCsReportRow,
 } from "./useFacultyCommunityServiceData";
-import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
+import ProjectMonitorCard, { RemindButtons, projectReportHref } from "@/components/ciel/community-service/ProjectMonitorCard";
+import { describeRemindNowResult, postRemindNow } from "@/utils/projectTracking";
+import { toast } from "sonner";
 import { useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
@@ -37,12 +39,11 @@ import {
     useFacultyOpportunityReviewActions,
 } from "@/components/faculty/FacultyOpportunityReviewActions";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
-import { isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
+import { normalizeReviewStatus } from "@/utils/reviewQueue";
 import { canEditReturnedOpportunity, isOpportunityPermanentlyRejected, isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readFacultyScopeSession } from "@/utils/facultyScopeSession";
-import { formatDisplayId, formatOpportunityCode } from "@/utils/displayIds";
-import { displayOrganizationName } from "@/utils/displayOrganizationName";
+import { formatOpportunityCode } from "@/utils/displayIds";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { FACULTY_QUICK_WORK_HREF } from "@/utils/quickWorkApi";
 
@@ -248,243 +249,6 @@ function EmptyPanel({ title, text }: { title: string; text: string }) {
     );
 }
 
-function personInitials(name: string): string {
-    return name
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 3)
-        .toUpperCase() || "?";
-}
-
-function FacultyRemindButtons({ email, title }: { email?: string | null; title: string }) {
-    const to = email && email.includes("@") ? email : "";
-    const subject = `Community Service reminder — ${title}`;
-    const body = `A reminder from your faculty supervisor about “${title}”. Please continue the pending Community Service step in your signed-in CIEL PK dashboard.`;
-    return (
-        <>
-            <a href={mailtoHref(to, subject, body)} className="rounded-[10px] bg-[#edf4fb] px-3 py-2 text-[12px] font-black text-[#376d9f]">
-                ✉ Remind
-            </a>
-            <a href={whatsappShareHref(body)} className="rounded-[10px] bg-[#e8f8ee] px-3 py-2 text-[12px] font-black text-[#1f7a46]">
-                WhatsApp
-            </a>
-        </>
-    );
-}
-
-function projectReportHref(row: { id: string; report_id?: string | null; status?: string; draft_locked?: boolean }): string | undefined {
-    if (row.draft_locked) return undefined;
-    const rid = String(row.report_id || "").trim() || (row.id.startsWith("track:") ? "" : row.id);
-    if (!rid) return undefined;
-    const status = normalizeReviewStatus(row.status);
-    if (status === "assigned" || status === "draft" || status === "continue" || !status) return undefined;
-    return `${REPORTS}/${rid}`;
-}
-
-function MemberHoursClock({
-    name,
-    hours,
-    required,
-}: {
-    name: string;
-    hours: number;
-    required: number;
-}) {
-    const met = hours + 1e-9 >= required;
-    const extra = Math.max(0, Math.round((hours - required) * 10) / 10);
-    const remaining = Math.max(0, Math.round((required - hours) * 10) / 10);
-    const pct = required > 0 ? Math.min(100, Math.round((hours / required) * 100)) : 0;
-    const col = extra > 0 ? "#d5aa46" : met ? "#15988b" : "#e6a23c";
-    return (
-        <div
-            className={`mt-3 grid grid-cols-[72px_minmax(0,1fr)] items-center gap-3 rounded-2xl border p-3 ${
-                extra > 0 ? "border-[#e9d59a] bg-[#fffcf2]" : met ? "border-[#bfe3d6] bg-[#f6fcf9]" : "border-[#e8edef] bg-white"
-            }`}
-        >
-            <div
-                className="relative h-[72px] w-[72px] shrink-0 rounded-full"
-                style={{ background: `conic-gradient(${col} ${pct}%, #e8eef1 0)` }}
-                aria-hidden
-            >
-                <div className="absolute inset-[9px] grid place-items-center rounded-full bg-white text-center">
-                    <span className="text-[13px] font-black tabular-nums leading-none text-slate-900">{hours}h</span>
-                    <span className="mt-0.5 text-[9px] font-semibold text-slate-500">of {required}h</span>
-                </div>
-            </div>
-            <div className="min-w-0">
-                <p className="truncate text-[13px] font-bold text-slate-900">
-                    {name} {extra > 0 ? "⭐" : met ? "🟢" : "🟠"}
-                </p>
-                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
-                    {extra > 0
-                        ? `Additional verified contribution: +${extra}h`
-                        : met
-                          ? "Minimum met"
-                          : `In progress · ${remaining}h remaining`}
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{pct}% complete</span>
-                    {met ? <span className="rounded-full bg-[#e7f6f1] px-2 py-0.5 text-[10px] font-bold text-[#1d765d]">Minimum ✓</span> : null}
-                    {extra > 0 ? <span className="rounded-full bg-[#f3eefc] px-2 py-0.5 text-[10px] font-bold text-[#6b2bd9]">Beyond minimum</span> : null}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function FacultyProjectMonitorCard({ row }: { row: FacultyCsReportRow }) {
-    const required = row.required_hours || 16;
-    const hours = row.hours || 0;
-    const hoursPct =
-        typeof row.hours_progress_pct === "number"
-            ? Math.max(0, Math.min(100, Math.round(row.hours_progress_pct)))
-            : required > 0
-              ? Math.max(0, Math.min(100, Math.round((hours / required) * 100)))
-              : 0;
-    const reportHref = projectReportHref(row);
-    const last = row.last_activity_at || row.updated_at;
-    const lastLabel = last
-        ? new Date(last).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-        : null;
-    const org = displayOrganizationName(row.organization_name);
-    const live = isFacultyCommunityLiveCard(row);
-    const members =
-        row.member_hours && row.member_hours.length
-            ? row.member_hours
-            : [{ name: row.student_name || "Student", hours, required }];
-    const fillingReport = row.draft_locked === true && typeof row.sections_complete === "number";
-    const team = row.team_members && row.team_members.length > 1 ? row.team_members : null;
-    const remindTo = team
-        ? team
-              .map((m) => m.email)
-              .filter((e): e is string => Boolean(e && e.includes("@")))
-              .join(",")
-        : row.student_email;
-    const status = live
-        ? { title: "Verified", text: "Impact package is live for connected stakeholders.", nextTitle: "No action required from you", nextText: "Hours and the verified package stay available here.", nextCls: "" }
-        : reportHref
-          ? { title: "Submitted", text: "The student submitted the Community Service report.", nextTitle: "Open the submitted report", nextText: "Review the locked package when you are ready.", nextCls: "next" }
-          : fillingReport
-            ? {
-                  title: "Report in progress",
-                  text: `${Math.round(row.progress_pct || 0)}% filled · ${row.sections_complete ?? 0} of ${row.sections_total ?? 10} sections`,
-                  nextTitle: "Opens after the student submits",
-                  nextText: "Live hours stay visible. The report stays locked until submit.",
-                  nextCls: "warn",
-              }
-            : {
-                  title: hoursPct >= 100 ? "Hours complete" : "Hours in progress",
-                  text: hoursPct >= 100 ? "Minimum hours met." : "Live hours from assigned students.",
-                  nextTitle:
-                      hoursPct >= 100
-                          ? team ? "Students can submit the report" : "Student can submit the report"
-                          : team ? "Students continue logging hours" : "Student continues logging hours",
-                  nextText: "Reminders are system-generated and logged.",
-                  nextCls: hoursPct >= 100 ? "next" : "warn",
-              };
-    const idLabel = formatDisplayId(row.project_id || row.id, "CS");
-    return (
-        <div className="rounded-[18px] border border-[#e2eaed] bg-white p-4 shadow-sm transition hover:border-[#bcd4d8] hover:shadow-md md:grid md:grid-cols-[minmax(0,1fr)_260px] md:gap-4">
-            <div className="min-w-0">
-                <h4 className="text-[15.5px] font-semibold leading-snug text-slate-900">{row.project_title || "Project"}</h4>
-                <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-slate-500">
-                    <span className="inline-block rounded-lg bg-[#eef3f5] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[#3f5661]">{idLabel}</span>
-                    <span aria-hidden className="text-[#b9c4ca]">•</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-600">
-                        {live ? "Verified" : reportHref ? "Submitted" : "Active"}
-                    </span>
-                    {lastLabel ? (
-                        <>
-                            <span aria-hidden className="text-[#b9c4ca]">•</span>
-                            <span>Last activity {lastLabel}</span>
-                        </>
-                    ) : null}
-                    {org ? (
-                        <>
-                            <span aria-hidden className="text-[#b9c4ca]">•</span>
-                            <span className="min-w-0 break-words">{org}</span>
-                        </>
-                    ) : null}
-                </div>
-                <div className="mt-2.5 flex flex-wrap gap-2">
-                    {team ? (
-                        <span className="inline-flex items-center rounded-full bg-[#e8f1ff] px-2.5 py-1 text-[11px] font-black text-[#2f5ea8]">
-                            {row.participation_type === "team" ? `Team · ${team.length} members` : `${team.length} students`}
-                        </span>
-                    ) : null}
-                    {(team ?? [{ name: row.student_name || "Student" }]).map((person, index) => (
-                        <span
-                            key={`${person.name}-${index}`}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-[#e2eaed] bg-[#fbfcfd] py-1 pl-1 pr-2.5 text-[11.5px] text-slate-800"
-                        >
-                            <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-[#dff1ed] text-[10px] font-black text-[#145a4f]">
-                                {personInitials(person.name || "Student")}
-                            </span>
-                            {person.name || "Student"}
-                            <small className="text-[10px] text-slate-500">{"lead" in person && person.lead ? "Team lead" : "Student"}</small>
-                        </span>
-                    ))}
-                    {org ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e2eaed] bg-[#fbfcfd] py-1 pl-1 pr-2.5 text-[11.5px] text-slate-800">
-                            <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-[#e6e0f7] text-[10px] font-black text-[#5a2bb5]">
-                                {personInitials(org)}
-                            </span>
-                            {org}
-                            <small className="text-[10px] text-slate-500">Organization</small>
-                        </span>
-                    ) : null}
-                </div>
-                {members.map((member, index) => (
-                    <MemberHoursClock
-                        key={`${member.name}-${index}`}
-                        name={member.name}
-                        hours={member.hours}
-                        required={member.required || required}
-                    />
-                ))}
-            </div>
-            <div className="mt-4 grid content-start gap-2.5 border-t border-[#e8edef] pt-4 md:mt-0 md:border-l md:border-t-0 md:pl-4 md:pt-0">
-                <div className="rounded-xl border border-[#e2eaed] bg-[#f8fafb] p-3">
-                    <div className="text-[9.5px] font-black uppercase tracking-[0.08em] text-[#7b8a91]">Status</div>
-                    <b className="mt-1 block text-[13px] text-slate-900">{status.title}</b>
-                    <small className="mt-1 block text-[11.5px] leading-snug text-slate-500">{status.text}</small>
-                </div>
-                <div
-                    className={`rounded-xl border p-3 ${
-                        status.nextCls === "warn"
-                            ? "border-[#f0d9a8] bg-[#fffaf0]"
-                            : "border-[#bfe3d6] bg-[#f3fbf7]"
-                    }`}
-                >
-                    <div className={`text-[9.5px] font-black uppercase tracking-[0.08em] ${status.nextCls === "warn" ? "text-[#9a6410]" : "text-[#1d765d]"}`}>
-                        Next action
-                    </div>
-                    <b className="mt-1 block text-[13px] text-slate-900">{status.nextTitle}</b>
-                    <small className="mt-1 block text-[11.5px] leading-snug text-slate-500">{status.nextText}</small>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                    {live ? null : <FacultyRemindButtons email={remindTo} title={row.project_title} />}
-                    {reportHref ? (
-                        <Link href={reportHref} className="rounded-[10px] bg-[#0e7d74] px-3 py-2 text-[12px] font-black text-white">
-                            Open report
-                        </Link>
-                    ) : null}
-                    {row.project_id ? (
-                        <Link
-                            href={`${HOURS}?projectId=${encodeURIComponent(row.project_id)}`}
-                            className="rounded-[10px] bg-[#edf4fb] px-3 py-2 text-[12px] font-black text-[#0e7d74]"
-                        >
-                            View live hours
-                        </Link>
-                    ) : null}
-                </div>
-            </div>
-        </div>
-    );
-}
-
 function mineBucket(row: MineRow): "drafts" | "review" | "action" | "published" | "closed" {
     const rec = row as unknown as Record<string, unknown>;
     if (normalizeReviewStatus(row.status) === "draft") return "drafts";
@@ -538,7 +302,6 @@ function FacultyCommunityServiceHub() {
         pendingAppRows,
         historyAppRows,
         hoursProjectCount,
-        liveRows,
         projectRows,
         projectLiveRows,
         activeProjects,
@@ -549,6 +312,23 @@ function FacultyCommunityServiceHub() {
         reload,
     } = useFacultyCommunityServiceData();
     const reviewActions = useFacultyOpportunityReviewActions(reload);
+    const [remindingId, setRemindingId] = useState<string | null>(null);
+    /** "Remind now" on a project card: CIEL PK sends the standard "Complete your report ASAP" message. */
+    const remindNow = async (row: FacultyCsReportRow) => {
+        if (!row.project_id || remindingId) return;
+        setRemindingId(row.id);
+        try {
+            const result = await postRemindNow("faculty", row.project_id, row.team_members?.length ? null : row.student_email);
+            const { ok, message } = describeRemindNowResult(result);
+            if (ok) toast.success(message);
+            else toast.error(message);
+            reload();
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Reminder could not be sent.");
+        } finally {
+            setRemindingId(null);
+        }
+    };
     const autoOpenedIdRef = useRef<string | null>(null);
     const [facultyName, setFacultyName] = useState("Faculty");
     const [department, setDepartment] = useState("");
@@ -1083,7 +863,7 @@ function FacultyCommunityServiceHub() {
                                                     </button>
                                                 }
                                             />
-                                            <FacultyRemindButtons email={row.studentEmail} title={row.projectTitle} />
+                                            <RemindButtons email={row.studentEmail} title={row.projectTitle} roleLabel="your faculty supervisor" />
                                         </div>
                                     );
                                 })}
@@ -1219,7 +999,13 @@ function FacultyCommunityServiceHub() {
                             return (
                                 <div className="grid grid-cols-1 gap-4">
                                     {list.map((row) => (
-                                        <FacultyProjectMonitorCard key={row.id} row={row} />
+                                        <ProjectMonitorCard
+                                            key={row.id}
+                                            row={row}
+                                            reportHrefFor={(r) => projectReportHref(r, REPORTS)}
+                                            hoursHrefFor={(projectId) => `${HOURS}?projectId=${encodeURIComponent(projectId)}`}
+                                            remind={{ roleLabel: "your faculty supervisor", onRemindNow: remindNow, busy: remindingId === row.id }}
+                                        />
                                     ))}
                                 </div>
                             );

@@ -8,7 +8,9 @@ import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
 import type { ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
 import {
+    ALL_SDG_FILTER_OPTIONS,
     buildSdgFilterLabel,
+    matchesSdgFilter,
     computeSeatsRemaining,
     modeMenuLabel,
     normalizeModeBucket,
@@ -499,9 +501,8 @@ export default function StudentBrowseOpportunitiesPage() {
     const oppTypeOptions = Array.from(
         new Set(opportunities.flatMap((op) => op.opportunityTypes || [])),
     ).sort((a, b) => a.localeCompare(b));
-    const sdgOptions = Array.from(
-        new Set(opportunities.map((op) => op.sdgLabel || "Unspecified SDG")),
-    ).sort((a, b) => a.localeCompare(b));
+    // All 17 goals, always (primary or supporting SDG matches — see matchesSdgFilter).
+    const sdgOptions = ALL_SDG_FILTER_OPTIONS;
     const locationOptions = Array.from(new Set(opportunities.map((op) => op.city || "Remote"))).sort((a, b) =>
         a.localeCompare(b),
     );
@@ -525,7 +526,7 @@ export default function StudentBrowseOpportunitiesPage() {
         if (universityFilter !== "all" && (op.universityLabel || "Unspecified") !== universityFilter) return false;
         if (modeFilter !== "all" && (op.modeBucket || "unspecified") !== modeFilter) return false;
         if (oppTypeFilter !== "all" && !(op.opportunityTypes || []).includes(oppTypeFilter)) return false;
-        if (sdgFilter !== "all" && (op.sdgLabel || "Unspecified SDG") !== sdgFilter) return false;
+        if (!matchesSdgFilter(sdgFilter, op.sdg_ids || [], op.sdgLabel)) return false;
         if (locationFilter !== "all" && (op.city || "Remote") !== locationFilter) return false;
         if (!passesSeatsFilter(op.seatsRemaining ?? null, seatsFilter)) return false;
         if (visibilityFilter !== "all" && (op.visibilityBucket || "unspecified") !== visibilityFilter) return false;

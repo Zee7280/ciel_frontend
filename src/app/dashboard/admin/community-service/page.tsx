@@ -26,6 +26,9 @@ import CommunityAwardAnalytics from "@/components/ciel/community-service/Communi
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
 import ReportProgressCard from "@/components/ciel/community-service/ReportProgressCard";
+import ProjectTrackingPanel from "@/components/ciel/community-service/ProjectTrackingPanel";
+import { projectReportHref } from "@/components/ciel/community-service/ProjectMonitorCard";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import CommunityCiiBreakdownModal from "@/components/ciel/community-service/CommunityCiiBreakdownModal";
 import FacultyReportReviewCard from "@/components/ciel/community-service/FacultyReportReviewCard";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
@@ -73,7 +76,7 @@ type CsView = (typeof CS_VIEWS)[number];
 const CREATE_FORM = "/dashboard/admin/create-opportunity";
 const CREATE_TABS = ["drafts", "review", "action", "published", "closed"] as const;
 type CreateTab = (typeof CREATE_TABS)[number];
-const PROJECT_TABS = ["approval", "progress", "active", "verified", "closed"] as const;
+const PROJECT_TABS = ["approval", "progress", "tracking", "active", "verified", "closed"] as const;
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const GUIDES: Record<string, { desc: string; items?: [string, string][]; rule?: string }> = {
@@ -516,6 +519,8 @@ export function AdminCommunityServiceHub() {
     useEffect(() => {
         void loadHub();
     }, [loadHub]);
+    // Live sync: the national pipeline refreshes while the hub is open.
+    useLiveRefresh(() => void loadHub());
 
     const liveRows = useMemo(() => pipeline.filter((r) => isAdminCommunityLiveCard(r)), [pipeline]);
     // Faculty-approved-and-ready-for-admin rows surface first — those are the only ones this
@@ -917,6 +922,7 @@ export function AdminCommunityServiceHub() {
                         tabs={[
                             { id: "approval", label: "In approval", count: approvalOpps.filter(filterOpp).length },
                             { id: "progress", label: "In progress", count: draftRows.filter(filterProject).length },
+                            { id: "tracking", label: "Live progress" },
                             { id: "active", label: "Active reports", count: inPipe.filter(filterProject).length },
                             { id: "verified", label: "Verified", count: liveRows.filter(filterProject).length },
                             { id: "closed", label: "Closed", count: closedReports.filter(filterProject).length },
@@ -926,6 +932,13 @@ export function AdminCommunityServiceHub() {
                     />
                     {loading ? (
                         <p className="text-sm text-slate-500">Loading…</p>
+                    ) : projectTab === "tracking" ? (
+                        <ProjectTrackingPanel
+                            role="admin"
+                            roleLabel="CIEL PK"
+                            reportHrefFor={(r) => projectReportHref(r, "/dashboard/admin/reports/verify")}
+                            emptyText="Every student on a CIEL-approved project appears here with live hours and report progress."
+                        />
                     ) : projectTab === "approval" ? (
                         approvalOpps.filter(filterOpp).length === 0 ? (
                             <EmptyPanel title="Nothing here" text="CIEL PK opportunities still waiting on a named partner or faculty appear here." />

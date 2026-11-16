@@ -17,6 +17,8 @@ import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { pickCiiV45DisplayScore } from "@/utils/reportCiiSnapshot";
 import type { FacultyInboxItem } from "@/components/ciel/community-service/FacultyCsInbox";
+import { mapTrackingRows } from "@/utils/projectTracking";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 export const FACULTY_CS_BASE = "/dashboard/faculty/community-service";
 export const FACULTY_CS_APPROVALS = "/dashboard/faculty/approvals";
@@ -62,6 +64,14 @@ export type FacultyCsReportRow = {
     sections_total?: number;
     last_activity_at?: string;
     draft_locked?: boolean;
+    /** Communication bar (tracking rows): project deadline and the last "Complete your report" reminder. */
+    project_end_date?: string | null;
+    reporting_close_date?: string | null;
+    days_left_to_report?: number | null;
+    deadline_phase?: string | null;
+    last_reminder_at?: string | null;
+    last_reminder_channel?: string | null;
+    reminders_sent?: number;
 };
 
 export type FacultyCsMineRow = {
@@ -125,6 +135,8 @@ export function useFacultyCommunityServiceData() {
     const [loading, setLoading] = useState(true);
     const [reloadTick, setReloadTick] = useState(0);
     const reload = useCallback(() => setReloadTick((n) => n + 1), []);
+    // Live sync: students' hours, report progress and approvals refresh while the hub is open.
+    useLiveRefresh(reload);
 
     useEffect(() => {
         let cancelled = false;
@@ -287,58 +299,7 @@ export function useFacultyCommunityServiceData() {
                             };
                         })
                         .filter((r: FacultyCsReportRow) => r.id);
-                const mappedTracking: FacultyCsReportRow[] = (Array.isArray(tracking?.data) ? tracking.data : [])
-                    .filter((item: unknown) => item && typeof item === "object")
-                    .map((item: Record<string, unknown>) => {
-                        const hoursRaw = item.hours;
-                        const hours =
-                            typeof hoursRaw === "number" && Number.isFinite(hoursRaw)
-                                ? hoursRaw
-                                : typeof hoursRaw === "string" && Number.isFinite(Number(hoursRaw))
-                                  ? Number(hoursRaw)
-                                  : 0;
-                        const email = pickStr(item, "student_email", "studentEmail");
-                        return {
-                            id: String(item.id || ""),
-                            student_name: pickStr(item, "student_name", "studentName") || "Student",
-                            student_email: email && email.includes("@") ? email : undefined,
-                            project_title: pickStr(item, "project_title", "projectTitle") || "Project",
-                            organization_name: displayOrganizationName(pickStr(item, "organization_name", "organizationName")),
-                            project_id: pickStr(item, "project_id", "projectId", "opportunity_id", "opportunityId"),
-                            faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
-                            status: pickStr(item, "status") || "assigned",
-                            hours,
-                            required_hours:
-                                typeof item.required_hours === "number" && Number.isFinite(item.required_hours)
-                                    ? item.required_hours
-                                    : 16,
-                            submission_date: pickStr(item, "submission_date", "submissionDate"),
-                            report_submitted_at: pickStr(item, "report_submitted_at", "reportSubmittedAt"),
-                            updated_at: pickStr(item, "updated_at", "updatedAt", "last_activity_at"),
-                            last_activity_at: pickStr(item, "last_activity_at"),
-                            report_id: pickStr(item, "report_id", "reportId") || null,
-                            hours_progress_pct:
-                                typeof item.hours_progress_pct === "number" ? item.hours_progress_pct : undefined,
-                            progress_pct: typeof item.progress_pct === "number" ? item.progress_pct : undefined,
-                            sections_complete:
-                                typeof item.sections_complete === "number" ? item.sections_complete : undefined,
-                            sections_total: typeof item.sections_total === "number" ? item.sections_total : undefined,
-                            draft_locked: item.draft_locked === true,
-                            team_id: pickStr(item, "team_id", "teamId") || null,
-                            is_team_lead: item.is_team_lead === true,
-                            participation_type: pickStr(item, "participation_type", "participationType") || undefined,
-                            member_hours: Array.isArray(item.member_hours)
-                                ? item.member_hours
-                                      .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object"))
-                                      .map((row) => ({
-                                          name: pickStr(row, "name") || "Student",
-                                          hours: Number(row.hours || 0) || 0,
-                                          required: Number(row.required || 16) || 16,
-                                      }))
-                                : [],
-                        };
-                    })
-                    .filter((r: FacultyCsReportRow) => r.id);
+                const mappedTracking: FacultyCsReportRow[] = mapTrackingRows(tracking);
                 setTrackingRows(mappedTracking);
                 const hoursSource = mappedTracking.length ? mappedTracking : mappedRows;
                 setHoursProjectCount(

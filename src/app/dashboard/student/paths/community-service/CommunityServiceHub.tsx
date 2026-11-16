@@ -6,6 +6,7 @@ import { readStoredCurrentUser } from "@/utils/currentUser";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { CommunityCrumb, UserGuideBanner } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import StudentReportReminderBar from "@/components/ciel/community-service/StudentReportReminderBar";
 import { prefetchCommunityServiceData, prefetchStudentBrowseOpportunities, fetchCommunityServiceRankings } from "@/utils/student-community-cache";
 import { QUICK_WORK_HREF } from "@/utils/quickWorkApi";
 import {
@@ -168,6 +169,8 @@ export default function CommunityServiceHub({
 
             />
             </div>
+
+            <StudentReportReminderBar className="mb-4" />
 
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                 <MockupActionCard

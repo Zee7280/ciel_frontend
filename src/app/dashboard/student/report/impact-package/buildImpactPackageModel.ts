@@ -541,7 +541,8 @@ export function buildImpactPackageModel(
             text:
                 firstSentence(pickString(data.section3?.student_contribution_intent_statement, data.section3?.contribution_intent_statement)) ||
                 (sdgs.length ? `${sdgs.length} SDG${sdgs.length === 1 ? "" : "s"} registered on this report.` : "No SDG mapping supplied."),
-            chips: sdgs.slice(0, 4).map((row) => {
+            // Every SDG: the opportunity's (create) plus the report's own mapping.
+            chips: sdgs.map((row) => {
                 const goal = Number(row.goalNumber);
                 const sdg = Number.isFinite(goal) ? findSdgById(String(goal)) : null;
                 return {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { authenticatedFetch } from "@/utils/api";
 import {
     mapCommunityPipelineRow,
@@ -118,6 +119,10 @@ export function useUniversityCommunityServiceData() {
     const [orgName, setOrgName] = useState("University");
     /** The organization's current name from the database (the cached login copy can be stale). */
     const [registeredOrgName, setRegisteredOrgName] = useState<string | null>(null);
+    const [reloadKey, setReloadKey] = useState(0);
+    const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+    // Live sync: institution-wide opportunities and reports refresh while the hub is open.
+    useLiveRefresh(reload);
 
     const reloadReps = async () => {
         const [faculty, awaiting] = await Promise.all([
@@ -207,7 +212,7 @@ export function useUniversityCommunityServiceData() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [reloadKey]);
 
     const currentUserId = getStoredCurrentUserId();
     const mine = useMemo(
@@ -292,6 +297,7 @@ export function useUniversityCommunityServiceData() {
         reps: authorizedReps,
         awaitingReps,
         reloadReps,
+        reload,
         approvedProjects,
     };
 }
