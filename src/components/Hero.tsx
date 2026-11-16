@@ -5,7 +5,11 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { usePlatformStats } from "@/utils/usePlatformStats";
 
-const TRUST_BADGES = ["HEC-recognized certificates", "Verified by partners, one tap", "Every hour valued at PKR 192"];
+const TRUST_BADGES = [
+    "Evidence-Backed Impact Records",
+    "Verified Contributions. Recognized Achievements.",
+    "University Impact Analytics & SDG Intelligence",
+];
 
 /** Eases from 0 to `target` — re-runs whenever `target` changes, so it animates once the real
  * number arrives from usePlatformStats() instead of animating a placeholder. */
