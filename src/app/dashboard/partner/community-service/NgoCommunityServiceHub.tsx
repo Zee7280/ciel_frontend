@@ -1,5 +1,6 @@
 "use client";
 
+import MyResourceContributions from "@/components/ciel/MyResourceContributions";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -657,6 +658,7 @@ export default function NgoCommunityServiceHub() {
                 </div>
             )}
 
+            {(view === "impact" || view === "approved") && <MyResourceContributions className="mb-5" />}
             {(view === "impact" || view === "approved") && (
                 <div className="mt-4">
                     <MockupSectionHead

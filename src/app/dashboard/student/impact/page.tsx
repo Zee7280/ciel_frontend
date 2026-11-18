@@ -8,6 +8,7 @@ import { CIEL_PATHS } from "@/utils/cielPaths";
 import { overallCurrentWorkCompletion } from "@/utils/currentWorkCompletion";
 import { MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import StudentImpactPortfolioTable from "./StudentImpactPortfolioTable";
+import MyResourceContributions from "@/components/ciel/MyResourceContributions";
 
 export default function ImpactHistoryPage() {
     const cachedDashboard = useStudentDashboardCache();
@@ -44,6 +45,8 @@ export default function ImpactHistoryPage() {
                 ]}
                 rightStat={{ value: `${completion}%`, label: "overall current-work completion" }}
             />
+
+            <MyResourceContributions className="mt-6" />
 
             <Suspense fallback={<div className="py-10 text-center text-sm text-[#7a919a]">Loading your portfolio…</div>}>
                 <StudentImpactPortfolioTable />

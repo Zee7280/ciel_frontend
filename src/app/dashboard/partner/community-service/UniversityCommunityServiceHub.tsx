@@ -1,5 +1,6 @@
 "use client";
 
+import MyResourceContributions from "@/components/ciel/MyResourceContributions";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -1108,6 +1109,7 @@ export default function UniversityCommunityServiceHub() {
                 </div>
             )}
 
+            {effectiveView === "wall" && <MyResourceContributions className="mb-5" />}
             {effectiveView === "wall" && (
                 <div className="mt-4">
                     <MockupSectionHead title={`${orgName} · My Impact Wall`} subtitle="After CIEL PK Admin publishes: flashcard, CII, detailed report and combined package. QR is on the Impact Package. No certificate download." action={<Link href={ANALYTICS} className="text-xs font-black text-[#087c75] hover:underline">Open analytics →</Link>} />

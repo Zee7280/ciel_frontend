@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
+import MyResourceContributions from "@/components/ciel/MyResourceContributions";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import ThesisCard from "@/components/ciel/ThesisCard";
@@ -151,6 +152,8 @@ export default function FacultyImpactWallPage() {
                     { value: String(community.length + ventures.length), label: "Service & Ventures" },
                 ]}
             />
+
+            <MyResourceContributions className="mb-5" />
 
             <PathSectionHead
                 title="Filter verified records"
