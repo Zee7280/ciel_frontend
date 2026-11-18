@@ -1,9 +1,8 @@
 /**
  * Section 5 (Resources) accountability rule, shared by the form and the submit validation.
  * A resource that came from outside the student team (a donor, sponsor, partner, NGO, university,
- * government, community, crowdfunding …) needs a named contributor, a way to reach them, a PKR
- * value and an evidence trail. The team's own time / self-funded items only need the PKR value
- * when they are cash.
+ * government, community, crowdfunding …) needs a named contributor, a way to reach them and an
+ * evidence trail. The amount / quantity + unit on the entry already carries its value.
  */
 export const INTERNAL_RESOURCE_SOURCES = ["Student Team", "Self-funded"] as const;
 
@@ -31,10 +30,4 @@ export function contributorPhoneLooksValid(code: unknown, number: unknown): bool
 export function contributorEmailLooksValid(email: unknown): boolean {
     const e = String(email ?? "").trim();
     return !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-}
-
-/** Numeric PKR value from "5,000" / "PKR 5000"; NaN when not a number. */
-export function parsePkrValue(value: unknown): number {
-    const cleaned = String(value ?? "").replace(/[^\d.]/g, "");
-    return cleaned ? Number(cleaned) : NaN;
 }

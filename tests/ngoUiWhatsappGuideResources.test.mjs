@@ -1,5 +1,5 @@
 // NGO / Partner project footer removed; WhatsApp app-first with a chooser; section guide pops up
-// on first visit; Section 5 resources carry contributor, PKR value and evidence trail. Run: npm test
+// on first visit; Section 5 resources carry contributor and evidence trail. Run: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -42,17 +42,20 @@ test("the section guide opens by itself the first time a section is reached, and
     assert.match(read("src/app/dashboard/student/report/page.tsx"), /autoOpenKey=\{projectId \|\| null\}/);
 });
 
-test("Section 5 resources: contributor, PKR value and evidence trail on every entry, mirrored in validation and the detailed report", () => {
+test("Section 5 resources: contributor and evidence trail on every entry (no duplicate PKR value field), mirrored in validation and the detailed report", () => {
     const form = read("src/app/dashboard/student/report/components/Section6Resources.tsx");
-    for (const field of ["pkr_value", "contributor_name", "contributor_email", "contributor_phone_code", "contributor_phone", "evidence_trail"]) {
+    for (const field of ["contributor_name", "contributor_email", "contributor_phone_code", "contributor_phone", "evidence_trail"]) {
         assert.match(form, new RegExp(`onUpdate\\("${field}"`), field);
     }
-    assert.match(form, /50 notebooks × PKR 100 = PKR 5,000/);
+    assert.match(form, /50 notebooks \(or PKR 5,000 cash\)/);
+    assert.doesNotMatch(form, /pkr_value|PKR value of this contribution/);
     assert.match(form, /Evidence for each contribution/);
     const validation = read("src/app/dashboard/student/report/utils/validation.ts");
     assert.match(validation, /isExternalResourceSource\(sources\)/);
     assert.match(validation, /Mobile number needs a country code/);
     const detailed = read("src/app/dashboard/student/report/impact-package/buildImpactPackageDetailedReport.ts");
-    assert.match(detailed, /Total PKR value of all contributions/);
+    assert.match(detailed, /Total cash PKR/);
+    assert.doesNotMatch(detailed, /pkr_value/);
+    assert.doesNotMatch(validation, /pkr_value/);
     assert.match(detailed, /evidence_trail: text\(rec\(item\)\.evidence_trail\)/);
 });

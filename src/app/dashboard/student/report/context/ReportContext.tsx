@@ -326,8 +326,6 @@ export interface ReportData {
             purpose: string;
             verification: string[];  // 6.2.5 multi-select
             verification_other?: string;
-            /** PKR value of this contribution (e.g. 50 notebooks × PKR 100 = 5000). */
-            pkr_value?: string;
             /** Who contributed it — required when the source is outside the student team. */
             contributor_name?: string;
             contributor_email?: string;

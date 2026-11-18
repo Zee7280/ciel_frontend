@@ -7,7 +7,7 @@ import { outputRowOk, step3Ok, stepNeedText, SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MA
 import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
 import { riskBlockErrors } from './riskSafeguarding';
 import { followupBlockErrors } from './sustainabilityFollowup';
-import { contributorEmailLooksValid, contributorPhoneLooksValid, isExternalResourceSource, parsePkrValue } from './resourceContributors';
+import { contributorEmailLooksValid, contributorPhoneLooksValid, isExternalResourceSource } from './resourceContributors';
 
 export interface ValidationError {
     field: string;
@@ -429,17 +429,9 @@ export function validateSection6(data: any): ValidationResult {
                     errors.push({ field: `resources.${index}.source_other`, message: 'Please specify the source' });
                 }
 
-                // Accountability: a contribution from outside the team names its contributor, carries a
-                // PKR value and an evidence trail (mirrors the backend submit gate).
+                // Accountability: a contribution from outside the team names its contributor and
+                // carries an evidence trail (mirrors the backend submit gate).
                 const external = isExternalResourceSource(sources);
-                const isCash = /cash|funding|financial/i.test(String(row.type || '')) || ['PKR', 'USD', 'EUR', 'GBP'].includes(String(row.unit || ''));
-                const pkr = parsePkrValue(row.pkr_value);
-                const pkrGiven = String(row.pkr_value || '').trim() !== '';
-                if ((external || isCash) && (!pkrGiven || !Number.isFinite(pkr) || pkr <= 0)) {
-                    errors.push({ field: `resources.${index}.pkr_value`, message: 'Give the PKR value of this contribution (e.g. 50 × PKR 100 = 5,000)' });
-                } else if (pkrGiven && (!Number.isFinite(pkr) || pkr < 0)) {
-                    errors.push({ field: `resources.${index}.pkr_value`, message: 'PKR value must be a number' });
-                }
                 if (!contributorEmailLooksValid(row.contributor_email)) {
                     errors.push({ field: `resources.${index}.contributor_email`, message: 'Enter a valid email address' });
                 }

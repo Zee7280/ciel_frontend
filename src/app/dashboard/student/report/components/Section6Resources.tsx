@@ -14,7 +14,7 @@ import { EvidenceMediaPreview } from "./ui/EvidenceMediaPreview";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
-import { isExternalResourceSource, parsePkrValue } from "../utils/resourceContributors";
+import { isExternalResourceSource } from "../utils/resourceContributors";
 
 function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
     const { accepted, rejected } = splitReportFilesByImageSize(files);
@@ -68,7 +68,7 @@ const evidenceDocTypes = [
 const emptyResource = () => ({
     type: "", type_other: "", amount: "", unit: "", unit_other: "",
     sources: [] as string[], source_other: "", purpose: "", verification: [] as string[],
-    pkr_value: "", contributor_name: "", contributor_email: "", contributor_phone_code: "+92", contributor_phone: "", evidence_trail: "",
+    contributor_name: "", contributor_email: "", contributor_phone_code: "+92", contributor_phone: "", evidence_trail: "",
 });
 
 const inputClasses =
@@ -195,7 +195,6 @@ function ResourceCard({
         onUpdate("verification", verifications.includes(v) ? verifications.filter(x => x !== v) : [...verifications, v]);
     };
     const external = isExternalResourceSource(sources);
-    const isCash = /cash|funding|financial/i.test(String(res.type || "")) || ["PKR", "USD", "EUR", "GBP"].includes(res.unit);
 
     return (
         <div className="overflow-hidden rounded-[14px] border border-[#dcebee] bg-white">
@@ -338,19 +337,6 @@ function ResourceCard({
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-1.5">
-                        <Label className={fieldLabel}>
-                            PKR value of this contribution {external || isCash ? <span className="text-rose-500">*</span> : null}
-                        </Label>
-                        <Input
-                            inputMode="numeric"
-                            placeholder="e.g. 5000 — 50 notebooks × PKR 100"
-                            value={res.pkr_value || ""}
-                            onChange={e => onUpdate("pkr_value", e.target.value)}
-                            className={inputClasses}
-                        />
-                        <FieldError message={getFieldError(`resources.${idx}.pkr_value`)} />
-                    </div>
-                    <div className="space-y-1.5">
                         <Label className={fieldLabel}>Contributor name {external ? <span className="text-rose-500">*</span> : null}</Label>
                         <Input
                             placeholder="Person or organisation who gave it"
@@ -489,10 +475,6 @@ export default function Section6Resources({ projectData: _projectData }: { proje
         });
         return totals;
     }, [resources]);
-    const totalPkrValue = useMemo(
-        () => resources.reduce((sum, r) => sum + (Number.isFinite(parsePkrValue(r.pkr_value)) ? parsePkrValue(r.pkr_value) : 0), 0),
-        [resources],
-    );
 
     return (
         <div className="mx-auto max-w-6xl space-y-3 pb-10">
@@ -516,11 +498,11 @@ export default function Section6Resources({ projectData: _projectData }: { proje
                     <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
                         Record <span className="font-semibold text-slate-900">every resource used</span>, whether
                         self-funded, donated or sponsored: cash, educational materials, medical supplies, equipment
-                        and other contributions. For each one give the quantity, unit and PKR value, who contributed
+                        and other contributions. For each one give the quantity and unit, who contributed
                         it (name, email, mobile with country code), what it made possible, and the evidence trail.
                     </p>
                     <p className="mt-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Example:</span> 50 notebooks × PKR 100 = PKR 5,000 ·
+                        <span className="font-semibold text-slate-900">Example:</span> 50 notebooks (or PKR 5,000 cash) ·
                         contributed by a local bookshop · delivered to Class 4 (purchase receipt + handover photos).
                     </p>
                 </div>
@@ -793,12 +775,6 @@ export default function Section6Resources({ projectData: _projectData }: { proje
                             ))}
                         </div>
 
-                        {totalPkrValue > 0 ? (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-5 py-3.5 text-sm font-bold text-amber-800">
-                                <span>🧾 Total PKR value of contributions</span>
-                                <span>PKR {totalPkrValue.toLocaleString()}</span>
-                            </div>
-                        ) : null}
                         {Object.keys(moneyByUnit).length > 0 ? (
                             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50 px-5 py-3.5 text-sm font-bold text-indigo-700">
                                 <span>💵 Total money used</span>
