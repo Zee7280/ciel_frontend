@@ -77,6 +77,11 @@ test("an email deep link survives the login redirect (next=) and lands on Action
     const api = read("src/utils/api.ts");
     assert.match(api, /window\.location\.replace\(`\/login\$\{next\}`\)/);
     assert.match(api, /here\.startsWith\("\/dashboard"\)/, "only dashboard pages are remembered");
+    // The dashboard session guard (first thing that runs for a signed-out visitor) keeps it too,
+    // so the "Open member portal" email button lands on the portal after sign-in.
+    const guard = read("src/components/DashboardSessionGuard.tsx");
+    assert.match(guard, /router\.replace\(here\.startsWith\("\/dashboard"\) \? `\/login\?next=\$\{encodeURIComponent\(here\)\}` : "\/login"\)/);
+    assert.doesNotMatch(guard, /if \(decision\.action === "login"\) router\.replace\("\/login"\);/);
     const login = read("src/app/login/page.tsx");
     assert.match(login, /searchParams\.get\("next"\)/);
     assert.match(login, /isSafeInternalReturnPath\(nextParam\)/);

@@ -29,8 +29,12 @@ export default function DashboardSessionGuard() {
                 tokenValid: isTokenValid(token),
                 role: readDashboardNavRoleFromStorage(),
             });
-            if (decision.action === "login") router.replace("/login");
-            else if (decision.action === "redirect") router.replace(decision.to);
+            if (decision.action === "login") {
+                // Keep the page the person was sent to (an email deep link such as the member portal
+                // or Action Required) so login returns them there instead of the generic dashboard.
+                const here = `${window.location.pathname}${window.location.search}`;
+                router.replace(here.startsWith("/dashboard") ? `/login?next=${encodeURIComponent(here)}` : "/login");
+            } else if (decision.action === "redirect") router.replace(decision.to);
         };
         check();
 
