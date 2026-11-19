@@ -236,18 +236,21 @@ export function buildOpportunityApprovalModel(
     }
 
     // Contact points for each stage, so whoever reads the chain knows where a reminder goes.
+    // Only a real address: reviewer queue rows carry the faculty email as `supervision.contact`.
+    const emailish = (value: string): string => (value.includes("@") ? value : "");
     const facultyEmail =
-        pickStr(row, "faculty_contact_email", "faculty_email", "facultyEmail") ||
-        pickStr(supervision, "supervisor_email", "faculty_email", "email");
+        emailish(pickStr(row, "faculty_contact_email", "faculty_email", "facultyEmail")) ||
+        emailish(pickStr(supervision, "supervisor_email", "faculty_email", "official_email", "contact", "email"));
     const facultyPhone = formatPhoneDisplay(
         pickStr(row, "faculty_contact_phone", "faculty_phone") ||
             pickStr(supervision, "whatsapp_e164", "faculty_whatsapp", "supervisor_phone", "supervisor_whatsapp", "phone"),
     );
     const partnerEmail =
-        pickStr(row, "partner_contact_email", "partner_email", "partnerEmail") ||
-        pickStr(supervision, "partner_email", "external_partner_email") ||
-        pickStr(collab, "contact_email", "email") ||
-        (isPlaceholderOpportunityOrg(partnerOrg) ? "" : pickStr(partnerOrg, "contact_email", "email"));
+        emailish(pickStr(row, "partner_contact_email", "partner_email", "partnerEmail")) ||
+        emailish(pickStr(supervision, "partner_email", "external_partner_email")) ||
+        emailish(pickStr(collab, "contact_email", "official_email", "email")) ||
+        emailish(pickStr(executingPartner, "official_email", "contact_email", "email")) ||
+        (isPlaceholderOpportunityOrg(partnerOrg) ? "" : emailish(pickStr(partnerOrg, "contact_email", "official_email", "email")));
     const partnerPhone = formatPhoneDisplay(
         pickStr(row, "partner_contact_phone", "partner_phone") ||
             pickStr(supervision, "partner_whatsapp_e164", "partner_phone", "external_partner_phone") ||
