@@ -758,8 +758,8 @@ export default function StudentBrowseOpportunitiesPage() {
         return (
             <div className="mx-auto max-w-[1400px] space-y-5 pb-20">
                 <header>
-                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
-                    <p className="mt-1 text-sm text-ciel-text-mid">Published listings from Faculty, NGOs, Partners and CIEL PK.</p>
+                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse Community Service opportunities</h1>
+                    <p className="mt-1 text-sm text-ciel-text-mid">Every published Community Service listing from Faculty, NGOs, Partners, Universities and CIEL PK.</p>
                 </header>
                 <div className="flex flex-col justify-center items-center min-h-[280px] gap-3">
                     <Loader2 className="w-8 h-8 animate-spin text-ciel-green" />
@@ -776,9 +776,12 @@ export default function StudentBrowseOpportunitiesPage() {
                 style={{ background: "linear-gradient(135deg, #0f766e 0%, #14b8a6 52%, #5eead4 100%)" }}
             >
                 <div>
-                    <h1 className="text-[22px] font-extrabold tracking-tight sm:text-[24px]">Browse opportunities</h1>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/80">Community Service · Browse</p>
+                    <h1 className="mt-1 text-[22px] font-extrabold tracking-tight sm:text-[24px]">Browse Community Service opportunities</h1>
                     <p className="mt-1 max-w-2xl text-[13px] text-white/85">
-                        Published listings from Faculty, NGOs, Partners and CIEL PK. Apply here; once participation is approved, the project moves to My Reports.
+                        Every published Community Service listing from Faculty, NGOs, Partners, Universities and CIEL PK. Apply here; once
+                        participation is approved, the project moves to My Reports. Coursework, FYP and Venture records live in their own
+                        areas and on your Impact Portfolio.
                     </p>
                     <Link href="/dashboard/student/paths/community-service" className="mt-2 inline-block text-[11px] font-extrabold text-white/85 hover:underline">
                         ← Community Service hub

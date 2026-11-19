@@ -161,6 +161,14 @@ test("team members reach their member portal from My Reports, and the portal lea
     assert.match(portal, /href="\/dashboard\/student\/paths\/community-service\?view=workspace"[\s\S]{0,200}Back to My Reports/);
 });
 
+test("browse screens say they are Community Service (the only path with opportunities)", () => {
+    const browse = read("src/app/dashboard/student/browse/page.tsx");
+    assert.match(browse, /Browse Community Service opportunities/);
+    assert.match(browse, /Coursework, FYP and Venture records live in their own/);
+    const explore = read("src/components/opportunities/ExploreOpportunitiesView.tsx");
+    assert.match(explore, /Community Service Marketplace/);
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);

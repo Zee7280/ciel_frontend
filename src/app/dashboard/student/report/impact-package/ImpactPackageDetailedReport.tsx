@@ -200,7 +200,17 @@ export default function ImpactPackageDetailedReport({
         el?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
 
-    let visibleFields = 0;
+    // Search filter derived once per query, so render never mutates a counter mid-way.
+    const { filteredSections, visibleFields } = useMemo(() => {
+        const list = dossier.sections.map((section) => ({
+            section,
+            subs: section.subsections
+                .map((sub) => ({ sub, rows: sub.rows.filter((item) => detailedReportMatchesQuery(item, sub, query)) }))
+                .filter((item) => item.rows.length),
+        }));
+        const total = list.reduce((sum, entry) => sum + entry.subs.reduce((acc, item) => acc + item.rows.length, 0), 0);
+        return { filteredSections: list, visibleFields: total };
+    }, [dossier.sections, query]);
 
     return (
         <div id="report" className={`view${compact ? " dr-compact" : ""}`}>
@@ -252,12 +262,7 @@ export default function ImpactPackageDetailedReport({
                     </div>
                     {compact ? null : <div className="coverage">{dossier.coverage}</div>}
                     <div id="report-sections">
-                        {dossier.sections.map((section) => {
-                            const subs = section.subsections.map((sub) => {
-                                const rows = sub.rows.filter((item) => detailedReportMatchesQuery(item, sub, query));
-                                visibleFields += rows.length;
-                                return { sub, rows };
-                            }).filter((item) => item.rows.length);
+                        {filteredSections.map(({ section, subs }) => {
                             if (query.trim() && !subs.length) return null;
                             const open = openIds.includes(section.id) || Boolean(query.trim());
                             return (
