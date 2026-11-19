@@ -143,9 +143,20 @@ function mapPublicOpportunity(raw: Record<string, unknown>): ExploreProject {
     const sdgLabel = buildSdgFilterLabel(raw);
     const sdgIdRaw = (asRecord(raw.sdg_info)?.sdg_id as unknown) ?? raw.sdg;
     const sdg = findSdgById(sdgIdRaw as string | number | undefined);
-    const sdgIds = Array.isArray(raw.sdg_ids)
+    // Every registered SDG for the card: an explicit `sdg_ids` list, else the primary plus the
+    // supporting ones (`secondary_sdgs`, as the public and partner payloads send them).
+    const secondaryIds = (Array.isArray(raw.secondary_sdgs) ? raw.secondary_sdgs : [])
+        .map((row) => {
+            const rec = asRecord(row);
+            const id = rec ? (rec.sdg_id ?? rec.sdgId ?? rec.goal_number ?? rec.id) : row;
+            return id != null && String(id).trim() ? String(id).trim() : "";
+        })
+        .filter(Boolean);
+    const sdgIds = Array.isArray(raw.sdg_ids) && raw.sdg_ids.length
         ? raw.sdg_ids.map((id) => String(id))
-        : [sdgIdRaw].filter((id) => id != null && String(id).trim()).map((id) => String(id));
+        : [...[sdgIdRaw].filter((id) => id != null && String(id).trim()).map((id) => String(id)), ...secondaryIds].filter(
+              (id, i, all) => all.indexOf(id) === i,
+          );
     const path_key = classifyBrowsePath(opportunityTypes.length ? opportunityTypes : raw.types, raw.path_key);
     const org =
         str(raw.partner_name) ||

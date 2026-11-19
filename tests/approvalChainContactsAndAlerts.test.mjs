@@ -169,6 +169,25 @@ test("browse screens say they are Community Service (the only path with opportun
     assert.match(explore, /Community Service Marketplace/);
 });
 
+test("supporting SDGs show everywhere the primary does: browse cards, faculty approvals list; report payload carries them", () => {
+    const explore = read("src/components/opportunities/ExploreOpportunitiesView.tsx");
+    assert.match(explore, /const secondaryIds = \(Array\.isArray\(raw\.secondary_sdgs\) \? raw\.secondary_sdgs : \[\]\)/);
+    assert.match(explore, /Array\.isArray\(raw\.sdg_ids\) && raw\.sdg_ids\.length/);
+    const approvals = read("src/utils/facultyApprovals.ts");
+    assert.match(approvals, /sdgIds\?: string\[\];/);
+    assert.match(approvals, /sdgIds: Array\.isArray\(\(r as \{ sdg_ids\?: unknown \}\)\.sdg_ids\)/);
+    const page = read("src/app/dashboard/faculty/approvals/page.tsx");
+    assert.equal((page.match(/project\.sdgIds\?\.length \? project\.sdgIds\.map\(\(id\) => `SDG \$\{id\}`\)\.join\(" \+ "\)/g) || []).length, 2, "both approvals cards");
+    assert.doesNotMatch(page, /^\s*project\.sdg \? `SDG \$\{project\.sdg\}` : "",$/m);
+});
+
+test("the notifications dropdown stays above the report's sticky toolbar on phones", () => {
+    const header = read("src/components/DashboardHeader.tsx");
+    assert.match(header, /sticky top-0 z-40 flex min-h-\[56px\]/, "header (and its dropdown) above the z-30 report toolbar");
+    const css = read("src/app/dashboard/student/report/community-engagement-report.css");
+    assert.match(css, /\.cer \.cer-sticky-head \{\s*position: sticky;\s*top: 56px;\s*z-index: 30;/);
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);

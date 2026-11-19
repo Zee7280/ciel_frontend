@@ -497,7 +497,7 @@ export default function FacultyApprovalsPage() {
                                       { mode: "decided" },
                                   )}
                                   facts={[
-                                      project.sdg ? `SDG ${project.sdg}` : "",
+                                      project.sdgIds?.length ? project.sdgIds.map((id) => `SDG ${id}`).join(" + ") : project.sdg ? `SDG ${project.sdg}` : "",
                                       project.totalHours != null ? `${project.totalHours}h` : "",
                                       project.eisScore != null ? `EIS ${project.eisScore}` : "",
                                   ]
@@ -593,7 +593,7 @@ export default function FacultyApprovalsPage() {
                                     },
                                 )}
                                 facts={[
-                                    project.sdg ? `SDG ${project.sdg}` : "",
+                                    project.sdgIds?.length ? project.sdgIds.map((id) => `SDG ${id}`).join(" + ") : project.sdg ? `SDG ${project.sdg}` : "",
                                     project.totalHours != null ? `${project.totalHours}h` : "",
                                     project.eisScore != null ? `EIS ${project.eisScore}` : "",
                                 ]

@@ -24,6 +24,8 @@ export type FacultyApprovalRow = {
     totalHours?: number;
     eisScore?: number;
     sdg?: string;
+    /** Every registered goal (primary first, then supporting) when the API sends `sdg_ids`. */
+    sdgIds?: string[];
     opportunityStatus?: string;
     workflowStage?: string | null;
     approvalVisibility?: FacultyApprovalVisibility;
@@ -131,6 +133,9 @@ export function mapFacultyApprovalBackendRow(raw: unknown): FacultyApprovalRow |
         totalHours: pickNum(r, "totalHours", "total_hours", "verified_hours"),
         eisScore: pickNum(r, "eisScore", "eis_score"),
         sdg: pickStr(r, "sdg", "primary_sdg", "sdg_label") || undefined,
+        sdgIds: Array.isArray((r as { sdg_ids?: unknown }).sdg_ids)
+            ? ((r as { sdg_ids: unknown[] }).sdg_ids.map((id) => String(id ?? "").trim()).filter(Boolean) as string[])
+            : undefined,
         opportunityStatus: pickStr(r, "opportunityStatus", "status", "opportunity_status") || undefined,
         workflowStage: pickStr(r, "workflowStage", "workflow_stage", "approval_stage") || null,
         approvalVisibility: pickApprovalVisibility(r),

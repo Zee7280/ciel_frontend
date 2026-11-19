@@ -434,7 +434,7 @@ function DashboardHeaderInner() {
     };
 
     return (
-        <header className={`ciel-transition sticky top-0 z-30 flex min-h-[56px] min-w-0 items-center justify-between gap-2 overflow-x-clip border-b border-[#dde5ea] bg-white px-3 py-2 font-sans sm:h-[72px] sm:gap-3 sm:px-7 sm:py-0 lg:ml-[var(--ciel-sidebar-width)] ${pathname.startsWith("/dashboard/student/report") ? "lg:hidden" : ""}`}>
+        <header className={`ciel-transition sticky top-0 z-40 flex min-h-[56px] min-w-0 items-center justify-between gap-2 overflow-x-clip border-b border-[#dde5ea] bg-white px-3 py-2 font-sans sm:h-[72px] sm:gap-3 sm:px-7 sm:py-0 lg:ml-[var(--ciel-sidebar-width)] ${pathname.startsWith("/dashboard/student/report") ? "lg:hidden" : ""}`}>
             <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {hasPageChrome ? null : (
