@@ -235,12 +235,15 @@ export function ReportMissionHero({
         if (uiStep > 7 && evidence) progressPills.push([String(evidence), "EVIDENCE FILES"]);
         if (uiStep > 8 && competency) progressPills.push([`${competency}/5`, "COMPETENCY"]);
     }
-    const sdgLabel = a.sdgs.length
-        ? a.sdgs
-              .filter((row) => row.role === "primary")
-              .map((row) => `SDG ${row.goalNumber}`)
-              .join(" + ") || `${a.sdgs.length} SDG${a.sdgs.length === 1 ? "" : "s"}`
-        : "—";
+    // Every SDG registered on the opportunity: primary first, then supporting ("SDG 12 + SDG 11"),
+    // the same set the flashcard shows under SDG alignment.
+    const registeredSdgNumbers = [
+        ...a.sdgs.filter((row) => row.role === "primary"),
+        ...a.sdgs.filter((row) => row.role !== "primary"),
+    ]
+        .map((row) => String(row.goalNumber ?? "").trim())
+        .filter((n, i, all) => n && all.indexOf(n) === i);
+    const sdgLabel = registeredSdgNumbers.length ? registeredSdgNumbers.map((n) => `SDG ${n}`).join(" + ") : "—";
     return (
         <div className="cer-mission">
             <div>
@@ -356,7 +359,7 @@ const ACHIEVEMENT_COPY: Record<number, (a: ReturnType<typeof chromeAgg>, require
     1: (a, requiredHours) => ({
         headline: "READY TO BEGIN",
         body: "Your opportunity is connected. Build your participation record first.",
-        badges: [`🎯 ${requiredHours}h target/member`, `🌍 ${a.sdgs.filter((row) => row.role === "primary").length || a.sdgs.length} registered SDG${(a.sdgs.filter((row) => row.role === "primary").length || a.sdgs.length) === 1 ? "" : "s"}`],
+        badges: [`🎯 ${requiredHours}h target/member`, `🌍 ${a.sdgs.length} registered SDG${a.sdgs.length === 1 ? "" : "s"}`],
     }),
     2: (a) => ({
         headline: "PARTICIPATION RECORD STARTED",
