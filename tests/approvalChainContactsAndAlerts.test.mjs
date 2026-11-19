@@ -85,6 +85,14 @@ test("an email deep link survives the login redirect (next=) and lands on Action
     assert.match(page, /\?view=create&filter=action/);
 });
 
+test("a dead reviewer link explains that each round issues a fresh link and points to the newest email / dashboard", () => {
+    for (const p of ["src/app/verify/faculty/page.tsx", "src/app/verify/partner/page.tsx"]) {
+        const src = read(p);
+        assert.match(src, /Each review round issues a fresh link/, p);
+        assert.match(src, /open the newest CIEL PK email/, p);
+    }
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);

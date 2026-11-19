@@ -95,7 +95,7 @@ function PartnerVerifyContent() {
                     setStatus("error");
                     setMessage(
                         res.status === 404
-                            ? "This verification link is no longer valid."
+                            ? "This verification link is no longer valid. Each review round issues a fresh link: if the creator resubmitted a revised version (or sent a reminder), open the newest CIEL PK email, or sign in to your partner dashboard to decide there."
                             : "Could not open this link. Please try again.",
                     );
                     return;
