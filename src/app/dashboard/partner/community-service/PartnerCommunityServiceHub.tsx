@@ -572,6 +572,15 @@ export default function PartnerCommunityServiceHub() {
                             background={MOCKUP_GRADIENTS.teal}
                         />
                         <MockupActionCard
+                            href="/dashboard/partner/browse"
+                            emoji="🔎"
+                            ghost="🔎"
+                            title="Browse Opportunities"
+                            subtitle="Every published Community Service opportunity on CIEL PK — from Faculty, NGOs, Partners, Universities and students. View only."
+                            badge="DISCOVER"
+                            background={MOCKUP_GRADIENTS.blue}
+                        />
+                        <MockupActionCard
                             href={`${CS_BASE}?view=approvals`}
                             emoji="✅"
                             ghost="✅"

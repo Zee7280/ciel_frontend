@@ -105,6 +105,26 @@ test("team roster changes pop up once on any dashboard page (email + in-app noti
     assert.match(layout, /<TeamChangePopup \/>/, "mounted for every dashboard page");
 });
 
+test("Browse Opportunities is offered to Faculty, Partner, NGO and University from their Community Service hubs", () => {
+    const tiles = [
+        ["src/app/dashboard/faculty/community-service/page.tsx", "/dashboard/faculty/browse"],
+        ["src/app/dashboard/partner/community-service/PartnerCommunityServiceHub.tsx", "/dashboard/partner/browse"],
+        ["src/app/dashboard/partner/community-service/NgoCommunityServiceHub.tsx", "/dashboard/partner/browse"],
+        ["src/app/dashboard/partner/community-service/UniversityCommunityServiceHub.tsx", "/dashboard/partner/browse"],
+    ];
+    for (const [p, href] of tiles) {
+        const src = read(p);
+        assert.match(src, new RegExp(`href="${href}"[\\s\\S]{0,200}title="Browse Opportunities"`), p);
+    }
+    // The pages themselves: the published list, view only, inside the dashboard chrome.
+    for (const p of ["src/app/dashboard/faculty/browse/page.tsx", "src/app/dashboard/partner/browse/page.tsx"]) {
+        assert.match(read(p), /<ExploreOpportunitiesView variant="dashboard" \/>/, p);
+    }
+    const sidebar = read("src/components/Sidebar.tsx");
+    assert.match(sidebar, /href: "\/dashboard\/partner\/browse"/);
+    assert.match(sidebar, /href: "\/dashboard\/faculty\/browse"/);
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);
