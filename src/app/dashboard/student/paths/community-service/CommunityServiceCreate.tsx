@@ -179,12 +179,27 @@ function pendingReviewerRole(op: MineRow): "faculty" | "partner" | "admin" | "no
     return "none";
 }
 
+/** A phone number is never a name: "Waiting for 03021414141 to approve" reads wrong on every card. */
+function looksLikePhone(value: string | null | undefined): boolean {
+    const v = String(value ?? "").trim();
+    return /^[+\d][\d\s().-]{6,}$/.test(v) && v.replace(/\D/g, "").length >= 7;
+}
+
+function personName(value: string | null | undefined): string {
+    const v = String(value ?? "").trim();
+    return v && !looksLikePhone(v) && !v.includes("@") ? v : "";
+}
+
 function currentReviewer(op: MineRow): string {
     const role = pendingReviewerRole(op);
-    if (role === "faculty") return op.faculty_contact_name?.trim() || "Faculty";
-    if (role === "partner") return op.partner_contact_name?.trim() || "Partner / NGO";
+    if (role === "faculty") return personName(op.faculty_contact_name) || "Faculty";
+    if (role === "partner") {
+        // Contact person, else the organisation the tracker names ("NGO"), else the generic label.
+        const org = personName(op.currently_with);
+        return personName(op.partner_contact_name) || (org && !/^partner \/ ngo$/i.test(org) ? org : "") || "Partner / NGO";
+    }
     if (role === "admin") return "CIEL PK";
-    return op.currently_with?.trim() || "CIEL PK";
+    return personName(op.currently_with) || "CIEL PK";
 }
 
 /** Which stage is currently pending, for the "Pending X" badge on Under Review cards. */

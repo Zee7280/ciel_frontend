@@ -125,6 +125,14 @@ test("Browse Opportunities is offered to Faculty, Partner, NGO and University fr
     assert.match(sidebar, /href: "\/dashboard\/faculty\/browse"/);
 });
 
+test("a phone number is never shown as the reviewer's name on the student card", () => {
+    assert.match(create, /function looksLikePhone\(value: string \| null \| undefined\): boolean/);
+    assert.match(create, /function personName\(value: string \| null \| undefined\): string/);
+    assert.match(create, /if \(role === "faculty"\) return personName\(op\.faculty_contact_name\) \|\| "Faculty";/);
+    assert.match(create, /return personName\(op\.partner_contact_name\) \|\| \(org && !\/\^partner \\\/ ngo\$\/i\.test\(org\) \? org : ""\) \|\| "Partner \/ NGO";/);
+    assert.doesNotMatch(create, /return op\.partner_contact_name\?\.trim\(\) \|\| "Partner \/ NGO";/);
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);
