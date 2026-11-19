@@ -573,6 +573,32 @@ export default function CommunityServiceWorkspace({
             // workflow "live". Only skip rejected seats.
             const st = String(project.status || "").toLowerCase();
             if (st.includes("reject")) continue;
+            if (project.is_team_member) {
+                // A team member never files a report: their only job is attendance, logged from the
+                // member portal (the same page the "You were added" email opens). The lead's report
+                // stays readable.
+                const portalHref = `/dashboard/student/projects/${encodeURIComponent(project.id)}/participation`;
+                out.push({
+                    id: `proj-${project.id}`,
+                    filter: project.report_status ? "reports" : "ready",
+                    stageLabel: "Stage 2 — Team member · attendance",
+                    title: project.title,
+                    meta: [project.team_display_name, "Team member — your lead files the report"].filter(Boolean).join(" · "),
+                    journeyHead: "ATTENDANCE",
+                    journeySub: project.report_status ? `Team report: ${project.report_status.replace(/_/g, " ")}` : "Log your hours",
+                    sideTitle: "Your Next Action",
+                    sideDetail: "Log attendance in your member portal",
+                    actions: [
+                        { label: "Open member portal", href: portalHref, style: "primary" },
+                        {
+                            label: "View team report",
+                            href: `/dashboard/student/report?projectId=${encodeURIComponent(project.id)}`,
+                            style: "soft",
+                        },
+                    ],
+                });
+                continue;
+            }
             out.push({
                 id: `proj-${project.id}`,
                 filter: project.report_status ? "reports" : "ready",

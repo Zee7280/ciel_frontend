@@ -148,6 +148,19 @@ test("report mission card lists every registered SDG (primary + supporting), mat
     assert.match(merge, /role: "secondary"/, "supporting SDGs are part of the merged snapshot rows");
 });
 
+test("team members reach their member portal from My Reports, and the portal leads back there (no orphan page)", () => {
+    const ws = read("src/app/dashboard/student/paths/community-service/CommunityServiceWorkspace.tsx");
+    assert.match(ws, /if \(project\.is_team_member\) \{/);
+    assert.match(ws, /const portalHref = `\/dashboard\/student\/projects\/\$\{encodeURIComponent\(project\.id\)\}\/participation`;/);
+    assert.match(ws, /label: "Open member portal", href: portalHref, style: "primary"/);
+    assert.match(ws, /label: "View team report"/);
+    const types = read("src/app/dashboard/student/types.ts");
+    assert.match(types, /is_team_member\?: boolean;/);
+    const portal = read("src/app/dashboard/student/projects/[projectId]/participation/page.tsx");
+    assert.doesNotMatch(portal, /\/dashboard\/student\/engagement"/, "the legacy Engagement page is not in the student nav");
+    assert.match(portal, /href="\/dashboard\/student\/paths\/community-service\?view=workspace"[\s\S]{0,200}Back to My Reports/);
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);

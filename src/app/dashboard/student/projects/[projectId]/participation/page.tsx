@@ -33,7 +33,7 @@ export default function TeamMemberParticipationPage() {
 
     useEffect(() => {
         if (!projectId) {
-            router.replace("/dashboard/student/engagement");
+            router.replace("/dashboard/student/paths/community-service?view=workspace");
             return;
         }
         void (async () => {
@@ -72,8 +72,11 @@ export default function TeamMemberParticipationPage() {
         return (
             <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center">
                 <p className="text-slate-600">{error || "Participation not found."}</p>
-                <Link href="/dashboard/student/engagement" className="mt-4 inline-block text-sm font-semibold text-blue-600">
-                    Back to Participation
+                <Link
+                    href="/dashboard/student/paths/community-service?view=workspace"
+                    className="mt-4 inline-block text-sm font-semibold text-blue-600"
+                >
+                    Back to My Reports
                 </Link>
             </div>
         );
@@ -84,10 +87,10 @@ export default function TeamMemberParticipationPage() {
     return (
         <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
             <Link
-                href="/dashboard/student/engagement"
+                href="/dashboard/student/paths/community-service?view=workspace"
                 className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800"
             >
-                <ArrowLeft className="h-4 w-4" /> Participation
+                <ArrowLeft className="h-4 w-4" /> Back to My Reports
             </Link>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

@@ -19,6 +19,10 @@ export interface ActiveProject {
     participation_type?: string;
     academic_integration_type?: string | null;
     team_size?: number;
+    /** Seat on a team project where someone else is the lead: attendance only, no report of their own. */
+    is_team_member?: boolean;
+    is_team_lead?: boolean;
+    team_display_name?: string | null;
 }
 
 export interface Deadline {
