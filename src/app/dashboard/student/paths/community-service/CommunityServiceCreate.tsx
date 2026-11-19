@@ -13,7 +13,13 @@ import {
 } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import DraftsLandingView from "@/app/dashboard/student/create-opportunity/DraftsLandingView";
 import { ApprovalChain, buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
-import { formatSentWaiting, whatsappHrefFromE164 } from "@/utils/reminderLinks";
+import { formatSentWaiting, whatsappDigits, whatsappShareHref } from "@/utils/reminderLinks";
+import {
+    CIEL_SUPPORT_EMAIL,
+    CIEL_SUPPORT_WHATSAPP_DISPLAY,
+    CIEL_SUPPORT_WHATSAPP_E164,
+    formatPhoneDisplay,
+} from "@/utils/cielContact";
 import {
     canEditReturnedOpportunity,
     isOpportunityPermanentlyRejected,
@@ -497,30 +503,63 @@ function ProposalCard({ op, tab, highlighted }: { op: MineRow; tab: StatusTab; h
               : op.approval_route?.faculty;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const openUrl = openPath ? `${origin}${openPath}` : "";
-    const remindSubject = publicCode
-        ? `CIEL PK Community Service Approval · ${publicCode}`
-        : `CIEL PK reminder — ${op.title}`;
-    const remindBody = [
-        "CIEL PK · Approval Reminder",
-        `Opportunity: ${op.title}`,
-        publicCode ? `ID: ${publicCode}` : "",
-        `Current Status: ${op.currently_with || who}`,
-        op.next_step ? `Next: ${op.next_step}` : "",
-        "",
-        "Please review the opportunity when convenient.",
-        openUrl ? `Open Approval: ${openUrl}` : "",
-    ]
-        .filter((line) => line !== "")
-        .join("\n");
     const canRemindReviewer =
         tab === "review" && (reviewerRole === "faculty" || reviewerRole === "partner" || reviewerRole === "admin");
-    const reviewerPhone =
+    // Where a reminder for the pending stage actually goes — shown before anything is sent.
+    const reviewerEmail =
+        reviewerRole === "faculty"
+            ? op.faculty_contact_email?.trim() || ""
+            : reviewerRole === "partner"
+              ? op.partner_contact_email?.trim() || ""
+              : reviewerRole === "admin"
+                ? CIEL_SUPPORT_EMAIL
+                : "";
+    const reviewerPhoneRaw =
         reviewerRole === "faculty"
             ? op.faculty_contact_phone
             : reviewerRole === "partner"
               ? op.partner_contact_phone
-              : null;
-    const whatsappHref = canRemindReviewer ? whatsappHrefFromE164(reviewerPhone, remindBody) : null;
+              : reviewerRole === "admin"
+                ? CIEL_SUPPORT_WHATSAPP_E164
+                : null;
+    const reviewerDigits = whatsappDigits(reviewerPhoneRaw || "");
+    const reviewerPhoneDisplay = reviewerRole === "admin" ? CIEL_SUPPORT_WHATSAPP_DISPLAY : formatPhoneDisplay(reviewerPhoneRaw || "");
+    const emailSubject =
+        reviewerRole === "faculty"
+            ? `CIEL PK — faculty approval requested: ${op.title}`
+            : reviewerRole === "partner"
+              ? `CIEL PK — partner verification requested: ${op.title}`
+              : `CIEL PK — ready for final approval: ${op.title}`;
+    const emailContent =
+        reviewerRole === "admin"
+            ? "A reminder to the CIEL PK review desk that Faculty and Partner approvals are complete and this opportunity is waiting for final platform approval, with the link to the admin approvals queue."
+            : `The official CIEL PK verification email (sent by CIEL PK, not from your mailbox): the opportunity title and ID, your name and university, the flashcard summary, and a secure one-click link for ${who} to Approve, Request revision or Reject. It resends the same link if the earlier one expired.`;
+    const whatsappText = [
+        `Hi ${who},`,
+        `${publicCode ? `${publicCode} — ` : ""}"${op.title}" is awaiting your approval on CIEL PK.`,
+        reviewerRole === "admin"
+            ? "Faculty and partner approvals are complete; it is ready for CIEL PK final approval."
+            : "CIEL PK has emailed you the approval link — please check Inbox and Spam/Junk.",
+        openUrl ? `Open approval: ${openUrl}` : "",
+        "Thank you!",
+    ]
+        .filter((line) => line !== "")
+        .join("\n");
+    // wa.me opens the WhatsApp app on a phone; on a computer WhatsAppLinkBridge hands it to the desktop app or WhatsApp Web.
+    const whatsappHref = canRemindReviewer
+        ? reviewerDigits
+            ? `https://wa.me/${reviewerDigits}?text=${encodeURIComponent(whatsappText)}`
+            : whatsappShareHref(whatsappText)
+        : null;
+    const [preview, setPreview] = useState<"email" | "whatsapp" | null>(null);
+    const copyText = async (text: string, label: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            toast.success(`${label} copied`);
+        } catch {
+            toast.error("Could not copy. Select the text and copy it manually.");
+        }
+    };
     const sentWaiting = formatSentWaiting(op.waiting_since);
     const oppRecord: Record<string, unknown> = {
         ...op,
@@ -572,6 +611,7 @@ function ProposalCard({ op, tab, highlighted }: { op: MineRow; tab: StatusTab; h
                         ? `Verification email sent to ${sentTo}. Inbox + Spam check karein.`
                         : `Verification email sent to ${who}. Inbox + Spam check karein.`),
             );
+            setPreview(null);
         } catch {
             toast.error("Could not send the email. Network/API check karein.");
         } finally {
@@ -607,7 +647,9 @@ function ProposalCard({ op, tab, highlighted }: { op: MineRow; tab: StatusTab; h
                 ? `Use Email CIEL PK to resend the final verification reminder. Also check Spam/Junk on the CIEL inbox.`
                 : reviewerRole === "none"
                   ? "This proposal is no longer waiting on a reviewer reminder."
-                  : `Use Email ${who} to resend their verification link. Also ask them to check Spam/Junk.`
+                  : reviewerEmail
+                    ? `Email ${who} resends their verification link to ${reviewerEmail}. WhatsApp ${who} sends a nudge${reviewerDigits ? ` to ${reviewerPhoneDisplay}` : ""}. Also ask them to check Spam/Junk.`
+                    : `Use Email ${who} to resend their verification link. Also ask them to check Spam/Junk.`
             : "This opportunity stays here until the current reviewer decides. You will be notified.";
     let tone: "ok" | "wait" | "rev" = reviewerRole === "none" && tab === "review" ? "ok" : "wait";
 
@@ -718,32 +760,30 @@ function ProposalCard({ op, tab, highlighted }: { op: MineRow; tab: StatusTab; h
                         <button
                             type="button"
                             disabled={sendingEmail}
-                            onClick={() => void sendReviewerEmail()}
-                            className="rounded-[9px] bg-[#edf4fb] px-2.5 py-2 text-[10px] font-black text-[#376d9f] disabled:opacity-60"
+                            aria-expanded={preview === "email"}
+                            title={reviewerEmail ? `Goes to ${reviewerEmail}` : "No email saved on this opportunity"}
+                            onClick={() => setPreview((current) => (current === "email" ? null : "email"))}
+                            className={
+                                "rounded-[9px] px-2.5 py-2 text-[10px] font-black disabled:opacity-60 " +
+                                (preview === "email" ? "bg-[#376d9f] text-white" : "bg-[#edf4fb] text-[#376d9f]")
+                            }
                         >
                             {sendingEmail ? "Sending…" : `Email ${who}`}
                         </button>
                     ) : null}
                     {canRemindReviewer ? (
-                        whatsappHref ? (
-                            <a
-                                href={whatsappHref}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded-[9px] bg-[#e8f8ee] px-2.5 py-2 text-[10px] font-black text-[#1f7a46]"
-                            >
-                                WhatsApp {who}
-                            </a>
-                        ) : (
-                            <button
-                                type="button"
-                                disabled
-                                title="No WhatsApp number saved for this reviewer"
-                                className="cursor-not-allowed rounded-[9px] bg-[#edf2f3] px-2.5 py-2 text-[10px] font-black text-[#8a9aa3] opacity-70"
-                            >
-                                WhatsApp {who}
-                            </button>
-                        )
+                        <button
+                            type="button"
+                            aria-expanded={preview === "whatsapp"}
+                            title={reviewerDigits ? `Goes to ${reviewerPhoneDisplay}` : "No WhatsApp number saved — you pick the contact in WhatsApp"}
+                            onClick={() => setPreview((current) => (current === "whatsapp" ? null : "whatsapp"))}
+                            className={
+                                "rounded-[9px] px-2.5 py-2 text-[10px] font-black " +
+                                (preview === "whatsapp" ? "bg-[#1f7a46] text-white" : "bg-[#e8f8ee] text-[#1f7a46]")
+                            }
+                        >
+                            WhatsApp {who}
+                        </button>
                     ) : null}
                     {reportCta ? (
                         <Link
@@ -754,6 +794,86 @@ function ProposalCard({ op, tab, highlighted }: { op: MineRow; tab: StatusTab; h
                         </Link>
                     ) : null}
                 </div>
+                {canRemindReviewer && preview === "email" ? (
+                    <div data-ciel-email-preview className="rounded-[13px] border border-[#cfe0f2] bg-[#f4f8fd] px-3 py-2.5 text-[10.5px] text-[#2f4a5a]">
+                        <p className="text-[9px] font-black uppercase tracking-[0.06em] text-[#376d9f]">Email preview · goes to</p>
+                        <b className="mt-0.5 block break-all text-[11.5px] text-[#16313d]">
+                            {reviewerRole === "admin" ? `CIEL PK review desk · ${CIEL_SUPPORT_EMAIL}` : reviewerEmail || "No email is saved on this opportunity"}
+                        </b>
+                        <p className="mt-1 leading-snug">
+                            <span className="font-black">Subject:</span> {emailSubject}
+                        </p>
+                        <p className="mt-1 leading-snug">
+                            <span className="font-black">Content:</span> {emailContent}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                            <button
+                                type="button"
+                                disabled={sendingEmail || !reviewerEmail}
+                                onClick={() => void sendReviewerEmail()}
+                                className="rounded-[9px] bg-[#376d9f] px-2.5 py-1.5 text-[10px] font-black text-white disabled:opacity-60"
+                            >
+                                {sendingEmail ? "Sending…" : `Send email to ${who}`}
+                            </button>
+                            {reviewerEmail ? (
+                                <button
+                                    type="button"
+                                    onClick={() => void copyText(reviewerEmail, "Email address")}
+                                    className="rounded-[9px] bg-white px-2.5 py-1.5 text-[10px] font-black text-[#376d9f] ring-1 ring-[#cfe0f2]"
+                                >
+                                    Copy address
+                                </button>
+                            ) : null}
+                            <button
+                                type="button"
+                                onClick={() => setPreview(null)}
+                                className="rounded-[9px] px-2.5 py-1.5 text-[10px] font-black text-[#6b7c86]"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
+                {canRemindReviewer && preview === "whatsapp" && whatsappHref ? (
+                    <div data-ciel-whatsapp-preview className="rounded-[13px] border border-[#bfe3d6] bg-[#f3fbf7] px-3 py-2.5 text-[10.5px] text-[#2f4a5a]">
+                        <p className="text-[9px] font-black uppercase tracking-[0.06em] text-[#1f7a46]">WhatsApp preview · goes to</p>
+                        <b className="mt-0.5 block text-[11.5px] text-[#16313d]">
+                            {reviewerDigits
+                                ? `${who} · ${reviewerPhoneDisplay}`
+                                : `No WhatsApp number is saved for ${who} — WhatsApp will ask you to pick the contact`}
+                        </b>
+                        <pre className="mt-1.5 whitespace-pre-wrap break-words rounded-[9px] border border-[#d6ece2] bg-white px-2.5 py-2 font-sans text-[10.5px] leading-snug text-[#2f4a5a]">
+                            {whatsappText}
+                        </pre>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                            <a
+                                href={whatsappHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-[9px] bg-[#1f7a46] px-2.5 py-1.5 text-[10px] font-black text-white"
+                            >
+                                Open WhatsApp
+                            </a>
+                            <button
+                                type="button"
+                                onClick={() => void copyText(whatsappText, "Message")}
+                                className="rounded-[9px] bg-white px-2.5 py-1.5 text-[10px] font-black text-[#1f7a46] ring-1 ring-[#bfe3d6]"
+                            >
+                                Copy message
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPreview(null)}
+                                className="rounded-[9px] px-2.5 py-1.5 text-[10px] font-black text-[#6b7c86]"
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <p className="mt-1.5 text-[9.5px] text-[#6b7c86]">
+                            Opens the WhatsApp app on your phone or computer, or WhatsApp Web in this browser, with the message filled in.
+                        </p>
+                    </div>
+                ) : null}
             </div>
         </article>
     );

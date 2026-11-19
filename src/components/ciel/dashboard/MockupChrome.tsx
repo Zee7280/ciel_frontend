@@ -123,6 +123,8 @@ export function MockupActionCard({
     locked,
     full,
     hot,
+    alertCount,
+    alertLabel,
     onPrefetch,
 }: {
     href?: string;
@@ -136,17 +138,37 @@ export function MockupActionCard({
     locked?: boolean;
     full?: boolean;
     hot?: boolean;
+    /** Items waiting on the person behind this tile: shows a blinking “N NOTIFICATIONS” alert so it cannot be missed. */
+    alertCount?: number;
+    /** Singular noun for the alert (default “notification”). */
+    alertLabel?: string;
     onPrefetch?: () => void;
 }) {
-    const className = `relative min-h-[140px] overflow-hidden rounded-[24px] px-4 py-4 text-left text-white shadow-[0_7px_15px_rgba(23,49,57,.08)] transition duration-[220ms] hover:-translate-y-[3px] hover:shadow-[0_14px_24px_rgba(23,49,57,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#15988b] sm:min-h-[158px] sm:px-[22px] sm:py-5 ${full ? "sm:col-span-2" : ""} ${locked ? "after:absolute after:bottom-3.5 after:left-4 after:text-[9px] after:font-[950] after:tracking-[0.08em] after:text-white/80 after:content-['SUBSCRIPTION'] sm:after:left-[22px]" : ""}`;
+    const alerts = typeof alertCount === "number" && Number.isFinite(alertCount) && alertCount > 0 ? Math.floor(alertCount) : 0;
+    const alertNoun = (alertLabel || "notification").trim();
+    const alertText = `${alerts} ${alertNoun}${alerts === 1 ? "" : "s"}`.toUpperCase();
+    const className = `relative min-h-[140px] overflow-hidden rounded-[24px] px-4 py-4 text-left text-white shadow-[0_7px_15px_rgba(23,49,57,.08)] transition duration-[220ms] hover:-translate-y-[3px] hover:shadow-[0_14px_24px_rgba(23,49,57,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#15988b] sm:min-h-[158px] sm:px-[22px] sm:py-5 ${full ? "sm:col-span-2" : ""} ${locked ? "after:absolute after:bottom-3.5 after:left-4 after:text-[9px] after:font-[950] after:tracking-[0.08em] after:text-white/80 after:content-['SUBSCRIPTION'] sm:after:left-[22px]" : ""} ${alerts ? "ring-2 ring-[#ff5a5f]/70 ring-offset-2 ring-offset-white" : ""}`;
     const inner = (
         <>
-            <span
-                className={`absolute right-4 top-3.5 rounded-[18px] px-2.5 py-1.5 text-[9.5px] font-[950] tracking-[0.04em] ${
-                    hot ? "bg-[#ffe7b3] text-[#7a4b00]" : "bg-white text-[#0e756e]"
-                }`}
-            >
-                {badge}
+            <span className="absolute right-4 top-3.5 flex items-center gap-1.5">
+                {alerts ? (
+                    <span
+                        data-ciel-tile-alert
+                        role="status"
+                        aria-live="polite"
+                        className="inline-flex animate-pulse items-center gap-1.5 rounded-[18px] bg-[#ff3b30] px-2.5 py-1.5 text-[9.5px] font-[950] tracking-[0.04em] text-white shadow-[0_0_0_3px_rgba(255,59,48,.25)] motion-reduce:animate-none"
+                    >
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
+                        {alertText}
+                    </span>
+                ) : null}
+                <span
+                    className={`rounded-[18px] px-2.5 py-1.5 text-[9.5px] font-[950] tracking-[0.04em] ${
+                        hot ? "bg-[#ffe7b3] text-[#7a4b00]" : "bg-white text-[#0e756e]"
+                    }`}
+                >
+                    {badge}
+                </span>
             </span>
             <span className="mb-[18px] block text-[29px] leading-none">{emoji}</span>
             <h3 className="m-0 pr-20 text-[18px] font-[950] leading-tight sm:pr-24 sm:text-[21px]">{title}</h3>

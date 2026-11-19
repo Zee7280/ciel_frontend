@@ -506,6 +506,7 @@ function FacultyCommunityServiceHub() {
                             badge="ACTION"
                             background={MOCKUP_GRADIENTS.orange}
                             hot={pendingApprovalsHero > 0}
+                            alertCount={pendingApprovalsHero}
                         />
                         <MockupActionCard
                             href={`${CS_BASE}?view=projects`}

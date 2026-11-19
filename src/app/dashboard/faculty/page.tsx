@@ -242,6 +242,7 @@ export default function FacultyDashboard() {
                     badge="OPEN AREA"
                     background={MOCKUP_GRADIENTS.teal}
                     hot={communityActions > 0}
+                    alertCount={communityActions}
                 />
                 <MockupActionCard
                     href="/dashboard/faculty/coursework-projects"

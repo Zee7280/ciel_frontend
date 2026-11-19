@@ -5,6 +5,7 @@ import {
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
 import { formatSentWaiting } from "@/utils/reminderLinks";
+import { CIEL_SUPPORT_EMAIL, CIEL_SUPPORT_WHATSAPP_DISPLAY, formatPhoneDisplay } from "@/utils/cielContact";
 
 export type ApprovalCardStepState = "done" | "cur" | "bad" | "locked";
 
@@ -14,6 +15,9 @@ export type ApprovalCardStep = {
     state: ApprovalCardStepState;
     /** Optional pill override (e.g. live handoff “Not live yet” instead of generic Locked). */
     pill?: string;
+    /** Where a reminder for this stage goes: the reviewer's email / WhatsApp as saved on the opportunity. */
+    email?: string;
+    phone?: string;
 };
 
 export type ApprovalCardPerson = {
@@ -117,6 +121,20 @@ export function ApprovalChain({ steps, badWord = "Revision" }: { steps: Approval
                 >
                     <b className="block text-[11.5px] text-[#16313d]">{step.role}</b>
                     {step.who ? <small className="mt-0.5 block text-[10.5px] text-[#6b7c86]">{step.who}</small> : null}
+                    {step.email ? (
+                        <small
+                            data-ciel-step-email
+                            title={step.email}
+                            className="mt-0.5 block break-all text-[10px] leading-snug text-[#4d6069]"
+                        >
+                            ✉ {step.email}
+                        </small>
+                    ) : null}
+                    {step.phone ? (
+                        <small data-ciel-step-phone className="mt-0.5 block text-[10px] leading-snug text-[#4d6069]">
+                            ☎ {step.phone}
+                        </small>
+                    ) : null}
                     <span
                         className={
                             "mt-1.5 inline-block rounded-[18px] px-2 py-0.5 text-[10.5px] font-black " +
@@ -217,11 +235,33 @@ export function buildOpportunityApprovalModel(
         if (lower(row.status) !== "draft") cursor.value = false;
     }
 
+    // Contact points for each stage, so whoever reads the chain knows where a reminder goes.
+    const facultyEmail =
+        pickStr(row, "faculty_contact_email", "faculty_email", "facultyEmail") ||
+        pickStr(supervision, "supervisor_email", "faculty_email", "email");
+    const facultyPhone = formatPhoneDisplay(
+        pickStr(row, "faculty_contact_phone", "faculty_phone") ||
+            pickStr(supervision, "whatsapp_e164", "faculty_whatsapp", "supervisor_phone", "supervisor_whatsapp", "phone"),
+    );
+    const partnerEmail =
+        pickStr(row, "partner_contact_email", "partner_email", "partnerEmail") ||
+        pickStr(supervision, "partner_email", "external_partner_email") ||
+        pickStr(collab, "contact_email", "email") ||
+        (isPlaceholderOpportunityOrg(partnerOrg) ? "" : pickStr(partnerOrg, "contact_email", "email"));
+    const partnerPhone = formatPhoneDisplay(
+        pickStr(row, "partner_contact_phone", "partner_phone") ||
+            pickStr(supervision, "partner_whatsapp_e164", "partner_phone", "external_partner_phone") ||
+            pickStr(collab, "contact_phone", "phone", "whatsapp") ||
+            (isPlaceholderOpportunityOrg(partnerOrg) ? "" : pickStr(partnerOrg, "whatsapp", "phone", "contact_phone")),
+    );
+
     const facultyLine = facultyDone ? "approved" : facultyStatus || (workflow.stage === "pending_faculty" ? "pending" : "");
     steps.push({
         role: "Faculty",
         who: facultyName || undefined,
         state: lineState(facultyLine, cursor, blocked),
+        email: facultyEmail || undefined,
+        phone: facultyPhone || undefined,
     });
 
     if (requiresPartner) {
@@ -235,6 +275,8 @@ export function buildOpportunityApprovalModel(
             role: viewer === "ngo" ? "NGO" : "Partner",
             who: partnerName || undefined,
             state: lineState(partnerLine, cursor, blocked),
+            email: partnerEmail || undefined,
+            phone: partnerPhone || undefined,
         });
     }
 
@@ -250,6 +292,8 @@ export function buildOpportunityApprovalModel(
         role: "CIEL PK",
         who: "Verification",
         state: lineState(adminLine, cursor, blocked),
+        email: CIEL_SUPPORT_EMAIL,
+        phone: CIEL_SUPPORT_WHATSAPP_DISPLAY,
     });
 
     const people: ApprovalCardPerson[] = [];

@@ -1,0 +1,75 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+
+const card = read("src/components/ciel/community-service/OpportunityApprovalCard.tsx");
+const create = read("src/app/dashboard/student/paths/community-service/CommunityServiceCreate.tsx");
+const chrome = read("src/components/ciel/dashboard/MockupChrome.tsx");
+const facultyCs = read("src/app/dashboard/faculty/community-service/page.tsx");
+const facultyHome = read("src/app/dashboard/faculty/page.tsx");
+const contact = read("src/utils/cielContact.ts");
+
+test("approval chain boxes carry the reviewer's email and phone for Faculty, Partner and CIEL PK", () => {
+    assert.match(card, /email\?: string;\s*phone\?: string;/, "step type has email/phone");
+    assert.match(card, /data-ciel-step-email/, "email line rendered in the box");
+    assert.match(card, /data-ciel-step-phone/, "phone line rendered in the box");
+    assert.match(card, /role: "Faculty",[\s\S]*?email: facultyEmail \|\| undefined,\s*phone: facultyPhone \|\| undefined/);
+    assert.match(card, /role: viewer === "ngo" \? "NGO" : "Partner",[\s\S]*?email: partnerEmail \|\| undefined,\s*phone: partnerPhone \|\| undefined/);
+    assert.match(card, /role: "CIEL PK",[\s\S]*?email: CIEL_SUPPORT_EMAIL,\s*phone: CIEL_SUPPORT_WHATSAPP_DISPLAY/);
+    // Reads the same fields the student "mine" list already returns.
+    assert.match(card, /"faculty_contact_email"/);
+    assert.match(card, /"faculty_contact_phone"/);
+    assert.match(card, /"partner_contact_email"/);
+    assert.match(card, /"partner_contact_phone"/);
+});
+
+test("CIEL PK contact points match the footer / floating support button", () => {
+    assert.match(contact, /CIEL_SUPPORT_EMAIL = "support@cielpk.com"/);
+    assert.match(contact, /CIEL_SUPPORT_WHATSAPP_E164 = "923712243575"/);
+    assert.match(read("src/components/FloatingSupportButton.tsx"), /923712243575/);
+    assert.match(read("src/components/Footer.tsx"), /support@cielpk\.com/);
+});
+
+test("student reminder buttons preview the recipient and content before anything is sent", () => {
+    // Email: a preview panel with the address, subject and content, then an explicit send.
+    assert.match(create, /data-ciel-email-preview/);
+    assert.match(create, /Email preview · goes to/);
+    assert.match(create, /Subject:<\/span> \{emailSubject\}/);
+    assert.match(create, /Content:<\/span> \{emailContent\}/);
+    assert.match(create, /`Send email to \$\{who\}`/);
+    assert.match(create, /CIEL PK — faculty approval requested: \$\{op\.title\}/, "subject mirrors the backend faculty mail");
+    assert.match(create, /CIEL PK — partner verification requested: \$\{op\.title\}/, "subject mirrors the backend partner mail");
+    // The Email button itself no longer fires the request straight away.
+    assert.doesNotMatch(create, /onClick=\{\(\) => void sendReviewerEmail\(\)\}\s*className="rounded-\[9px\] bg-\[#edf4fb\]/);
+    // WhatsApp: number + message shown, wa.me link (bridge opens app / web), share sheet when no number.
+    assert.match(create, /data-ciel-whatsapp-preview/);
+    assert.match(create, /WhatsApp preview · goes to/);
+    assert.match(create, /https:\/\/wa\.me\/\$\{reviewerDigits\}\?text=\$\{encodeURIComponent\(whatsappText\)\}/);
+    assert.match(create, /: whatsappShareHref\(whatsappText\)/);
+    assert.match(create, /whatsappDigits\(reviewerPhoneRaw \|\| ""\)/, "accepts 03xx / +92 formats");
+    assert.match(create, /Open WhatsApp/);
+    assert.match(create, /Copy message/);
+    // CIEL PK stage reminders go to the support desk, never a disabled button.
+    assert.match(create, /reviewerRole === "admin"\s*\? CIEL_SUPPORT_EMAIL/);
+    assert.match(create, /reviewerRole === "admin"\s*\? CIEL_SUPPORT_WHATSAPP_E164/);
+    assert.doesNotMatch(create, /No WhatsApp number saved for this reviewer/);
+});
+
+test("WhatsApp links in the app are handed to the WhatsApp app / web client by the global bridge", () => {
+    const layout = read("src/app/layout.tsx");
+    assert.match(layout, /<WhatsAppLinkBridge \/>/);
+    const bridge = read("src/components/WhatsAppLinkBridge.tsx");
+    assert.match(bridge, /openWhatsApp\(parts\.text, parts\.digits\)/);
+});
+
+test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
+    assert.match(chrome, /alertCount\?: number;/);
+    assert.match(chrome, /data-ciel-tile-alert/);
+    assert.match(chrome, /animate-pulse/);
+    assert.match(chrome, /motion-reduce:animate-none/);
+    assert.match(chrome, /\$\{alerts\} \$\{alertNoun\}\$\{alerts === 1 \? "" : "s"\}/, "1 NOTIFICATION / 2 NOTIFICATIONS");
+    assert.match(facultyCs, /title="Review Opportunities"[\s\S]*?alertCount=\{pendingApprovalsHero\}/);
+    assert.match(facultyHome, /title="Community Service"[\s\S]*?alertCount=\{communityActions\}/);
+});
