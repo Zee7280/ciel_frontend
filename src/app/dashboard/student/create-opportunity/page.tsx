@@ -3955,6 +3955,24 @@ function StudentOpportunityCreationPageInner() {
                 open={showSubmittedReviewModal}
                 opportunityTitle={submittedOpportunityTitle}
                 resubmitted={submittedWasResubmit}
+                chain={{
+                    privateCandidate: formData.privateCandidate,
+                    faculty: formData.privateCandidate
+                        ? null
+                        : {
+                              name: formData.supervision.facultyName,
+                              email: formData.supervision.facultyOfficialEmail,
+                              department: formData.supervision.facultyDepartment,
+                          },
+                    partner:
+                        formData.supervision.executingContext === "partner"
+                            ? {
+                                  organization: formData.supervision.partnerOrgName,
+                                  contact: formData.supervision.partnerContactPerson,
+                                  email: formData.supervision.partnerEmail,
+                              }
+                            : null,
+                }}
                 onClose={() => {
                     setShowSubmittedReviewModal(false);
                     const qs = new URLSearchParams({ view: "create", filter: "review" });

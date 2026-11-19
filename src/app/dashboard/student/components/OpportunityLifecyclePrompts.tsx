@@ -173,18 +173,111 @@ function ActionLink({
     );
 }
 
+/** Who approves this submission, as entered at create time, so the student sees exactly where it went. */
+export type SubmittedApprovalChain = {
+    faculty?: { name?: string; email?: string; department?: string } | null;
+    /** Partner / NGO named in Section F; null when the team runs it independently. */
+    partner?: { organization?: string; contact?: string; email?: string } | null;
+    /** Private / independent candidate: CIEL PK verifies first; no faculty step. */
+    privateCandidate?: boolean;
+};
+
+function ChainStep({
+    n,
+    title,
+    who,
+    email,
+    note,
+    now,
+}: {
+    n: number;
+    title: string;
+    who?: string;
+    email?: string;
+    note: string;
+    now?: boolean;
+}) {
+    return (
+        <li className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+            <span
+                className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                    now ? "bg-amber-400 text-slate-900" : "bg-slate-100 text-slate-600"
+                }`}
+            >
+                {n}
+            </span>
+            <div className="min-w-0">
+                <p className="text-sm font-black text-slate-900">
+                    {title}
+                    {now ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-800">Now</span> : null}
+                </p>
+                {who ? <p className="text-sm font-semibold text-slate-800">{who}</p> : null}
+                {email ? (
+                    <p className="break-all text-[13px] text-blue-700" data-ciel-chain-email>
+                        ✉ {email}
+                    </p>
+                ) : null}
+                <p className="mt-0.5 text-[12.5px] leading-snug text-slate-600">{note}</p>
+            </div>
+        </li>
+    );
+}
+
 export function OpportunitySubmittedReviewModal({
     open,
     opportunityTitle,
     resubmitted = false,
+    chain,
     onClose,
 }: {
     open: boolean;
     opportunityTitle?: string;
     /** True after "Save changes" sent an existing opportunity back for review. */
     resubmitted?: boolean;
+    chain?: SubmittedApprovalChain | null;
     onClose: () => void;
 }) {
+    const facultyName = chain?.faculty?.name?.trim() || "";
+    const facultyEmail = chain?.faculty?.email?.trim() || "";
+    const facultyDept = chain?.faculty?.department?.trim() || "";
+    const partnerOrg = chain?.partner?.organization?.trim() || "";
+    const partnerContact = chain?.partner?.contact?.trim() || "";
+    const partnerEmail = chain?.partner?.email?.trim() || "";
+    const hasPartner = Boolean(partnerOrg || partnerEmail);
+    const privateCandidate = chain?.privateCandidate === true;
+    const steps: Array<{ title: string; who?: string; email?: string; note: string; now?: boolean }> = [];
+    if (privateCandidate) {
+        steps.push({
+            title: "CIEL PK verification",
+            note: "CIEL PK verifies you as a private / independent candidate first. You will be contacted directly.",
+            now: true,
+        });
+    } else {
+        steps.push({
+            title: "Faculty supervisor approval",
+            who: [facultyName, facultyDept].filter(Boolean).join(" · ") || undefined,
+            email: facultyEmail || undefined,
+            note: facultyEmail
+                ? `A verification email with the approve / revise / reject link has just been sent to ${facultyEmail}. Nothing moves until they decide.`
+                : "A verification email with the approve / revise / reject link is sent to the faculty supervisor now.",
+            now: true,
+        });
+    }
+    if (hasPartner) {
+        steps.push({
+            title: privateCandidate ? "Host organization acknowledgement" : "Partner / NGO approval",
+            who: [partnerOrg, partnerContact].filter(Boolean).join(" · ") || undefined,
+            email: partnerEmail || undefined,
+            note: partnerEmail
+                ? `Emailed automatically to ${partnerEmail} right after step 1 is approved — not before.`
+                : "Emailed automatically right after step 1 is approved — not before.",
+        });
+    }
+    steps.push({
+        title: privateCandidate && hasPartner ? "CIEL PK final review" : "CIEL PK final approval",
+        who: "CIEL PK review desk",
+        note: "Final platform check. On approval the opportunity goes live and your report opens.",
+    });
     return (
         <Dialog
             open={open}
@@ -212,14 +305,19 @@ export function OpportunitySubmittedReviewModal({
 
                     <div className="space-y-4 text-sm leading-relaxed text-slate-700">
                         <p>
-                            Your opportunity has been submitted for approval. You&apos;ll receive an update as it moves through these steps:
+                            {resubmitted
+                                ? "Your revised opportunity is back in review. It goes through these approvals, in this order:"
+                                : "Your opportunity is in review. It goes through these approvals, in this order:"}
                         </p>
-                        <ol className="list-decimal space-y-1.5 pl-5 font-semibold text-slate-800">
-                            <li>Faculty supervisor approval</li>
-                            <li>Partner organization approval — only if a partner organization is involved</li>
-                            <li>CIEL PK Admin approval</li>
+                        <ol className="space-y-2" data-ciel-submitted-chain>
+                            {steps.map((step, index) => (
+                                <ChainStep key={step.title} n={index + 1} {...step} />
+                            ))}
                         </ol>
-                        <p>Once all required approvals are complete, you can apply to the opportunity or start your report.</p>
+                        <p className="text-[12.5px] text-slate-600">
+                            Each reviewer is emailed when it is their turn, and you get an email plus a dashboard alert at every decision. Follow
+                            it live, or resend a reviewer&apos;s link, from <strong>My Opportunities › Under Review</strong>.
+                        </p>
                     </div>
 
                     <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row">

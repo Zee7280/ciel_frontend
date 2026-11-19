@@ -89,6 +89,21 @@ test("flashcard Accountability: creator, faculty and host each show email + What
     assert.doesNotMatch(page, /: \(studentDetails\.department \|\| "—"\);/);
 });
 
+test("after submit, the modal shows the real approval chain: faculty name + email now, partner / NGO name + email next (only if added), then CIEL PK", () => {
+    const modal = read("src/app/dashboard/student/components/OpportunityLifecyclePrompts.tsx");
+    assert.match(modal, /export type SubmittedApprovalChain = \{/);
+    assert.match(modal, /data-ciel-submitted-chain/);
+    assert.match(modal, /data-ciel-chain-email/);
+    assert.match(modal, /title: "Faculty supervisor approval",[\s\S]*?email: facultyEmail \|\| undefined,[\s\S]*?now: true,/);
+    assert.match(modal, /if \(hasPartner\) \{[\s\S]*?title: privateCandidate \? "Host organization acknowledgement" : "Partner \/ NGO approval"/);
+    assert.match(modal, /right after step 1 is approved — not before/);
+    assert.match(modal, /On approval the opportunity goes live and your report opens\./);
+    assert.doesNotMatch(modal, /<li>Partner organization approval — only if a partner organization is involved<\/li>/);
+    const page = read("src/app/dashboard/student/create-opportunity/page.tsx");
+    assert.match(page, /chain=\{\{[\s\S]*?name: formData\.supervision\.facultyName,\s*email: formData\.supervision\.facultyOfficialEmail,\s*department: formData\.supervision\.facultyDepartment,/);
+    assert.match(page, /formData\.supervision\.executingContext === "partner"[\s\S]*?organization: formData\.supervision\.partnerOrgName,\s*contact: formData\.supervision\.partnerContactPerson,\s*email: formData\.supervision\.partnerEmail,/);
+});
+
 test("the final submit button says what it does: create (new / draft) or resubmit (returned opportunity)", () => {
     const page = read("src/app/dashboard/student/create-opportunity/page.tsx");
     assert.match(page, /editingOpportunityId && !isDraftMode\s*\? "✅ Finalize & Resubmit Opportunity"\s*: "🚀 Finalize & Create Opportunity"/);
