@@ -71,6 +71,24 @@ test("on a phone WhatsApp opens the app itself (whatsapp://), the page stays, an
     assert.doesNotMatch(flash, /href=\{`mailto:\$\{/);
 });
 
+test("flashcard Accountability: creator, faculty and host each show email + WhatsApp; the faculty box shows the supervisor's department", () => {
+    const flash = read("src/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard.tsx");
+    // Faculty box: department line, then an email link (only a real address) and WhatsApp when known.
+    assert.match(flash, /facultyWhatsapp\?: string;/);
+    assert.match(flash, /facultyWhatsapp: pickStr\(supervision\.whatsapp_e164, supervision\.faculty_whatsapp\)/);
+    assert.match(flash, /const facultyEmail = \/@\/\.test\(String\(model\.facultyEmail \|\| ""\)\)/);
+    assert.match(flash, /title="Email the faculty supervisor"/);
+    assert.match(flash, /title="WhatsApp the faculty supervisor"/);
+    assert.doesNotMatch(flash, /<em>\{esc\(model\.unitLabel \|\| model\.facultyEmail\)\}<\/em>/);
+    // Create-form preview: same contacts as the published card.
+    const page = read("src/app/dashboard/student/create-opportunity/page.tsx");
+    assert.match(page, /creatorEmail: studentDetails\.email,\s*creatorWhatsapp: studentDetails\.contact,/);
+    assert.match(page, /partnerWhatsapp:\s*partnerOn && formData\.supervision\.partnerPhone\.trim\(\)/);
+    // The FACULTY box never shows the student's own department.
+    assert.match(page, /: \(formData\.supervision\.facultyDepartment\.trim\(\) \|\| formData\.supervision\.facultyDesignation\.trim\(\) \|\| ""\);/);
+    assert.doesNotMatch(page, /: \(studentDetails\.department \|\| "—"\);/);
+});
+
 test("report-card Email / WhatsApp chips are prefilled links for every notify note", () => {
     const ws = read("src/app/dashboard/student/paths/community-service/CommunityServiceWorkspace.tsx");
     const notifyNotes = ws.match(/kind: "notify",[\s\S]*?channels: reportNoteChannels\("(draft|fee|review)"/g) || [];

@@ -62,6 +62,8 @@ export type StudentFlashcardModel = {
     privateCandidate: boolean;
     facultyName: string;
     facultyEmail: string;
+    /** Faculty WhatsApp, when the record carries one. */
+    facultyWhatsapp?: string;
     host: string;
     partnerEmail: string;
     /** Partner / NGO organisation WhatsApp — present only when the API returned it for this viewer. */
@@ -265,6 +267,7 @@ export function buildOpportunityRecordFlashcard(
         privateCandidate: supervision.private_candidate === true,
         facultyName: pickStr(people?.facultyName, supervision.supervisor_name),
         facultyEmail: pickStr(people?.facultyEmail, supervision.contact),
+        facultyWhatsapp: pickStr(supervision.whatsapp_e164, supervision.faculty_whatsapp),
         host,
         partnerEmail: pickStr(
             people?.partnerEmail,
@@ -457,6 +460,13 @@ export function StudentOpportunityFlashcard({
     const partnerMessage = `Hi, I am contacting you about "${contactTitle}" on CIEL PK.`;
     const partnerWaHref = partnerWa ? `https://wa.me/${partnerWa}?text=${encodeURIComponent(partnerMessage)}` : "";
     const partnerMailHref = partnerEmail ? mailtoHref(partnerEmail, `CIEL PK · ${contactTitle}`, `${partnerMessage}\n\n`) : "";
+    // Faculty: the record may carry a sentence instead of an address ("Candidate contacted directly by CIEL PK").
+    const facultyEmail = /@/.test(String(model.facultyEmail || "")) ? String(model.facultyEmail).trim() : "";
+    const facultyFirstName = String(model.facultyName || "").trim().split(/\s+/)[0] || "";
+    const facultyMessage = `Dear ${facultyFirstName ? `${facultyFirstName}` : "Faculty"}, I am contacting you about "${contactTitle}" on CIEL PK.`;
+    const facultyMailHref = facultyEmail ? mailtoHref(facultyEmail, `CIEL PK · ${contactTitle}`, `${facultyMessage}\n\n`) : "";
+    const facultyWa = whatsappDigits(model.facultyWhatsapp);
+    const facultyWaHref = facultyWa ? `https://wa.me/${facultyWa}?text=${encodeURIComponent(facultyMessage)}` : "";
     const mapUrl = String(model.mapUrl || "").trim();
     const mapPlace = String(model.mapPlace || "").trim() || String(model.city || "").trim();
     const title = String(model.title || "").trim() || "Untitled Community Service Opportunity";
@@ -748,7 +758,29 @@ export function StudentOpportunityFlashcard({
                         <div className="co-flash-chain-item">
                             <small>{model.privateCandidate ? "Verification" : "Faculty"}</small>
                             <b>{esc(model.facultyName)}</b>
-                            <em>{esc(model.unitLabel || model.facultyEmail)}</em>
+                            {model.unitLabel ? <em>{esc(model.unitLabel)}</em> : null}
+                            {facultyEmail || facultyWaHref ? (
+                                <span className="co-flash-contact">
+                                    {facultyEmail ? (
+                                        <a href={facultyMailHref} title="Email the faculty supervisor">
+                                            {facultyEmail}
+                                        </a>
+                                    ) : null}
+                                    {facultyWaHref ? (
+                                        <a
+                                            href={facultyWaHref}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="co-flash-contact-wa"
+                                            title="WhatsApp the faculty supervisor"
+                                        >
+                                            WhatsApp
+                                        </a>
+                                    ) : null}
+                                </span>
+                            ) : !model.unitLabel && model.facultyEmail ? (
+                                <em>{esc(model.facultyEmail)}</em>
+                            ) : null}
                         </div>
                         <div className="co-flash-chain-item">
                             <small>Host</small>

@@ -1233,9 +1233,11 @@ function StudentOpportunityCreationPageInner() {
         const orgLabel = privatePath
             ? (formData.privateAwardingBody.trim() || "Private / independent undergraduate programme")
             : (studentDetails.institution || "—");
+        // Shown under the FACULTY box on the flashcard: the department chosen for the supervisor in
+        // Section F, never the student's own department.
         const unitLabel = privatePath
             ? (formData.privateProgramme.trim() || "Independent undergraduate candidate")
-            : (studentDetails.department || "—");
+            : (formData.supervision.facultyDepartment.trim() || formData.supervision.facultyDesignation.trim() || "");
         let scopeDetail = "CIEL PK network";
         if (formData.applyScope === "student_selected_depts") scopeDetail = selectedDepts || "Selected departments";
         else if (formData.applyScope === "multi_all") scopeDetail = selectedUnis || "Selected universities";
@@ -1283,6 +1285,9 @@ function StudentOpportunityCreationPageInner() {
             objective: formData.objectives.description,
             outputs: formData.objectives.outputs,
             creatorName: studentDetails.name,
+            // The creator's own contact from their profile, so the preview matches the published card.
+            creatorEmail: studentDetails.email,
+            creatorWhatsapp: studentDetails.contact,
             orgLabel,
             unitLabel,
             badgeLabel: privatePath ? "PRIVATE / INDEPENDENT CANDIDATE" : "STUDENT CREATOR",
@@ -1291,6 +1296,13 @@ function StudentOpportunityCreationPageInner() {
             facultyEmail: privatePath ? "Candidate contacted directly by CIEL PK" : formData.supervision.facultyOfficialEmail,
             host: partnerOn ? formData.supervision.partnerOrgName : "No external partner",
             partnerEmail: partnerOn ? formData.supervision.partnerEmail : "",
+            partnerWhatsapp:
+                partnerOn && formData.supervision.partnerPhone.trim()
+                    ? composeInternationalPhone(
+                          formData.supervision.partnerPhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
+                          normalizeNationalPhoneInput(formData.supervision.partnerPhoneKey || DEFAULT_PHONE_COUNTRY_KEY, formData.supervision.partnerPhone),
+                      ).trim()
+                    : "",
             verification: formData.verification.join(", "),
             scopeLabel: scopeMap[formData.applyScope] || formData.applyScope,
             scopeDetail,
