@@ -64,6 +64,27 @@ test("WhatsApp links in the app are handed to the WhatsApp app / web client by t
     assert.match(bridge, /openWhatsApp\(parts\.text, parts\.digits\)/);
 });
 
+test("a revision blinks on the student's Community Service tile and on My Opportunities / My Reports", () => {
+    const home = read("src/app/dashboard/student/page.tsx");
+    assert.match(home, /canEditReturnedOpportunity\(row\)/, "counts opportunities a reviewer sent back");
+    assert.match(home, /alertCount=\{card\.key === "communityService" \? csRevisionCount : undefined\}/);
+    const hub = read("src/app/dashboard/student/paths/community-service/CommunityServiceHub.tsx");
+    assert.match(hub, /title="My Opportunities"[\s\S]*?alertCount=\{oppActionCount\}/);
+    assert.match(hub, /title="My Reports"[\s\S]*?alertCount=\{reportActionCount\}/);
+});
+
+test("an email deep link survives the login redirect (next=) and lands on Action Required", () => {
+    const api = read("src/utils/api.ts");
+    assert.match(api, /window\.location\.replace\(`\/login\$\{next\}`\)/);
+    assert.match(api, /here\.startsWith\("\/dashboard"\)/, "only dashboard pages are remembered");
+    const login = read("src/app/login/page.tsx");
+    assert.match(login, /searchParams\.get\("next"\)/);
+    assert.match(login, /isSafeInternalReturnPath\(nextParam\)/);
+    // The Action Required sub-tab is the create view with filter=action (what the email links to).
+    const page = read("src/app/dashboard/student/paths/community-service/page.tsx");
+    assert.match(page, /\?view=create&filter=action/);
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);

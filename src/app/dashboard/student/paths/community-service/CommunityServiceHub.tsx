@@ -101,8 +101,10 @@ export default function CommunityServiceHub({
     }, [displayName]);
 
     const firstName = name.split(/\s+/)[0] ?? "";
-    const createHot = Boolean(attention?.some((item) => item.key === "oppAction" && item.n > 0));
-    const workspaceHot = Boolean(attention?.find((item) => item.key === "reportAction")?.n);
+    const oppActionCount = attention?.find((item) => item.key === "oppAction")?.n ?? 0;
+    const reportActionCount = attention?.find((item) => item.key === "reportAction")?.n ?? 0;
+    const createHot = oppActionCount > 0;
+    const workspaceHot = reportActionCount > 0;
     const browseHot = pendingApplications > 0;
 
     return (
@@ -182,6 +184,7 @@ export default function CommunityServiceHub({
                     badge="PROPOSAL LOOP"
                     background={MOCKUP_GRADIENTS.teal}
                     hot={createHot}
+                    alertCount={oppActionCount}
                     onPrefetch={() => {
                         prefetchCommunityServiceData();
                         void import("./CommunityServiceCreate");
@@ -207,6 +210,7 @@ export default function CommunityServiceHub({
                     badge="REPORT HOME"
                     background={MOCKUP_GRADIENTS.orange}
                     hot={workspaceHot}
+                    alertCount={reportActionCount}
                     onPrefetch={() => {
                         prefetchCommunityServiceData();
                         void import("./CommunityServiceWorkspace");

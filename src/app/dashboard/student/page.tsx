@@ -9,7 +9,12 @@ import type { DashboardData } from "@/app/dashboard/student/types";
 import { CIEL_PATHS } from "@/utils/cielPaths";
 import { overallCurrentWorkCompletion } from "@/utils/currentWorkCompletion";
 import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils/student-path-prefetch";
-import { prefetchCommunityServiceData } from "@/utils/student-community-cache";
+import {
+    fetchStudentOpportunityMine,
+    peekStudentOpportunityMine,
+    prefetchCommunityServiceData,
+} from "@/utils/student-community-cache";
+import { canEditReturnedOpportunity } from "@/utils/opportunityWorkflow";
 import { TimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import OpportunityApprovedModal from "@/components/ciel/community-service/OpportunityApprovedModal";
@@ -80,10 +85,17 @@ export default function StudentDashboardPage() {
     const [firstName, setFirstName] = useState("");
     const viewDashboard = dashboard ?? cachedDashboard;
     const viewSummary = summary ?? cachedSummary;
+    // Opportunities a reviewer sent back: the Community Service tile blinks until the student acts.
+    const [csRevisionCount, setCsRevisionCount] = useState(
+        () => (peekStudentOpportunityMine() ?? []).filter((row) => canEditReturnedOpportunity(row)).length,
+    );
 
     useEffect(() => {
         const name = readStoredCurrentUser()?.name;
         setFirstName(typeof name === "string" ? name.trim().split(/\s+/)[0] : "");
+        void fetchStudentOpportunityMine()
+            .then((rows) => setCsRevisionCount(rows.filter((row) => canEditReturnedOpportunity(row)).length))
+            .catch(() => undefined);
         void fetchStudentDashboardData({ redirectToLogin: false }).then((dashboardData) => {
             if (dashboardData) setDashboard(dashboardData);
         });
@@ -150,6 +162,8 @@ export default function StudentDashboardPage() {
                         subtitle={viewSummary?.pathsStatus[card.key]?.detail || card.subtitle}
                         badge={card.badge}
                         background={card.background}
+                        hot={card.key === "communityService" && csRevisionCount > 0}
+                        alertCount={card.key === "communityService" ? csRevisionCount : undefined}
                         onPrefetch={() => prefetchStudentPathData(card.key)}
                     />
                 ))}

@@ -66,7 +66,11 @@ function leaveForLogin() {
     localStorage.removeItem("ciel_token");
     clearStudentDashboardCache();
     clearPathSessionCache();
-    window.location.replace("/login");
+    // Keep the page the person was sent to (an email deep link such as My Opportunities › Action
+    // Required) so login returns them there instead of the generic dashboard.
+    const here = `${window.location.pathname}${window.location.search}`;
+    const next = here.startsWith("/dashboard") ? `?next=${encodeURIComponent(here)}` : "";
+    window.location.replace(`/login${next}`);
 }
 
 /**
