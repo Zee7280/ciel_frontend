@@ -109,18 +109,40 @@ export function clickHref(href: string, newTab = false): void {
 }
 
 /**
- * Opens WhatsApp for this device. A phone opens the WhatsApp app (wa.me). A computer clicks a real
- * `whatsapp://send` link so the installed desktop app opens (Chrome asks "Open WhatsApp?" the
- * first time); when nothing takes focus within 1.5s the bridge shows a small chooser — open the
- * app again, or WhatsApp Web in a new tab — instead of guessing. The current page never navigates
- * away unless a popup blocker stops that tab.
+ * Opens WhatsApp for this device, and the current page stays where it is.
+ *
+ * A phone clicks a real `whatsapp://send` link, which opens the WhatsApp app straight into the chat
+ * (no wa.me landing page, no extra browser tab). Only when no app answers within 1.5s (not
+ * installed) does wa.me open in a new tab, where WhatsApp offers the store / "continue to chat".
+ *
+ * A computer clicks the same `whatsapp://send` link so the installed desktop app opens (Chrome asks
+ * "Open WhatsApp?" the first time); when nothing takes focus within 1.5s the bridge shows a small
+ * chooser — open the app again, or WhatsApp Web in a new tab — instead of guessing. The current
+ * page never navigates away unless a popup blocker stops that tab.
  */
 export function openWhatsApp(text: string, digits = ""): void {
     if (typeof window === "undefined") return;
     const webHref = whatsappOpenHref(text, digits);
     const appHref = whatsappAppHref(text, digits);
     if (isMobileBrowser()) {
-        if (!openInNewTab(webHref)) window.location.href = webHref;
+        let appOpened = false;
+        const markApp = () => {
+            appOpened = true;
+        };
+        const onHidden = () => {
+            if (document.visibilityState === "hidden") markApp();
+        };
+        window.addEventListener("pagehide", markApp);
+        window.addEventListener("blur", markApp);
+        document.addEventListener("visibilitychange", onHidden);
+        clickHref(appHref);
+        window.setTimeout(() => {
+            window.removeEventListener("pagehide", markApp);
+            window.removeEventListener("blur", markApp);
+            document.removeEventListener("visibilitychange", onHidden);
+            if (appOpened) return;
+            if (!openInNewTab(webHref)) window.location.href = webHref;
+        }, WHATSAPP_APP_FALLBACK_MS);
         return;
     }
     let handedOff = false;

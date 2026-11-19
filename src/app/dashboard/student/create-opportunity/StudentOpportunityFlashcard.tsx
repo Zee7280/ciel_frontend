@@ -9,7 +9,7 @@ import {
 } from "@/utils/studentApplyMaintenance";
 import "@/components/opportunities/create-opportunity.css";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
-import { whatsappDigits } from "@/utils/reminderLinks";
+import { mailtoHref, whatsappDigits } from "@/utils/reminderLinks";
 import { resolveOpportunityMap } from "@/utils/opportunityMapLink";
 import { flowSteps } from "./opportunityFlashcardSteps";
 
@@ -446,19 +446,17 @@ export function StudentOpportunityFlashcard({
     const creatorEmail = String(model.creatorEmail || "").trim();
     const creatorWa = whatsappDigits(model.creatorWhatsapp);
     const creatorFirstName = String(model.creatorName || "").trim().split(/\s+/)[0] || "";
-    const creatorWaHref = creatorWa
-        ? `https://wa.me/${creatorWa}?text=${encodeURIComponent(
-              `Hi${creatorFirstName && creatorFirstName !== "You" ? ` ${creatorFirstName}` : ""}, I am contacting you about "${String(model.title || "").trim() || "your opportunity"}" on CIEL PK.`,
-          )}`
-        : "";
+    const contactTitle = String(model.title || "").trim() || "your opportunity";
+    const creatorMessage = `Hi${creatorFirstName && creatorFirstName !== "You" ? ` ${creatorFirstName}` : ""}, I am contacting you about "${contactTitle}" on CIEL PK.`;
+    const creatorWaHref = creatorWa ? `https://wa.me/${creatorWa}?text=${encodeURIComponent(creatorMessage)}` : "";
+    // Email opens with the subject and the same opening line already written, like the WhatsApp chip.
+    const creatorMailHref = creatorEmail ? mailtoHref(creatorEmail, `CIEL PK · ${contactTitle}`, `${creatorMessage}\n\n`) : "";
     const partnerEmail = String(model.partnerEmail || "").trim();
     const partnerWa = whatsappDigits(model.partnerWhatsapp);
     const hasHost = host !== "No external partner" && host !== "Partner";
-    const partnerWaHref = partnerWa
-        ? `https://wa.me/${partnerWa}?text=${encodeURIComponent(
-              `Hi, I am contacting you about "${String(model.title || "").trim() || "your opportunity"}" on CIEL PK.`,
-          )}`
-        : "";
+    const partnerMessage = `Hi, I am contacting you about "${contactTitle}" on CIEL PK.`;
+    const partnerWaHref = partnerWa ? `https://wa.me/${partnerWa}?text=${encodeURIComponent(partnerMessage)}` : "";
+    const partnerMailHref = partnerEmail ? mailtoHref(partnerEmail, `CIEL PK · ${contactTitle}`, `${partnerMessage}\n\n`) : "";
     const mapUrl = String(model.mapUrl || "").trim();
     const mapPlace = String(model.mapPlace || "").trim() || String(model.city || "").trim();
     const title = String(model.title || "").trim() || "Untitled Community Service Opportunity";
@@ -729,7 +727,7 @@ export function StudentOpportunityFlashcard({
                             {creatorEmail || creatorWaHref ? (
                                 <span className="co-flash-contact">
                                     {creatorEmail ? (
-                                        <a href={`mailto:${creatorEmail}`} title="Email the creator">
+                                        <a href={creatorMailHref} title="Email the creator">
                                             {creatorEmail}
                                         </a>
                                     ) : null}
@@ -758,7 +756,7 @@ export function StudentOpportunityFlashcard({
                             {hasHost && (partnerEmail || partnerWaHref) ? (
                                 <span className="co-flash-contact">
                                     {partnerEmail ? (
-                                        <a href={`mailto:${partnerEmail}`} title="Email the organisation">
+                                        <a href={partnerMailHref} title="Email the organisation">
                                             {partnerEmail}
                                         </a>
                                     ) : null}

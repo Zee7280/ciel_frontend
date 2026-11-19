@@ -48,9 +48,27 @@ test("the bridge is mounted once in the root layout and only touches WhatsApp li
     assert.equal((layout.match(/<WhatsAppLinkBridge \/>/g) || []).length, 1);
     const bridge = read("src/components/WhatsAppLinkBridge.tsx");
     assert.match(bridge, /if \(!\/whatsapp\\\.com\|wa\\\.me\/i\.test\(href\)\) return;/);
-    assert.match(bridge, /if \(!rewritten \|\| rewritten === anchor\.href\) return;/);
+    // Every chat link (number and/or message) is taken over — on a phone too — so the app opens
+    // directly; only the bare support link is left to the browser.
+    assert.match(bridge, /if \(!parts \|\| \(!parts\.digits && !parts\.text\)\) return;/);
+    assert.doesNotMatch(bridge, /rewritten === anchor\.href/);
     // Modified clicks (new tab, etc.) stay with the browser.
     assert.match(bridge, /event\.metaKey \|\| event\.ctrlKey/);
+});
+
+test("on a phone WhatsApp opens the app itself (whatsapp://), the page stays, and wa.me is only the no-app fallback", () => {
+    const lib = read("src/utils/reminderLinks.ts");
+    const mobile = lib.slice(lib.indexOf("if (isMobileBrowser()) {", lib.indexOf("export function openWhatsApp")));
+    const branch = mobile.slice(0, mobile.indexOf("return;\n    }") + 10);
+    assert.match(branch, /clickHref\(appHref\);/, "app scheme first");
+    assert.match(branch, /if \(appOpened\) return;/, "no fallback once the app took over");
+    assert.match(branch, /if \(!openInNewTab\(webHref\)\) window\.location\.href = webHref;/, "wa.me only as fallback");
+    assert.doesNotMatch(branch, /^\s*if \(!openInNewTab\(webHref\)\) window\.location\.href = webHref;\s*return;/m, "never straight to wa.me");
+    // Flashcard contact chips: email arrives with subject + opening line, like the WhatsApp chip.
+    const flash = read("src/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard.tsx");
+    assert.match(flash, /mailtoHref\(creatorEmail, `CIEL PK · \$\{contactTitle\}`, `\$\{creatorMessage\}\\n\\n`\)/);
+    assert.match(flash, /mailtoHref\(partnerEmail, `CIEL PK · \$\{contactTitle\}`, `\$\{partnerMessage\}\\n\\n`\)/);
+    assert.doesNotMatch(flash, /href=\{`mailto:\$\{/);
 });
 
 test("report-card Email / WhatsApp chips are prefilled links for every notify note", () => {

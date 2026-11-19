@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
     openWhatsApp,
     parseWhatsAppHref,
-    rewriteWhatsAppHrefForDevice,
     WHATSAPP_FALLBACK_EVENT,
     type WhatsAppFallbackDetail,
 } from "@/utils/reminderLinks";
@@ -29,10 +28,11 @@ export default function WhatsAppLinkBridge() {
             if (!anchor || anchor.hasAttribute("data-ciel-whatsapp-direct")) return;
             const href = anchor.getAttribute("href") || "";
             if (!/whatsapp\.com|wa\.me/i.test(href)) return;
-            const rewritten = rewriteWhatsAppHrefForDevice(anchor.href);
-            if (!rewritten || rewritten === anchor.href) return;
+            // Every chat link (a number and/or a prefilled message) goes through openWhatsApp — on a
+            // phone too, so the app opens directly instead of a wa.me landing page in a new tab. The
+            // bare support link (nothing to prefill) is left to the browser.
             const parts = parseWhatsAppHref(anchor.href);
-            if (!parts) return;
+            if (!parts || (!parts.digits && !parts.text)) return;
             event.preventDefault();
             openWhatsApp(parts.text, parts.digits);
         };
