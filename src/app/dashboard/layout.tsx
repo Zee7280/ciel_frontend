@@ -3,6 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import DashboardHeader from "@/components/DashboardHeader";
 import ProfileCompletionGate from "@/components/ProfileCompletionGate";
 import WelcomeModal from "@/components/WelcomeModal";
+import TeamChangePopup from "@/components/TeamChangePopup";
 import { DashboardChromeProvider } from "@/components/ciel/dashboard/DashboardChromeContext";
 import StudentSessionGuard from "@/components/StudentSessionGuard";
 import DashboardSessionGuard from "@/components/DashboardSessionGuard";
@@ -31,6 +32,7 @@ export default function DashboardLayout({
                 </div>
                 <div className="print:hidden">
                     <WelcomeModal />
+                    <TeamChangePopup />
                 </div>
             </DashboardChromeProvider>
         </div>

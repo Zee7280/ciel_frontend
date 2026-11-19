@@ -93,6 +93,18 @@ test("a dead reviewer link explains that each round issues a fresh link and poin
     }
 });
 
+test("team roster changes pop up once on any dashboard page (email + in-app notice already exist)", () => {
+    const popup = read("src/components/TeamChangePopup.tsx");
+    assert.match(popup, /\/api\/v1\/notifications\?type=\$\{TEAM_NOTIFICATION_TYPE\}&status=unread&limit=10/);
+    assert.match(popup, /TEAM_NOTIFICATION_TYPE = "team"/, "same type the backend roster notice writes");
+    assert.match(popup, /notifications\/\$\{encodeURIComponent\(id\)\}\/read/, "Got it marks the notice read");
+    assert.match(popup, /TEAM_POPUP_SEEN_KEY_PREFIX/, "shown once per notification");
+    assert.match(popup, /data-ciel-team-change-popup/);
+    assert.match(popup, /role="dialog"/);
+    const layout = read("src/app/dashboard/layout.tsx");
+    assert.match(layout, /<TeamChangePopup \/>/, "mounted for every dashboard page");
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);
