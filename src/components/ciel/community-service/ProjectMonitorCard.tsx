@@ -146,6 +146,7 @@ export default function ProjectMonitorCard({
     row,
     reportHrefFor,
     hoursHrefFor,
+    onViewFlashcard,
     remind,
 }: {
     row: FacultyCsReportRow;
@@ -153,6 +154,8 @@ export default function ProjectMonitorCard({
     reportHrefFor?: (row: FacultyCsReportRow) => string | undefined;
     /** Where "View live hours" goes for a project id; undefined hides the button. */
     hoursHrefFor?: (projectId: string) => string;
+    /** Opens the approved opportunity's flashcard (read-only review); undefined hides the button. */
+    onViewFlashcard?: (projectId: string) => void;
     remind?: ProjectMonitorRemind;
 }) {
     const required = row.required_hours || 16;
@@ -336,6 +339,16 @@ export default function ProjectMonitorCard({
                         >
                             View live hours
                         </Link>
+                    ) : null}
+                    {row.project_id && onViewFlashcard ? (
+                        <button
+                            type="button"
+                            onClick={() => onViewFlashcard(row.project_id as string)}
+                            className="rounded-[10px] bg-[#f1eef8] px-3 py-2 text-[12px] font-black text-[#6b2bd9] hover:brightness-95"
+                            title="Open the approved opportunity flashcard"
+                        >
+                            View flashcard
+                        </button>
                     ) : null}
                 </div>
             </div>

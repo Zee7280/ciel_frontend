@@ -188,6 +188,17 @@ test("the notifications dropdown stays above the report's sticky toolbar on phon
     assert.match(css, /\.cer \.cer-sticky-head \{\s*position: sticky;\s*top: 56px;\s*z-index: 30;/);
 });
 
+test("faculty Community Service Projects: 'View flashcard' opens the approved opportunity's flashcard (read-only)", () => {
+    const card = read("src/components/ciel/community-service/ProjectMonitorCard.tsx");
+    assert.match(card, /onViewFlashcard\?: \(projectId: string\) => void;/);
+    assert.match(card, /row\.project_id && onViewFlashcard \? \([\s\S]*?View flashcard/);
+    const page = read("src/app/dashboard/faculty/community-service/page.tsx");
+    assert.match(page, /onViewFlashcard=\{\(projectId\) =>\s*void reviewActions\.openOpportunityDetail\(projectId, \{ showActions: false \}\)/);
+    // The dialogs are mounted once at page level, so the Projects view can open them too.
+    assert.equal((page.match(/\{reviewActions\.dialogs\}/g) || []).length, 1);
+    assert.match(page, /\{reviewActions\.dialogs\}\s*\{helpOpen \? \(/);
+});
+
 test("dashboard tiles can blink a notification count, and faculty review tiles use it", () => {
     assert.match(chrome, /alertCount\?: number;/);
     assert.match(chrome, /data-ciel-tile-alert/);

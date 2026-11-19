@@ -953,7 +953,6 @@ function FacultyCommunityServiceHub() {
                             Open participation requests
                         </Link>
                     </p>
-                    {reviewActions.dialogs}
                 </div>
             )}
 
@@ -1014,6 +1013,9 @@ function FacultyCommunityServiceHub() {
                                             row={row}
                                             reportHrefFor={(r) => projectReportHref(r, REPORTS)}
                                             hoursHrefFor={(projectId) => `${HOURS}?projectId=${encodeURIComponent(projectId)}`}
+                                            onViewFlashcard={(projectId) =>
+                                                void reviewActions.openOpportunityDetail(projectId, { showActions: false })
+                                            }
                                             remind={{ roleLabel: "your faculty supervisor", onRemindNow: remindNow, busy: remindingId === row.id }}
                                         />
                                     ))}
@@ -1084,6 +1086,9 @@ function FacultyCommunityServiceHub() {
                     </a>
                 </div>
             )}
+
+            {/* Opportunity flashcard / decision dialogs: mounted once so Review AND Projects can open them. */}
+            {reviewActions.dialogs}
 
             {helpOpen ? (
                 <div
