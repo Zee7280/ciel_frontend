@@ -89,6 +89,12 @@ test("flashcard Accountability: creator, faculty and host each show email + What
     assert.doesNotMatch(page, /: \(studentDetails\.department \|\| "—"\);/);
 });
 
+test("the final submit button says what it does: create (new / draft) or resubmit (returned opportunity)", () => {
+    const page = read("src/app/dashboard/student/create-opportunity/page.tsx");
+    assert.match(page, /editingOpportunityId && !isDraftMode\s*\? "✅ Finalize & Resubmit Opportunity"\s*: "🚀 Finalize & Create Opportunity"/);
+    assert.doesNotMatch(page, /"Save changes"/);
+});
+
 test("report-card Email / WhatsApp chips are prefilled links for every notify note", () => {
     const ws = read("src/app/dashboard/student/paths/community-service/CommunityServiceWorkspace.tsx");
     const notifyNotes = ws.match(/kind: "notify",[\s\S]*?channels: reportNoteChannels\("(draft|fee|review)"/g) || [];

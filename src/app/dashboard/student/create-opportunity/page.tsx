@@ -3873,9 +3873,9 @@ function StudentOpportunityCreationPageInner() {
                         {isSubmitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : null}
                         {isSubmitting
                             ? "Submitting..."
-                            : editingOpportunityId
-                              ? "Save changes"
-                              : "🚀 Submit project"}
+                            : editingOpportunityId && !isDraftMode
+                              ? "✅ Finalize & Resubmit Opportunity"
+                              : "🚀 Finalize & Create Opportunity"}
                     </button>
                 </div>
             </div>
