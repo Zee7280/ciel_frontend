@@ -50,8 +50,7 @@ import { buildIndividualRosterFromSection1, loggedHoursClearSubmitBar, resolveRe
 import Section1Participation from './components/Section1Participation';
 import Section2ProjectContext from './components/Section2ProjectContext'; // Renamed
 import Section3SDGMapping from './components/Section3SDGMapping';
-import Section4Activities from './components/Section4Activities';
-import Section5Outcomes from './components/Section5Outcomes';
+import Section4Streamlined from './components/Section4Streamlined';
 import Section6Resources from './components/Section6Resources';
 import Section7Partnerships from './components/Section7Partnerships';
 import Section8Evidence from './components/Section8Evidence';
@@ -1234,10 +1233,7 @@ function ReportFormContent() {
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
                     {isMergedActivitiesStep(activeStep) && (
                         <div className="cer-s4">
-                            <div className="cer-partk">PART A · WHAT WE DID — ACTIVITY BY ACTIVITY</div>
-                            <Section4Activities />
-                            <div className="cer-partk">PART B · WHAT CHANGED BECAUSE OF IT</div>
-                            <Section5Outcomes />
+                            <Section4Streamlined />
                         </div>
                     )}
                     {activeStep === 5 && <Section6Resources projectData={projectDetails} />}

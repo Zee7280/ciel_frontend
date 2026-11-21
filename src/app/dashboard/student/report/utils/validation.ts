@@ -3,7 +3,9 @@
  * Updated for the 11-Section Community Engagement Report
  */
 
-import { outputRowOk, step3Ok, stepNeedText, SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MAX_WORDS } from './section4Ladder';
+import { SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MAX_WORDS } from './section4Ladder';
+import { activityIssues, challengeTagIssues, reachIssues, simpleMeasureIssues } from './section4Streamlined';
+import { GLOBAL_ACTIVITY_TAXONOMY } from './globalActivityTaxonomy';
 import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
 import { riskBlockErrors } from './riskSafeguarding';
 import { followupBlockErrors } from './sustainabilityFollowup';
@@ -35,7 +37,8 @@ export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
     contribution_intent_statement: { min: 30, max: 80 },
     student_contribution_intent_statement: { min: 10, max: 60 },
     justification_text: { min: 10, max: 60 },
-    observed_change: { min: 40, max: 100 },
+    /** V19: "describe only what you observed; if nothing could be measured, say so" — short is fine. */
+    observed_change: { min: 8, max: 100 },
     challenges: { min: 15, max: 60 },
     continuation_details: { min: 60, max: 120 },
     description: { min: 15, max: 60 },
@@ -75,13 +78,6 @@ export function hasAcademicIntegration(value: unknown): boolean {
 
 export function wordRangeLabel(min: number, max: number): string {
     return `${min}–${max} words`;
-}
-
-function isCustomActivityChoice(value: unknown): boolean {
-    const text = String(value || '').trim();
-    if (!text) return false;
-    if (/^other$/i.test(text)) return true;
-    return /other\s*\/\s*custom/i.test(text);
 }
 
 export function countWords(str: string): number {
@@ -307,48 +303,30 @@ export function validateSection3(data: any): ValidationResult {
 export function validateSection4(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     data = asObj(data);
-    const activityBlocks = asList(data.activity_blocks);
-    
+    const activityBlocks = asList(data.activity_blocks).map((block: any) => asObj(block));
+
     if (!activityBlocks.length) {
         errors.push({ field: 'activity_blocks', message: 'At least one activity block is required' });
     } else {
-        activityBlocks.forEach((block: any, index: number) => {
-            const row = asObj(block);
-            if (!String(row.title || '').trim()) errors.push({ field: `activity_blocks.${index}.title`, message: `Activity ${index + 1}: Title is required` });
-            if (!row.primary_category) errors.push({ field: `activity_blocks.${index}.primary_category`, message: `Activity ${index + 1}: Activity family is required` });
-            if (isCustomActivityChoice(row.primary_category) && !String(row.other_category_text || '').trim()) {
-                errors.push({ field: `activity_blocks.${index}.other_category_text`, message: `Activity ${index + 1}: Name the custom activity family` });
-            }
-            if (row.primary_category && !isCustomActivityChoice(row.primary_category) && !row.sub_category) {
-                errors.push({ field: `activity_blocks.${index}.sub_category`, message: `Activity ${index + 1}: Sub-category is required` });
-            }
-            if (isCustomActivityChoice(row.sub_category) && !String(row.other_sub_category_text || '').trim()) {
-                errors.push({ field: `activity_blocks.${index}.other_sub_category_text`, message: `Activity ${index + 1}: Describe the custom sub-category` });
-            }
-            if (!row.status) errors.push({ field: `activity_blocks.${index}.status`, message: `Activity ${index + 1}: Status is required` });
-
-            pushWordRange(errors, `activity_blocks.${index}.description`, row.description, `Activity ${index + 1} description`);
-
-            // Ladder-built activities (carry ladder_ui) must pass every ladder step, exactly like the
-            // wizard's own step ticks; legacy rows keep the lighter rule below.
-            if (row.ladder_ui && typeof row.ladder_ui === 'object') {
-                const outs = asList(row.outputs);
-                if (!outs.length || !outs.every((o: any) => outputRowOk(asObj(o)))) {
-                    errors.push({ field: `activity_blocks.${index}.outputs`, message: `Activity ${index + 1}: Each delivered item needs a number above 0 and a unit` });
-                }
-                if (!step3Ok(row)) {
-                    errors.push({ field: `activity_blocks.${index}.beneficiaries_reached`, message: `Activity ${index + 1}: ${stepNeedText(row, 3) || 'Finish "Who did it serve, and how many?"'}` });
-                }
-                return;
-            }
-
-            const hasOutput = asList(row.outputs).some((out: any) => String(out?.title || '').trim() && String(out?.quantity ?? '').trim());
-            const hasReach = String(row.beneficiaries_reached ?? '').trim() && String(row.unique_beneficiaries ?? row.beneficiaries_reached ?? '').trim();
-            if (!hasOutput && !hasReach) {
-                errors.push({ field: `activity_blocks.${index}.outputs`, message: `Activity ${index + 1}: Add a countable output or a beneficiary reach` });
+        activityBlocks.forEach((row: any, index: number) => {
+            // V19 streamlined card: name, status, category (+ sub / custom), what we did, and what we
+            // delivered (≥ 1 complete output, or the explicit "no countable output" + reason).
+            const issues = activityIssues(row, index, (category) => GLOBAL_ACTIVITY_TAXONOMY[category] || []);
+            const descIssue = issues.find((i) => i.field.endsWith('.description'));
+            issues.filter((i) => i !== descIssue).forEach((i) => errors.push(i));
+            if (descIssue) errors.push(descIssue);
+            else pushWordRange(errors, `activity_blocks.${index}.description`, row.description, `Activity ${index + 1} description`);
+            // Older ladder rows that only recorded a per-activity reach (no outputs) stay valid.
+            const legacyReach = String(row.beneficiaries_reached ?? '').trim() && !row.v19 && !row.no_output && !asList(row.outputs).length;
+            if (legacyReach) {
+                const idx = errors.findIndex((e) => e.field === `activity_blocks.${index}.outputs`);
+                if (idx >= 0) errors.splice(idx, 1);
             }
         });
     }
+
+    // 4.2 Community reach: one project-level answer (counted + source, unconfirmed, or none).
+    reachIssues(asObj(data.project_summary), activityBlocks).forEach((i) => errors.push(i));
 
     return { isValid: errors.length === 0, errors };
 }
@@ -361,11 +339,14 @@ export function validateSection5(data: any): ValidationResult {
     data = asObj(data);
     pushWordRange(errors, 'observed_change', data.observed_change, 'Observed change narrative');
 
+    // V19: the one before / after result is optional; when started it must be complete. Older
+    // detailed outcomes (no `simple` flag) keep their original rules.
     const outcomes = asList(data.measurable_outcomes);
-    if (!outcomes.length) {
-        errors.push({ field: 'measurable_outcomes', message: 'At least one measurable outcome is required' });
-    } else {
-        outcomes.forEach((outcome: any, index: number) => {
+    const simpleRow = outcomes.find((o: any) => asObj(o).simple === true);
+    simpleMeasureIssues(simpleRow ? asObj(simpleRow) : null).forEach((i) => errors.push(i));
+    const legacyOutcomes = outcomes.filter((o: any) => asObj(o).simple !== true);
+    {
+        legacyOutcomes.forEach((outcome: any, index: number) => {
             const row = asObj(outcome);
             if (!row.outcome_area) errors.push({ field: `measurable_outcomes.${index}.outcome_area`, message: 'Outcome category is required' });
             if (!row.outcome_sub_category && row.outcome_area !== 'Other') errors.push({ field: `measurable_outcomes.${index}.outcome_sub_category`, message: 'Outcome sub-category is required' });
@@ -388,6 +369,7 @@ export function validateSection5(data: any): ValidationResult {
         });
     }
 
+    challengeTagIssues(data.challenge_tags).forEach((i) => errors.push(i));
     pushWordRange(errors, 'challenges', data.challenges, 'Challenges description');
 
     return { isValid: errors.length === 0, errors };

@@ -28,16 +28,30 @@ test("description limit is 15-60 words", () => {
     assert.equal(step1Ok({ ...goodActivity(), description: words(61) }), false);
 });
 
+// V19: reach is answered once per project (4.2); older ladder drafts already carry this summary.
+const reach = { reach_mode: "counted", distinct_total_beneficiaries: "120", counting_method: "Manual counting by team" };
+
 test("a complete ladder activity passes submit validation; a zero quantity does not", () => {
-    assert.equal(validateSection4({ activity_blocks: [goodActivity()] }).isValid, true);
+    assert.equal(validateSection4({ activity_blocks: [goodActivity()], project_summary: reach }).isValid, true);
     const bad = { ...goodActivity(), outputs: [{ type: "Sessions Conducted", quantity: "0", unit: "Sessions" }] };
-    assert.equal(validateSection4({ activity_blocks: [bad] }).isValid, false);
+    assert.equal(validateSection4({ activity_blocks: [bad], project_summary: reach }).isValid, false);
 });
 
-test("ladder activity missing overlap / counting method / geography cannot submit", () => {
+test("V19: per-activity overlap / counting / geography no longer block; name, status, category, what-we-did and delivery do", () => {
     for (const patch of [{ overlap_status: "" }, { reach_counting_method: "" }, { geographic_reach: "" }]) {
-        assert.equal(validateSection4({ activity_blocks: [{ ...goodActivity(), ...patch }] }).isValid, false);
+        assert.equal(validateSection4({ activity_blocks: [{ ...goodActivity(), ...patch }], project_summary: reach }).isValid, true);
     }
+    for (const patch of [{ title: "" }, { status: "" }, { primary_category: "" }, { description: "" }, { outputs: [], beneficiaries_reached: "", unique_beneficiaries: "" }]) {
+        assert.equal(validateSection4({ activity_blocks: [{ ...goodActivity(), ...patch }], project_summary: reach }).isValid, false, JSON.stringify(patch));
+    }
+    // "No countable output" needs its reason; with the reason it replaces outputs.
+    assert.equal(validateSection4({ activity_blocks: [{ ...goodActivity(), outputs: [], no_output: true }], project_summary: reach }).isValid, false);
+    assert.equal(validateSection4({ activity_blocks: [{ ...goodActivity(), outputs: [], no_output: true, no_output_reason: "Awareness talk only" }], project_summary: reach }).isValid, true);
+    // Project reach must be answered: counted needs a number + source; unconfirmed / none need nothing more.
+    assert.equal(validateSection4({ activity_blocks: [{ ...goodActivity(), unique_beneficiaries: "", beneficiaries_reached: "" }], project_summary: {} }).isValid, false);
+    assert.equal(validateSection4({ activity_blocks: [goodActivity()], project_summary: { reach_mode: "counted", distinct_total_beneficiaries: "" } }).isValid, false);
+    assert.equal(validateSection4({ activity_blocks: [{ ...goodActivity(), unique_beneficiaries: "", beneficiaries_reached: "" }], project_summary: { reach_mode: "unconfirmed" } }).isValid, true);
+    assert.equal(validateSection4({ activity_blocks: [{ ...goodActivity(), unique_beneficiaries: "", beneficiaries_reached: "" }], project_summary: { reach_mode: "none" } }).isValid, true);
 });
 
 test("clearing unique people does not fall back to a stale gross value", () => {
@@ -47,7 +61,9 @@ test("clearing unique people does not fall back to a stale gross value", () => {
 test("legacy (non-ladder) activity keeps the lighter rule", () => {
     const { ladder_ui, ...legacy } = goodActivity();
     void ladder_ui;
-    assert.equal(validateSection4({ activity_blocks: [legacy] }).isValid, true);
+    assert.equal(validateSection4({ activity_blocks: [legacy], project_summary: reach }).isValid, true);
+    // A legacy row that only recorded a per-activity reach (no outputs) still submits.
+    assert.equal(validateSection4({ activity_blocks: [{ ...legacy, outputs: [] }], project_summary: reach }).isValid, true);
 });
 
 test("metric picks follow the metric, not a hard-coded Access-to-Education default", () => {
