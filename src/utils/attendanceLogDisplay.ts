@@ -169,19 +169,20 @@ export function normalizeAttendanceLogsForDisplay(rawLogs: unknown): NormalizedA
 
 export { evidenceLinkLabel };
 
-export function describeEvidenceCell(norm: NormalizedAttendanceLogRow): { href: string | null; label: string } {
+export function describeEvidenceCell(norm: NormalizedAttendanceLogRow): { href: string | null; label: string; missing: boolean } {
     const href = resolveAttendanceEvidenceHrefFromLog(norm);
     const uploaded =
         norm.evidenceUploaded === true ||
         norm.evidenceUploaded === "true" ||
         norm.evidence_uploaded === true ||
         norm.evidence_file === true;
-    if (href) return { href, label: evidenceLinkLabel(href) };
-    if (uploaded) return { href: null, label: "Uploaded (URL not stored)" };
+    if (href) return { href, label: evidenceLinkLabel(href), missing: false };
+    if (uploaded) return { href: null, label: "Uploaded (URL not stored)", missing: false };
     const ef = norm.evidence_file;
-    if (isNativeFile(ef)) return { href: null, label: ef.name || "Local file" };
-    if (ef && typeof ef === "object") return { href: null, label: "Evidence attached" };
-    return { href: null, label: "—" };
+    if (isNativeFile(ef)) return { href: null, label: ef.name || "Local file", missing: false };
+    if (ef && typeof ef === "object") return { href: null, label: "Evidence attached", missing: false };
+    // V19 item 08: reviewers see at a glance which sessions were saved without proof.
+    return { href: null, label: "No evidence", missing: true };
 }
 
 export function pickApprovalRemark(norm: Record<string, unknown>): string {
@@ -214,6 +215,8 @@ export function buildAttendanceTableRows(
     remark: string;
     evidenceHref: string | null;
     evidenceLabel: string;
+    /** True when the session carries no photo / document at all (V19 item 08). */
+    evidenceMissing: boolean;
 }> {
     return normalizeAttendanceLogsForDisplay(rawLogs).map((norm, idx) => {
         const hoursRaw = norm.hours;
@@ -239,6 +242,7 @@ export function buildAttendanceTableRows(
             remark: pickApprovalRemark(norm),
             evidenceHref: ev.href,
             evidenceLabel: ev.label,
+            evidenceMissing: ev.missing,
         };
     });
 }

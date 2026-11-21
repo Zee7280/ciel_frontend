@@ -81,6 +81,13 @@ export function AttendanceLogsDossierTable({
                                     >
                                         {row.evidenceLabel}
                                     </a>
+                                ) : row.evidenceMissing ? (
+                                    <span
+                                        className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800"
+                                        data-testid="dossier-no-evidence"
+                                    >
+                                        No evidence
+                                    </span>
                                 ) : (
                                     <span className="break-words font-medium text-slate-600">{row.evidenceLabel}</span>
                                 )}

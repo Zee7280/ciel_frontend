@@ -18,7 +18,7 @@ import {
     type SDG,
 } from "@/utils/sdgData";
 import clsx from "clsx";
-import { listOpportunityReportSdgs } from "../utils/reportSdgMerge";
+import { listOpportunityReportSdgs, registeredSecondaryContribution } from "../utils/reportSdgMerge";
 import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_MAX_WORDS, FIELD_WORD_POLICY, reportTextWordMeter } from "../utils/validation";
 
 const PRIMARY_SDG_WORD_RANGE = FIELD_WORD_POLICY.contribution_intent_statement;
@@ -48,6 +48,9 @@ const ALL_SDGS = [
     { num: 16, color: "#00689D", name: "Peace, Justice & Strong Institutions" },
     { num: 17, color: "#19486A", name: "Partnerships for the Goals" },
 ];
+
+/** Generated Section 3 summaries start with this; anything else is treated as hand-written and left alone. */
+const SDG_AUTO_SUMMARY_LEAD = "This project is aligned with SDG";
 
 /** First sentence (or a clipped lead-in) of free text, used to quote the student's own wording in the finalized shortlist card. */
 function firstSentence(text: string, maxLen = 220): string {
@@ -265,7 +268,36 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const opportunitySdgRows = useMemo(() => listOpportunityReportSdgs(projectData), [projectData]);
     const oppPrimaryRow = opportunitySdgRows.find((row) => row.role === "primary");
     const oppPrimaryNum = oppPrimaryRow?.goalNumber || 0;
-    const oppSecondaries = opportunitySdgRows.filter((row) => row.role === "secondary");
+    const oppSecondaries = useMemo(() => opportunitySdgRows.filter((row) => row.role === "secondary"), [opportunitySdgRows]);
+    /** Every goal registered on the opportunity (primary + secondaries) — the student cannot pick these again (V19 item 20). */
+    const registeredGoalIds = useMemo(
+        () => opportunitySdgRows.map((row) => String(row.goalNumber)),
+        [opportunitySdgRows],
+    );
+    const registeredContributions = section3.registered_secondary_contributions || {};
+
+    // V19 item 17: seed one contribution slot per registered secondary SDG so validation can require each.
+    useEffect(() => {
+        if (!oppSecondaries.length) return;
+        const current = section3.registered_secondary_contributions || {};
+        const missing = oppSecondaries.filter((row) => !(String(row.goalNumber) in current));
+        if (!missing.length) return;
+        const next: Record<string, string> = { ...current };
+        missing.forEach((row) => {
+            next[String(row.goalNumber)] = "";
+        });
+        updateSection("section3", { registered_secondary_contributions: next });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [oppSecondaries, section3.registered_secondary_contributions]);
+
+    const setRegisteredContribution = (goalNumber: number, text: string) => {
+        updateSection("section3", {
+            registered_secondary_contributions: {
+                ...(section3.registered_secondary_contributions || {}),
+                [String(goalNumber)]: text,
+            },
+        });
+    };
 
     // ── Student primary SDG state (Part B – dropdowns) ────────────────────────
     const studentPrimaryId = data.section3.primary_sdg.goal_number?.toString() || "";
@@ -290,31 +322,57 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
     // ── Finalize: "Finalise my SDGs" builds a shortlist card from whatever's been confirmed above ──
     const finalizedGoals = useMemo(() => {
-        type FinalizedGoal = { num: number; isPrimary: boolean; targetId: string; quote: string };
+        type FinalizedGoal = {
+            num: number;
+            isPrimary: boolean;
+            targetId: string;
+            quote: string;
+            /** "registered" = set on the opportunity; "student" = added by the team during implementation (V19 item 22). */
+            source: "registered" | "student";
+        };
         const goals: FinalizedGoal[] = [];
-        const seen = new Set<number>();
+        const byNum = new Map<number, FinalizedGoal>();
+        const push = (goal: FinalizedGoal) => {
+            const existing = byNum.get(goal.num);
+            if (!existing) {
+                goals.push(goal);
+                byNum.set(goal.num, goal);
+                return;
+            }
+            // V19 item 20: a student entry that duplicates a registered goal is merged, never dropped —
+            // its text fills the registered row when that row has none, and its target is kept as a fallback.
+            if (!existing.quote.trim() && goal.quote.trim()) existing.quote = goal.quote;
+            if (!existing.targetId && goal.targetId) existing.targetId = goal.targetId;
+        };
 
         if (oppPrimaryNum > 0) {
-            goals.push({ num: oppPrimaryNum, isPrimary: true, targetId: oppPrimaryRow?.targetId || "", quote: contribution_intent_statement || "" });
-            seen.add(oppPrimaryNum);
+            push({ num: oppPrimaryNum, isPrimary: true, targetId: oppPrimaryRow?.targetId || "", quote: contribution_intent_statement || "", source: "registered" });
         }
+        // V19 item 21: registered secondary goals are part of the footprint, with their own contribution text.
+        oppSecondaries.forEach((row) => {
+            push({
+                num: row.goalNumber,
+                isPrimary: false,
+                targetId: row.targetId || "",
+                quote: registeredSecondaryContribution(section3, row.goalNumber) || row.justification || "",
+                source: "registered",
+            });
+        });
 
         const studentNum = Number(studentPrimaryId);
-        if (studentNum && !seen.has(studentNum)) {
-            goals.push({ num: studentNum, isPrimary: oppPrimaryNum === 0, targetId: studentTargetId, quote: student_contribution_intent_statement || "" });
-            seen.add(studentNum);
+        if (studentNum) {
+            push({ num: studentNum, isPrimary: oppPrimaryNum === 0, targetId: studentTargetId, quote: student_contribution_intent_statement || "", source: "student" });
         }
 
         (secondary_sdgs || []).forEach((sdg) => {
             const num = Number(sdg.goal_number);
-            if (num && !seen.has(num)) {
-                goals.push({ num, isPrimary: false, targetId: sdg.target_id || "", quote: sdg.justification_text || "" });
-                seen.add(num);
+            if (num) {
+                push({ num, isPrimary: false, targetId: sdg.target_id || "", quote: sdg.justification_text || "", source: "student" });
             }
         });
 
         return goals;
-    }, [oppPrimaryNum, oppPrimaryRow?.targetId, contribution_intent_statement, studentPrimaryId, studentTargetId, student_contribution_intent_statement, secondary_sdgs]);
+    }, [oppPrimaryNum, oppPrimaryRow?.targetId, oppSecondaries, section3, contribution_intent_statement, studentPrimaryId, studentTargetId, student_contribution_intent_statement, secondary_sdgs]);
 
     const canFinalize = finalizedGoals.length > 0 && finalizedGoals.some((g) => g.quote.trim());
     const isFinalized = section3.summary_stage === "validated";
@@ -351,16 +409,45 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
     const autoSummary = useMemo(() => {
         const currentSummary = data.section3.summary_text || "";
-        // If user already edited the summary significantly, don't overwrite it
-        if (currentSummary && (currentSummary.length > 100 || !currentSummary.includes("This project is aligned with SDG"))) {
+        // A summary the student rewrote by hand no longer starts with the generated lead-in — keep it.
+        // (The old guard also froze the generated text once it passed 100 characters, so SDGs added
+        // later never reached the summary — V19 item 21.)
+        if (currentSummary && !currentSummary.startsWith(SDG_AUTO_SUMMARY_LEAD)) {
             return currentSummary;
         }
 
         const goalNum = oppPrimaryNum || studentPrimaryId || "X";
-        const target = oppPrimaryRow?.targetId || studentTargetId || "X.X";
-        const indicator = oppPrimaryRow?.indicatorId || studentIndicatorId || "X.X.X";
-        return `This project is aligned with SDG ${goalNum}, Target ${target}, Indicator ${indicator}. The planned intervention focuses on the intended contribution pathway described above. Final validation of indicator-level contribution will be determined after measurable outputs and outcomes are submitted in Sections 4 and 5.`;
-    }, [oppPrimaryNum, oppPrimaryRow?.targetId, oppPrimaryRow?.indicatorId, studentPrimaryId, studentTargetId, studentIndicatorId]);
+        const target = oppPrimaryRow?.targetId || studentTargetId || "";
+        const indicator = oppPrimaryRow?.indicatorId || studentIndicatorId || "";
+        const nameOf = (num: number) => ALL_SDGS.find((s) => s.num === num)?.name || `Goal ${num}`;
+        const registeredSecondaryNums = oppSecondaries.map((r) => r.goalNumber);
+        const studentOnly = finalizedGoals.filter((g) => g.source === "student");
+
+        const parts: string[] = [];
+        parts.push(
+            `${SDG_AUTO_SUMMARY_LEAD} ${goalNum}${target ? `, Target ${target}` : ""}${indicator ? `, Indicator ${indicator}` : ""}${oppPrimaryNum ? " as its registered primary goal" : ""}.`,
+        );
+        if (registeredSecondaryNums.length) {
+            parts.push(
+                `Registered secondary goal${registeredSecondaryNums.length === 1 ? "" : "s"}: ${registeredSecondaryNums.map((n) => `SDG ${n} (${nameOf(n)})`).join(", ")}.`,
+            );
+        }
+        if (studentOnly.length) {
+            parts.push(
+                `During implementation the team also mapped ${studentOnly.map((g) => `SDG ${g.num} (${nameOf(g.num)})`).join(", ")}.`,
+            );
+        }
+        const quoted = finalizedGoals.filter((g) => g.quote.trim());
+        if (quoted.length) {
+            parts.push(
+                `Reported contributions — ${quoted.map((g) => `SDG ${g.num}: "${firstSentence(g.quote, 160)}"`).join("; ")}.`,
+            );
+        }
+        parts.push(
+            "These are the team's reported contributions; registered alignment is distinct from demonstrated contribution, which is validated against the outputs and outcomes in Sections 4 and 5.",
+        );
+        return parts.join(" ");
+    }, [data.section3.summary_text, oppPrimaryNum, oppPrimaryRow?.targetId, oppPrimaryRow?.indicatorId, studentPrimaryId, studentTargetId, studentIndicatorId, oppSecondaries, finalizedGoals]);
 
     useEffect(() => {
         if (data.section3.summary_text !== autoSummary) {
@@ -504,30 +591,62 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
                         if (!sdg) return null;
 
+                        const contributionField = `registered_secondary_contributions.${num}`;
+                        const contributionText = registeredContributions[String(num)] || "";
+                        const contributionWords = contributionText.trim().split(/\s+/).filter(Boolean).length;
+
                         return (
-                            <div
-                                key={`${num}-${row.targetId}-${i}`}
-                                className="cer-registered-sdg"
-                                style={{ background: sdg.color }}
-                            >
-                                <div className="cer-rs-num">{sdg.num}</div>
-                                <div className="cer-rs-name">SDG {sdg.num}: {sdg.name}</div>
-                                <p className="cer-rs-meta">Secondary alignment</p>
-                                {row.targetId ? (
-                                    <p className="cer-rs-meta">
-                                        <b>Target {meta.targetCode}:</b> {meta.targetDesc || "Registered"}
+                            <div key={`${num}-${row.targetId}-${i}`} className="space-y-3">
+                                <div className="cer-registered-sdg" style={{ background: sdg.color }}>
+                                    <div className="cer-rs-num">{sdg.num}</div>
+                                    <div className="cer-rs-name">SDG {sdg.num}: {sdg.name}</div>
+                                    <p className="cer-rs-meta">Secondary alignment</p>
+                                    {row.targetId ? (
+                                        <p className="cer-rs-meta">
+                                            <b>Target {meta.targetCode}:</b> {meta.targetDesc || "Registered"}
+                                        </p>
+                                    ) : null}
+                                    {row.indicatorId ? (
+                                        <p className="cer-rs-meta">
+                                            <b>Indicator {meta.indicatorCode}:</b> {meta.indicatorDesc || "Registered"}
+                                        </p>
+                                    ) : null}
+                                    {meta.subIndicator ? (
+                                        <p className="cer-rs-meta">
+                                            <b>Sub-indicator:</b> {meta.subIndicator}
+                                        </p>
+                                    ) : null}
+                                </div>
+                                {/* V19 item 17: a contribution statement for every registered SDG, not only the primary. */}
+                                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <Label className="text-sm font-semibold text-slate-900">
+                                            3.1.{i + 2} Actual contribution to SDG {num}
+                                        </Label>
+                                        <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600">
+                                            Required
+                                        </span>
+                                    </div>
+                                    <p className="text-sm leading-relaxed text-slate-500">
+                                        How did your activities actually contribute to this registered goal — who benefited and what shifted?
                                     </p>
-                                ) : null}
-                                {row.indicatorId ? (
-                                    <p className="cer-rs-meta">
-                                        <b>Indicator {meta.indicatorCode}:</b> {meta.indicatorDesc || "Registered"}
-                                    </p>
-                                ) : null}
-                                {meta.subIndicator ? (
-                                    <p className="cer-rs-meta">
-                                        <b>Sub-indicator:</b> {meta.subIndicator}
-                                    </p>
-                                ) : null}
+                                    <Textarea
+                                        placeholder={`During implementation, this project supported SDG ${num} by…`}
+                                        className={clsx(
+                                            "min-h-[110px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--aqua-soft)]",
+                                            getFieldError(contributionField) && "border-red-300",
+                                        )}
+                                        value={contributionText}
+                                        onChange={(e) => setRegisteredContribution(num, e.target.value)}
+                                    />
+                                    <WordCountBar
+                                        count={contributionWords}
+                                        min={EXTRA_SDG_WORD_RANGE.min}
+                                        max={EXTRA_SDG_WORD_RANGE.max}
+                                        text={contributionText}
+                                    />
+                                    <FieldError message={getFieldError(contributionField)} />
+                                </div>
                             </div>
                         );
                     })}
@@ -620,6 +739,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         </label>
                         <SDGTileGrid
                             selectedId={studentPrimaryId}
+                            disabledIds={registeredGoalIds}
                             onSelect={(id) =>
                                 updateSection("section3", {
                                     primary_sdg: {
@@ -632,6 +752,16 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 })
                             }
                         />
+                        {registeredGoalIds.length ? (
+                            <p className="text-xs text-slate-500">
+                                Goals already registered on the opportunity (SDG {registeredGoalIds.join(", ")}) are greyed out — their contribution is written in 3.1.
+                            </p>
+                        ) : null}
+                        {studentPrimaryId && registeredGoalIds.includes(studentPrimaryId) ? (
+                            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                SDG {studentPrimaryId} is already registered on this opportunity. It will be shown once in your SDG footprint, and this statement is merged into that entry.
+                            </p>
+                        ) : null}
                         <FieldError message={getFieldError("primary_sdg")} />
                     </div>
 
@@ -734,7 +864,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 .filter((_: unknown, i: number) => i !== index)
                                 .map((s: { goal_number?: string | number | null }) => s.goal_number?.toString())
                                 .filter((v: string | undefined): v is string => Boolean(v));
-                            const disabledIds = [studentPrimaryId, ...otherSelectedIds].filter(Boolean);
+                            const disabledIds = [studentPrimaryId, ...otherSelectedIds, ...registeredGoalIds].filter(Boolean);
+                            const duplicatesRegistered = Boolean(sdgId) && registeredGoalIds.includes(sdgId);
 
                             return (
                                 <div
@@ -755,6 +886,11 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                         </button>
                                     </div>
 
+                                    {duplicatesRegistered ? (
+                                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                            SDG {sdgId} is already registered on this opportunity — it is counted once, and this justification is merged into the 3.1 entry.
+                                        </p>
+                                    ) : null}
                                     <SDGTileGrid
                                         selectedId={sdgId}
                                         disabledIds={disabledIds}
@@ -922,7 +1058,15 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                         <span className="inline-flex items-center gap-1 rounded-full bg-[var(--gold-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--gold)]">
                                                             ★ Primary — set by program
                                                         </span>
-                                                    ) : null}
+                                                    ) : g.source === "registered" ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                                                            <Lock className="h-2.5 w-2.5" /> Registered on opportunity
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--aqua-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--teal)]">
+                                                            Added by the team
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {g.targetId ? (
                                                     <p className="text-xs text-slate-500">

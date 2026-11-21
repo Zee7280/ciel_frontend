@@ -171,7 +171,64 @@ export function validateSection1(data: any): ValidationResult {
         errors.push({ field: 'privacy_consent', message: 'You must provide privacy consent to proceed.' });
     }
 
+    // V19 item 08 — every counted session needs a photo / document (mirrors the backend submit gate).
+    const missing = attendanceSessionsWithoutEvidence(data.attendance_logs);
+    if (missing.length) {
+        const dates = missing
+            .map((log) => String(log.date || '').slice(0, 10))
+            .filter(Boolean)
+            .slice(0, 5)
+            .join(', ');
+        errors.push({
+            field: 'attendance_logs',
+            message: `${missing.length} attendance session${missing.length === 1 ? ' has' : 's have'} no supporting evidence${dates ? ` (${dates})` : ''}. Add a photo or document to each session, or remove it.`,
+        });
+    }
+
     return { isValid: errors.length === 0, errors };
+}
+
+export type AttendanceLogEvidenceShape = {
+    id?: string;
+    date?: unknown;
+    approval_status?: unknown;
+    approvalStatus?: unknown;
+    entryStatus?: unknown;
+    evidence_file?: unknown;
+    evidence_url?: unknown;
+    evidenceUrl?: unknown;
+    evidence_urls?: unknown;
+    evidenceUploaded?: unknown;
+};
+
+/** Any uploaded URL, upload flag or attached file counts as evidence for a session. */
+export function attendanceLogHasEvidence(log: AttendanceLogEvidenceShape): boolean {
+    if (log.evidence_file) return true;
+    if (log.evidenceUploaded === true) return true;
+    for (const v of [log.evidence_url, log.evidenceUrl]) {
+        if (typeof v === 'string' && v.trim()) return true;
+    }
+    return Array.isArray(log.evidence_urls) && log.evidence_urls.length > 0;
+}
+
+/** Sessions a reviewer has already approved / verified are trusted as logged; rejected ones do not count. */
+export function attendanceSessionIsFrozenByReviewer(log: AttendanceLogEvidenceShape): boolean {
+    const approval = String(log.approval_status ?? log.approvalStatus ?? '').trim().toLowerCase();
+    const entry = String(log.entryStatus ?? '').trim().toLowerCase();
+    return approval === 'approved' || entry === 'verified';
+}
+
+/** Counted sessions (not rejected, not reviewer-approved) that carry no evidence — the ones item 08 blocks on. */
+export function attendanceSessionsWithoutEvidence(logs: unknown): AttendanceLogEvidenceShape[] {
+    if (!Array.isArray(logs)) return [];
+    return logs.filter((raw): raw is AttendanceLogEvidenceShape => {
+        if (!raw || typeof raw !== 'object') return false;
+        const log = raw as AttendanceLogEvidenceShape;
+        const approval = String(log.approval_status ?? log.approvalStatus ?? '').trim().toLowerCase();
+        if (approval === 'rejected') return false;
+        if (attendanceSessionIsFrozenByReviewer(log)) return false;
+        return !attendanceLogHasEvidence(log);
+    });
 }
 
 
@@ -293,6 +350,22 @@ export function validateSection3(data: any): ValidationResult {
     asList(data.secondary_sdgs).forEach((sdg: any, index: number) => {
         pushWordRange(errors, `secondary_sdgs.${index}.justification_text`, sdg?.justification_text, 'Justification');
     });
+
+    // V19 item 17 — one contribution statement per SDG registered as secondary on the opportunity.
+    // Section 3 seeds a key per registered secondary SDG; reports without the map are left alone.
+    const registered = asObj(data.registered_secondary_contributions);
+    Object.keys(registered)
+        .sort((a, b) => Number(a) - Number(b))
+        .forEach((goal) => {
+            pushWordRange(
+                errors,
+                `registered_secondary_contributions.${goal}`,
+                registered[goal],
+                `Registered SDG ${goal} contribution`,
+                true,
+                'justification_text',
+            );
+        });
 
     return { isValid: errors.length === 0, errors };
 }

@@ -10,6 +10,7 @@ import clsx from "clsx";
 import { toast } from "sonner";
 
 import { FieldError } from "./ui/FieldError";
+import { attendanceSessionsWithoutEvidence } from "../utils/validation";
 import IdentityVerification from "../../engagement/components/IdentityVerification";
 import AttendanceForm from "../../engagement/components/AttendanceForm";
 import AttendanceSummaryTable from "../../engagement/components/AttendanceSummaryTable";
@@ -1096,6 +1097,38 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
         }
     };
 
+    /** V19 item 08 — persist an uploaded photo / document on a session saved without evidence. */
+    const handleAttachEvidence = async (entryId: string, evidenceUrl: string) => {
+        const entry = attendanceLogs.find((l: any) => l.id === entryId);
+        if (!entry) return;
+        const entryParticipantId = (entry as any)?.participantId || participantId;
+        if (!entryParticipantId) return;
+        const segments = String(entryParticipantId).split(':');
+        const realId = segments.length > 1 ? segments[segments.length - 1] : entryParticipantId;
+        if (!realId) return;
+        const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance/${entryId}/evidence`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ evidenceUrl }),
+        });
+        if (res && res.ok) {
+            updateSection('section1', {
+                attendance_logs: attendanceLogs.map((l: any) =>
+                    l.id === entryId ? { ...l, evidence_file: evidenceUrl, evidence_url: evidenceUrl } : l,
+                ),
+            });
+            toast.success("Evidence attached to the session.");
+            return;
+        }
+        const message = await resolveAttendanceSubmitError(res, "submit");
+        toast.error(message, { duration: 8000 });
+    };
+
+    const sessionsMissingEvidence = React.useMemo(
+        () => attendanceSessionsWithoutEvidence(attendanceLogs),
+        [attendanceLogs],
+    );
+
 
     const isAttendanceFormLocked = !isParticipationUnlocked && isSubmittedReport;
     const lockTeamMemberAdd = isAttendanceFormLocked;
@@ -1937,6 +1970,22 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                                         : ""}
                                                 </p>
                                             </div>
+                                            {sessionsMissingEvidence.length ? (
+                                                <div
+                                                    className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900"
+                                                    data-testid="attendance-missing-evidence-banner"
+                                                >
+                                                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                                                    <p className="leading-relaxed">
+                                                        <span className="font-bold">
+                                                            {sessionsMissingEvidence.length} session{sessionsMissingEvidence.length === 1 ? " has" : "s have"} no supporting evidence.
+                                                        </span>{" "}
+                                                        The report cannot be submitted until every counted session carries a photo or document.
+                                                        Use <span className="font-semibold">Add evidence</span> on each card below, or remove the session.
+                                                    </p>
+                                                </div>
+                                            ) : null}
+                                            <FieldError message={getFieldError("attendance_logs")} />
                                             <AttendanceSummaryTable
                                                 embedded
                                                 showVerificationStatus={false}
@@ -1951,6 +2000,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                                         currentUserId,
                                                     )
                                                 }
+                                                onAttachEvidence={handleAttachEvidence}
                                                 isLocked={isAttendanceFormLocked}
                                             />
                                         </div>

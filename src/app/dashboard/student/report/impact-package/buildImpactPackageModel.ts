@@ -531,7 +531,7 @@ export function buildImpactPackageModel(
                 pickString(data.section2?.primary_beneficiary, data.section2?.affected_group)
                     ? { text: pickString(data.section2?.primary_beneficiary, data.section2?.affected_group) }
                     : null,
-                riskConsent ? { text: `Photo / data consent: ${nice(riskConsent)}` } : null,
+                riskConsent ? { text: `Photo / data consent (student-reported): ${nice(riskConsent)}` } : null,
             ].filter(Boolean) as ImpactPackageChip[],
             hasContent: Boolean(firstSentence(pickString(data.section2?.problem_statement, data.section2?.summary_text, data.section2?.affected_group))),
         },

@@ -9,8 +9,13 @@ import {
     ExternalLink,
     FileImage,
     FileText,
+    ImagePlus,
+    Loader2,
+    AlertTriangle,
 } from "lucide-react";
 import clsx from "clsx";
+import { toast } from "sonner";
+import { uploadFileViaPresign } from "@/utils/presignedFileUpload";
 
 /** "09:00" (24h, from a native <input type="time">) → "9:00 AM" — this table previously rendered
  * the raw 24h value verbatim (e.g. "14:30 – 17:00"). */
@@ -198,6 +203,8 @@ function SessionCard({
     participantNames,
     onDelete,
     canDelete,
+    onAttachEvidence,
+    canAttach,
     isLocked,
     showVerificationStatus = true,
 }: {
@@ -205,10 +212,15 @@ function SessionCard({
     participantNames: Record<string, string>;
     onDelete?: (id: string) => void;
     canDelete: boolean;
+    /** V19 item 08: upload a photo / document for a session saved without evidence. */
+    onAttachEvidence?: (id: string, url: string) => Promise<void> | void;
+    canAttach?: boolean;
     isLocked: boolean;
     showVerificationStatus?: boolean;
 }) {
     const [remarkOpen, setRemarkOpen] = React.useState(false);
+    const [attaching, setAttaching] = React.useState(false);
+    const fileInputRef = React.useRef<HTMLInputElement | null>(null);
     const descText = pickDescription(entry);
     const locationText = pickEntryLocation(entry);
     const participantLabel = resolveParticipantDisplayName(entry.participantId, participantNames);
@@ -219,6 +231,25 @@ function SessionCard({
     const approvalRaw = (entry.approval_status ?? entry.entryStatus ?? "")
         .toString()
         .toLowerCase();
+    const hasEvidence = Boolean(evidenceHref) || localFile;
+    const frozenByReviewer = approvalRaw === "approved" || approvalRaw === "verified";
+    const missingEvidence = !hasEvidence && !rejected && !frozenByReviewer;
+    const showAttach = missingEvidence && !isLocked && !!canAttach && !!onAttachEvidence;
+    const handleEvidencePicked = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file || !onAttachEvidence) return;
+        setAttaching(true);
+        try {
+            const url = await uploadFileViaPresign("/api/v1/engagement/attendance/evidence/presign", file);
+            await onAttachEvidence(entry.id, url);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Could not upload the evidence file. Try a smaller image.";
+            toast.error(message, { duration: 8000 });
+        } finally {
+            setAttaching(false);
+        }
+    };
     const showApproval = showVerificationStatus
         ? approvalRaw === "pending" ||
           approvalRaw === "rejected" ||
@@ -344,6 +375,36 @@ function SessionCard({
                                 {evidenceDisplayLabel((entry.evidence_file as File).name || "File attached")}
                             </span>
                         </span>
+                    ) : missingEvidence ? (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span
+                                className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800"
+                                data-testid="attendance-no-evidence"
+                            >
+                                <AlertTriangle className="h-2.5 w-2.5" />
+                                No evidence
+                            </span>
+                            {showAttach ? (
+                                <>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*,application/pdf"
+                                        className="hidden"
+                                        onChange={handleEvidencePicked}
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={attaching}
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                                    >
+                                        {attaching ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImagePlus className="h-3 w-3" />}
+                                        {attaching ? "Uploading…" : "Add evidence"}
+                                    </button>
+                                </>
+                            ) : null}
+                        </div>
                     ) : null}
 
                     {remarkOpen && rejected ? (
@@ -367,6 +428,8 @@ export default function AttendanceSummaryTable({
     entries,
     onDelete,
     canDeleteEntry,
+    onAttachEvidence,
+    canAttachEvidence,
     isLocked = false,
     participantNames = {},
     embedded = false,
@@ -375,6 +438,10 @@ export default function AttendanceSummaryTable({
     entries: AttendanceEntry[];
     onDelete?: (id: string) => void;
     canDeleteEntry?: (entry: AttendanceEntry) => boolean;
+    /** V19 item 08: called with the uploaded file URL; the caller persists it and refreshes the entry. */
+    onAttachEvidence?: (id: string, url: string) => Promise<void> | void;
+    /** Defaults to the delete rule (seat owner / proxy author). */
+    canAttachEvidence?: (entry: AttendanceEntry) => boolean;
     isLocked?: boolean;
     participantNames?: Record<string, string>;
     embedded?: boolean;
@@ -382,6 +449,11 @@ export default function AttendanceSummaryTable({
 }) {
     const rowCanDelete = (entry: AttendanceEntry) =>
         !isLocked && !!onDelete && (canDeleteEntry ? canDeleteEntry(entry) : true);
+    const rowCanAttach = (entry: AttendanceEntry) => {
+        if (isLocked || !onAttachEvidence) return false;
+        if (canAttachEvidence) return canAttachEvidence(entry);
+        return canDeleteEntry ? canDeleteEntry(entry) : true;
+    };
 
     if (entries.length === 0) {
         return (
@@ -412,6 +484,8 @@ export default function AttendanceSummaryTable({
                         participantNames={participantNames}
                         onDelete={onDelete}
                         canDelete={rowCanDelete(entry)}
+                        onAttachEvidence={onAttachEvidence}
+                        canAttach={rowCanAttach(entry)}
                         isLocked={isLocked}
                         showVerificationStatus={showVerificationStatus}
                     />

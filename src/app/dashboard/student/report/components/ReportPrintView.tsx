@@ -15,7 +15,8 @@ import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7Paki
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
 import { dataSectionUiMark } from "../utils/reportWizardNav";
 import { distinctBeneficiaryTotal } from "../utils/activityReach";
-import { consentLabel, hasRiskBlockContent, riskFactorIds, riskFactorLabel } from "../utils/riskSafeguarding";
+import { consentReportedLabel, hasRiskBlockContent, riskFactorIds, riskFactorLabel } from "../utils/riskSafeguarding";
+import { SafeguardingReviewNotes } from "@/components/verify/SafeguardingReviewNotes";
 import { followupSummaryRows } from "../utils/sustainabilityFollowup";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
@@ -1398,11 +1399,14 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
                         <QandA q="Baseline evidence other" a={data.section2.baseline_evidence_other} fullWidth />
                         <QandA q="Baseline other entries" a={data.section2.baseline_other_entries} fullWidth />
                         <QandA q="Section summary" a={data.section2.summary_text} fullWidth />
+                        <div className="col-span-full">
+                            <SafeguardingReviewNotes block={data.section2} compact />
+                        </div>
                         {hasRiskBlockContent(data.section2) ? (
                             <>
                                 <QandA q="Risks identified" a={riskFactorIds(data.section2.risk_factors).map(riskFactorLabel).join(", ")} fullWidth />
                                 <QandA q="Risk mitigation" a={data.section2.risk_mitigation} fullWidth />
-                                <QandA q="Consent for photos and data" a={consentLabel(data.section2.risk_consent)} />
+                                <QandA q="Consent for photos and data (student-reported)" a={consentReportedLabel(data.section2.risk_consent)} />
                                 <QandA q="Safeguarding lead on site" a={data.section2.risk_safeguarding_lead} />
                                 <QandA q="Unresolved risks" a={data.section2.risk_unresolved || "None reported"} fullWidth />
                             </>
@@ -1534,6 +1538,15 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
                         <QandA q="Validation status" a={data.section3.validation_status} />
                         <QandA q="Summary stage" a={data.section3.summary_stage} />
                         <QandA q="Section summary" a={data.section3.summary_text} fullWidth />
+                        {data.section3.registered_secondary_contributions && Object.keys(data.section3.registered_secondary_contributions).length > 0 ? (
+                            <QandA
+                                q="Registered secondary SDG contributions (3.1)"
+                                a={Object.entries(data.section3.registered_secondary_contributions)
+                                    .sort(([a], [b]) => Number(a) - Number(b))
+                                    .map(([goal, text]) => `SDG ${goal}: ${String(text || "").trim() || "— not provided"}`)}
+                                fullWidth
+                            />
+                        ) : null}
                         <QandA q="Raw secondary SDG entries" a={data.section3.secondary_sdgs} fullWidth />
                     </div>
 

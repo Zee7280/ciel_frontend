@@ -54,3 +54,32 @@ test("labels fall back to the raw value for unknown ids", () => {
     assert.equal(consentLabel("written"), "Written consent obtained");
     assert.equal(consentLabel(""), "");
 });
+
+test("V19 item 13: reviewer attention notes flag blank, incomplete and inconsistent safeguarding answers", async () => {
+    const { safeguardingReviewNotes } = await import("../src/app/dashboard/student/report/utils/riskSafeguarding.ts");
+    const codes = (block) => safeguardingReviewNotes(block).map((n) => n.code);
+
+    assert.deepEqual(codes(undefined), ["block_blank"]);
+    assert.deepEqual(codes({}), ["block_blank"]);
+    assert.deepEqual(codes({ risk_factors: ["none"] }), []);
+
+    assert.deepEqual(codes({ risk_factors: ["children_present"] }), ["fields_missing", "consent_missing_sensitive"]);
+    assert.deepEqual(
+        codes({ risk_factors: ["beneficiary_photos"], risk_mitigation: "x", risk_consent: "not_obtained", risk_safeguarding_lead: "Ms A" }),
+        ["consent_not_obtained_sensitive"],
+    );
+    assert.deepEqual(
+        codes({ risk_factors: ["personal_data"], risk_mitigation: "x", risk_consent: "not_applicable", risk_safeguarding_lead: "Ms A" }),
+        ["consent_not_applicable_sensitive"],
+    );
+    assert.deepEqual(codes({ risk_factors: ["none"], risk_unresolved: "Roof still unsafe" }), ["none_but_details", "unresolved_risks"]);
+
+    const clean = safeguardingReviewNotes({
+        risk_factors: ["physical_work"],
+        risk_mitigation: "Helmets and a contractor for heights",
+        risk_consent: "written",
+        risk_safeguarding_lead: "Mr B, site supervisor",
+    });
+    assert.deepEqual(clean.map((n) => [n.level, n.code]), [["info", "consent_student_reported"]]);
+    assert.match(clean[0].message, /student-reported, not independently verified/);
+});

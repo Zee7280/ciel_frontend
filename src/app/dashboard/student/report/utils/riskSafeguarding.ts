@@ -80,6 +80,18 @@ export function consentLabel(value: unknown): string {
     return CONSENT_OPTIONS.find((o) => o.value === v)?.label ?? v;
 }
 
+/**
+ * V19 item 15 — the consent status is the student's own declaration. Nobody on the platform
+ * checks the consent forms, so every reviewer-facing surface (faculty / admin / partner views,
+ * print, impact package) must say so instead of presenting "Written consent obtained" as a fact.
+ */
+export const CONSENT_REPORTED_QUALIFIER = "student-reported, not independently verified";
+
+export function consentReportedLabel(value: unknown): string {
+    const label = consentLabel(value);
+    return label ? `${label} (${CONSENT_REPORTED_QUALIFIER})` : label;
+}
+
 /** True when the student answered anything in this block (used to decide whether to render it read-only). */
 export function hasRiskBlockContent(block: RiskBlockShape | null | undefined): boolean {
     if (!block) return false;
@@ -113,4 +125,96 @@ export function riskBlockErrors(
         errors.push({ field: "risk_safeguarding_lead", message: "Name the person responsible for safeguarding on site" });
     }
     return errors;
+}
+
+/**
+ * V19 item 13 — reviewer attention notes for Section 2.3. Pure, side-effect free, and tolerant of
+ * older reports: a blank block yields one "not completed" note instead of a crash. Rendered on the
+ * faculty / partner / admin review surfaces and the print dossier; never shown as a submit error.
+ * Keep in sync with ciel_backend/src/reports/safeguarding-review.util.ts.
+ */
+export type SafeguardingReviewNote = {
+    level: "attention" | "info";
+    code:
+        | "block_blank"
+        | "fields_missing"
+        | "consent_not_obtained_sensitive"
+        | "consent_not_applicable_sensitive"
+        | "consent_missing_sensitive"
+        | "none_but_details"
+        | "unresolved_risks"
+        | "consent_student_reported";
+    message: string;
+};
+
+const SENSITIVE_RISK_IDS = new Set(["children_present", "beneficiary_photos", "personal_data", "health_contact"]);
+
+export function safeguardingReviewNotes(block: RiskBlockShape | null | undefined): SafeguardingReviewNote[] {
+    const notes: SafeguardingReviewNote[] = [];
+    if (!hasRiskBlockContent(block)) {
+        notes.push({
+            level: "attention",
+            code: "block_blank",
+            message: "Risk, safeguarding & consent (2.3) was not completed by the student — a blank block is not evidence of \"no risk\".",
+        });
+        return notes;
+    }
+    const b = block as RiskBlockShape;
+    const ids = riskFactorIds(b.risk_factors);
+    const real = realRiskIds(b.risk_factors);
+    const consent = text(b.risk_consent);
+    const mitigation = text(b.risk_mitigation);
+    const unresolved = text(b.risk_unresolved);
+    const sensitive = real.filter((id) => SENSITIVE_RISK_IDS.has(id));
+    const sensitiveLabels = sensitive.map(riskFactorLabel).join(", ");
+
+    const missing = riskBlockErrors(b);
+    if (missing.length) {
+        notes.push({
+            level: "attention",
+            code: "fields_missing",
+            message: `Risks were selected but the block is incomplete: ${missing.map((m) => m.message.toLowerCase()).join("; ")}.`,
+        });
+    }
+    if (sensitive.length && consent === "not_obtained") {
+        notes.push({
+            level: "attention",
+            code: "consent_not_obtained_sensitive",
+            message: `Consent reported as not obtained although the work involved ${sensitiveLabels.toLowerCase()}. Check how photos / data were handled before accepting.`,
+        });
+    } else if (sensitive.length && consent === "not_applicable") {
+        notes.push({
+            level: "attention",
+            code: "consent_not_applicable_sensitive",
+            message: `Consent marked "not applicable" but the student also reported ${sensitiveLabels.toLowerCase()} — these answers conflict.`,
+        });
+    } else if (sensitive.length && !consent) {
+        notes.push({
+            level: "attention",
+            code: "consent_missing_sensitive",
+            message: `No consent status recorded although the work involved ${sensitiveLabels.toLowerCase()}.`,
+        });
+    }
+    if (ids.includes(RISK_NONE_ID) && (mitigation || unresolved)) {
+        notes.push({
+            level: "attention",
+            code: "none_but_details",
+            message: "\"None identified\" is selected, yet mitigation or unresolved-risk text was entered — ask which answer is right.",
+        });
+    }
+    if (unresolved) {
+        notes.push({
+            level: "attention",
+            code: "unresolved_risks",
+            message: `Unresolved risks reported by the student: ${unresolved.length > 180 ? `${unresolved.slice(0, 180).trim()}…` : unresolved}`,
+        });
+    }
+    if (consent === "written" || consent === "verbal") {
+        notes.push({
+            level: "info",
+            code: "consent_student_reported",
+            message: `${consentLabel(consent)} is the student's own declaration (${CONSENT_REPORTED_QUALIFIER}); no consent form has been checked by the platform.`,
+        });
+    }
+    return notes;
 }

@@ -115,7 +115,11 @@ export interface ReportData {
             location: string;
             activity_type: string;
             description: string;
-            evidence_file?: File;
+            /** Local File before upload, or the uploaded URL string once normalised. */
+            evidence_file?: File | string;
+            /** Uploaded evidence URL as the API returns it (V19 item 08 validation reads either key). */
+            evidence_url?: string | null;
+            entryStatus?: "pending" | "verified" | "flagged";
             hours: number;
             participantId?: string;
             /** Backend / report payload (snake_case). Null = legacy row (counts toward verified hours). */
@@ -200,6 +204,12 @@ export interface ReportData {
         };
         contribution_intent_statement: string;
         student_contribution_intent_statement: string;
+        /**
+         * V19 item 17 — one "actual contribution" statement per SDG registered as *secondary* on the
+         * opportunity, keyed by goal number ("5"). The wizard seeds an empty key for every registered
+         * secondary SDG, so validation can require each one. Older reports simply lack the map.
+         */
+        registered_secondary_contributions?: Record<string, string>;
         secondary_sdgs: Array<{
             goal_number: number | string | null;
             target_id?: string;

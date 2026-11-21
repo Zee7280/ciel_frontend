@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { distinctBeneficiaryTotal } from '@/app/dashboard/student/report/utils/activityReach';
-import { consentLabel, hasRiskBlockContent, riskFactorIds, riskFactorLabel } from '@/app/dashboard/student/report/utils/riskSafeguarding';
+import { consentReportedLabel, hasRiskBlockContent, riskFactorIds, riskFactorLabel } from '@/app/dashboard/student/report/utils/riskSafeguarding';
+import { SafeguardingReviewNotes } from '@/components/verify/SafeguardingReviewNotes';
 import { followupSummaryRows } from '@/app/dashboard/student/report/utils/sustainabilityFollowup';
 import AdminReportFollowUpCard from './AdminReportFollowUpCard';
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from '@/app/dashboard/student/report/utils/mediaVisibility';
@@ -1705,11 +1706,14 @@ function AdminReportDetailPage() {
                                         <LabelValue label="Baseline evidence other" value={report.section2?.baseline_evidence_other} fullWidth />
                                         <LabelValue label="Baseline other entries" value={report.section2?.baseline_other_entries} fullWidth />
                                         <LabelValue label="Section summary" value={report.section2?.summary_text} fullWidth />
+                                        <div className="col-span-full">
+                                            <SafeguardingReviewNotes block={report.section2} />
+                                        </div>
                                         {hasRiskBlockContent(report.section2) ? (
                                             <>
                                                 <LabelValue label="Risks identified (2.3)" value={riskFactorIds(report.section2?.risk_factors).map(riskFactorLabel).join(", ")} fullWidth />
                                                 <LabelValue label="Risk mitigation" value={report.section2?.risk_mitigation} fullWidth />
-                                                <LabelValue label="Consent for photos and data" value={consentLabel(report.section2?.risk_consent)} />
+                                                <LabelValue label="Consent for photos and data (student-reported)" value={consentReportedLabel(report.section2?.risk_consent)} />
                                                 <LabelValue label="Safeguarding lead on site" value={report.section2?.risk_safeguarding_lead} />
                                                 <LabelValue label="Unresolved risks" value={report.section2?.risk_unresolved} fullWidth />
                                             </>
@@ -1798,6 +1802,15 @@ function AdminReportDetailPage() {
                                         </div>
                                     </div>
                                 )}
+                                {report.section3?.registered_secondary_contributions && Object.keys(report.section3.registered_secondary_contributions).length > 0 ? (
+                                    <LabelValue
+                                        label="Registered secondary SDG contributions (3.1)"
+                                        value={Object.entries(report.section3.registered_secondary_contributions)
+                                            .sort(([a], [b]) => Number(a) - Number(b))
+                                            .map(([goal, text]) => `SDG ${goal}: ${String(text || "").trim() || "— not provided"}`)}
+                                        fullWidth
+                                    />
+                                ) : null}
                                 {Array.isArray(report.section3?.secondary_sdgs) && report.section3.secondary_sdgs.length > 0 ? (
                                     <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                         <LabelValue label="Raw secondary SDG entries" value={report.section3.secondary_sdgs} fullWidth />

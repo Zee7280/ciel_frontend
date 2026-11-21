@@ -3,6 +3,7 @@ import { formatInternationalPhoneDisplay } from "@/utils/countryCallingCodes";
 import { formatPakistaniCnicDisplay } from "@/utils/section1ParticipantDossierFields";
 import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
 import { findSdgById } from "@/utils/sdgData";
+import { safeguardingReviewNotes } from "../utils/riskSafeguarding";
 import { mergeReportSdgSnapshotRows } from "../utils/reportSdgMerge";
 import { distinctBeneficiaryTotal } from "../utils/activityReach";
 import { effectiveHoursFromLog, isLogCountedBeforeFacultyReview } from "../utils/engagementMetrics";
@@ -472,6 +473,11 @@ export function buildImpactPackageDetailedReport(
                     row("Consent for photos and data", text(data.section2?.risk_consent)),
                     row("Responsible for safeguarding on site", text(data.section2?.risk_safeguarding_lead)),
                     row("Anything unresolved?", text(data.section2?.risk_unresolved)),
+                    // V19 item 13: the same reviewer flags faculty / partner / admin see on their review pages.
+                    row(
+                        "Reviewer attention (safeguarding)",
+                        safeguardingReviewNotes(data.section2).map((note) => `${note.level === "attention" ? "⚠" : "ℹ"} ${note.message}`),
+                    ),
                 ],
             },
         ],
@@ -511,6 +517,12 @@ export function buildImpactPackageDetailedReport(
                     row(
                         "Mapped goals",
                         sdgs.map((rowSdg) => `SDG ${rowSdg.goalNumber}${rowSdg.title ? ` — ${rowSdg.title}` : ""}`),
+                    ),
+                    row(
+                        "Registered secondary SDG contributions",
+                        Object.entries(data.section3?.registered_secondary_contributions || {})
+                            .sort(([a], [b]) => Number(a) - Number(b))
+                            .map(([goal, note]) => ({ goal, contribution: text(note) })),
                     ),
                     row(
                         "Secondary justifications",

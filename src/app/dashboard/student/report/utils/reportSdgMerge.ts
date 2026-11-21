@@ -243,7 +243,40 @@ export function listOpportunityReportSdgs(projectData: unknown): ReportSdgRow[] 
         });
     });
 
-    return rows;
+    // V19 item 20: the same goal can reach us from several payload shapes (primary_sdg + sdg_ids,
+    // nested opportunity objects, …). Keep one row per goal — the primary role wins, otherwise the
+    // first row that carries a target.
+    const byGoal = new Map<number, ReportSdgRow>();
+    rows.forEach((row) => {
+        const existing = byGoal.get(row.goalNumber);
+        if (!existing) {
+            byGoal.set(row.goalNumber, row);
+            return;
+        }
+        if (existing.role !== "primary" && row.role === "primary") {
+            byGoal.set(row.goalNumber, row);
+        } else if (!existing.targetId && row.targetId) {
+            byGoal.set(row.goalNumber, { ...row, role: existing.role });
+        }
+    });
+    return Array.from(byGoal.values());
+}
+
+/** V19 item 17: the student's contribution statement for an SDG registered as secondary on the opportunity. */
+export function registeredSecondaryContribution(section3: ReportData["section3"] | null | undefined, goalNumber: number): string {
+    const map = (section3 as { registered_secondary_contributions?: unknown } | null | undefined)?.registered_secondary_contributions;
+    if (!map || typeof map !== "object" || Array.isArray(map)) return "";
+    const value = (map as Record<string, unknown>)[String(goalNumber)];
+    return typeof value === "string" ? value.trim() : "";
+}
+
+/** Opportunity rows with the student's per-SDG contribution text filled in for registered secondaries. */
+export function applyRegisteredSecondaryContributions(rows: ReportSdgRow[], section3: ReportData["section3"] | null | undefined): ReportSdgRow[] {
+    return rows.map((row) => {
+        if (row.source !== "opportunity" || row.role !== "secondary") return row;
+        const text = registeredSecondaryContribution(section3, row.goalNumber);
+        return text ? { ...row, justification: text } : row;
+    });
 }
 
 /** Student Section 3 mapping (primary + optional secondaries). */
@@ -351,7 +384,7 @@ export function mergeReportSdgSnapshotRows(
     if (!nums.length) return [];
 
     const oppByGoal = new Map<number, ReportSdgRow>(
-        listOpportunityReportSdgs(projectData).map((r) => [r.goalNumber, r]),
+        applyRegisteredSecondaryContributions(listOpportunityReportSdgs(projectData), section3).map((r) => [r.goalNumber, r]),
     );
     const studByGoal = new Map<number, ReportSdgRow>(
         listStudentReportSdgs(section3).map((r) => [r.goalNumber, r]),

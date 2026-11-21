@@ -1390,7 +1390,10 @@ function ReportFormContent() {
             </div>
 
             <Dialog open={opportunityFlashOpen} onOpenChange={setOpportunityFlashOpen}>
-                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto">
+                {/* V19 item 01/02: near-full-screen on desktop (max-w-6xl), full-screen sheet on phones;
+                    `co-flash-dialog` turns the panel into a CSS container so the card's grid breakpoints
+                    follow the dialog width, not the browser window. */}
+                <DialogContent className="co-flash-dialog h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto rounded-none p-3 pt-10 sm:h-auto sm:max-h-[94vh] sm:w-[calc(100vw-2rem)] sm:max-w-6xl sm:rounded-2xl sm:p-6">
                     <DialogHeader>
                         <DialogTitle>Opportunity flash card</DialogTitle>
                         <DialogDescription>

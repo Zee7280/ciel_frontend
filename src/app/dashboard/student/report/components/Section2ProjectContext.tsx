@@ -532,6 +532,33 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 </p>
             </div>
 
+            {/* V19 item 04: partner, dates and location come from the approved opportunity — shown
+                read-only here so the student never re-types them in Section 2. */}
+            <div
+                className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-xs sm:grid-cols-3"
+                data-testid="section2-opportunity-identity"
+            >
+                <div className="min-w-0">
+                    <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Partner</p>
+                    <p className="mt-0.5 truncate font-medium text-slate-800" title={partner}>{partner}</p>
+                </div>
+                <div className="min-w-0">
+                    <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Dates</p>
+                    <p className="mt-0.5 font-medium text-slate-800">
+                        {startDate === "—" && endDate === "—" ? "—" : `${startDate} → ${endDate}`}
+                    </p>
+                </div>
+                <div className="min-w-0">
+                    <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Location</p>
+                    <p className="mt-0.5 truncate font-medium text-slate-800" title={locationDisplay || undefined}>
+                        {locationDisplay || "—"}
+                    </p>
+                </div>
+                <p className="text-[11px] text-slate-500 sm:col-span-3">
+                    From your approved opportunity · edit the opportunity if any of this is wrong.
+                </p>
+            </div>
+
             <div className="cer-note !mb-0">
                 <span aria-hidden>☝️</span>
                 <p>
@@ -909,6 +936,9 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             disabled={isReadOnly}
                         />
                         <FieldError message={getFieldError("risk_consent")} />
+                        <p className="text-[11px] leading-snug text-slate-500">
+                            This is your own declaration. Reviewers see it as student-reported, not as independently verified consent.
+                        </p>
                     </div>
                     <div className="space-y-1.5">
                         <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Responsible for safeguarding on site</p>

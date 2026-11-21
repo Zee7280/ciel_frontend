@@ -1179,11 +1179,18 @@ function Section1ExecutiveSummary({ data }: { data: ReportData }) {
     const locations = [...new Set(logs.map((log) => String(log.location || "").trim()).filter(Boolean))];
     const types = [...new Set(logs.map((log) => String(log.activity_type || "").trim()).filter(Boolean))];
     const evidenceCount = logs.filter((log) => logHasEvidence(log)).length;
+    // Only hours from sessions that carry a photo / document are "evidence-backed" (V19 item 06/08).
+    const evidenceBackedHours =
+        Math.round(logs.filter((log) => logHasEvidence(log)).reduce((sum, log) => sum + effectiveHoursFromLog(log), 0) * 10) / 10;
     const scale = Math.max(required, ...rows.map((row) => row.hours), 1);
     const typeLine = types.slice(0, 3).join(", ");
+    const hoursPhrase =
+        evidenceCount === logs.length
+            ? `${totalHours.toFixed(1)} evidence-backed ${isTeam ? "team-hours" : "hours"}`
+            : `${totalHours.toFixed(1)} ${isTeam ? "team-hours" : "hours"} (${evidenceBackedHours.toFixed(1)} evidence-backed; ${logs.length - evidenceCount} session${logs.length - evidenceCount === 1 ? "" : "s"} still without evidence)`;
     const line = logs.length
-        ? `${roster.length} registered student${roster.length === 1 ? "" : "s"} have logged ${totalHours.toFixed(1)} evidence-backed ${isTeam ? "team-hours" : "hours"} across ${logs.length} session${logs.length === 1 ? "" : "s"}${locations.length ? ` at ${locations.length} location${locations.length === 1 ? "" : "s"}` : ""}. ${met}/${roster.length} have reached the ${required}h minimum${typeLine ? `; recorded work includes ${typeLine}${types.length > 3 ? " and more" : ""}` : ""}.`
-        : `The ${isTeam ? "team" : "student"} is registered, but no evidence-backed sessions have been saved yet.`;
+        ? `${roster.length} registered student${roster.length === 1 ? "" : "s"} have logged ${hoursPhrase} across ${logs.length} session${logs.length === 1 ? "" : "s"}${locations.length ? ` at ${locations.length} location${locations.length === 1 ? "" : "s"}` : ""}. ${met}/${roster.length} have reached the ${required}h minimum${typeLine ? `; recorded work includes ${typeLine}${types.length > 3 ? " and more" : ""}` : ""}.`
+        : `The ${isTeam ? "team" : "student"} is registered, but no sessions have been saved yet.`;
 
     return (
         <div className="cer-s1sum">

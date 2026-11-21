@@ -1271,6 +1271,37 @@
 }
 .co-flash-foot span:first-child { font-weight: 800; color: #102f3d; letter-spacing: .04em; }
 @keyframes co-flash-pulse { 50% { transform: scale(1.04); } }
+/* Flash card inside a dialog (student report › "Opportunity flash card"): the panel is a CSS
+   container so the card's breakpoints follow the dialog's own width, not the browser window.
+   The rules mirror the @media blocks below. */
+.co-flash-dialog { container-type: inline-size; }
+.co-flash-dialog .co-flash { max-width: none; box-shadow: none; }
+@container (max-width: 980px) {
+    .co-flash-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .co-flash-steps { grid-template-columns: 1fr 1fr; }
+    .co-flash-ribbon { grid-template-columns: 1fr; }
+    .co-flash-ribbon-actions { justify-content: flex-start; }
+}
+@container (max-width: 760px) {
+    .co-flash { border-radius: 18px; }
+    .co-flash-facts { grid-template-columns: 1fr 1fr; padding: 14px 14px 4px; gap: 8px; }
+    .co-flash-duo, .co-flash-half { margin: 12px 14px 0; gap: 10px; }
+    .co-flash-sdg, .co-flash-cta, .co-flash-note { margin-left: 14px; margin-right: 14px; }
+    .co-flash-foot { padding: 12px 14px 16px; }
+    .co-flash-duo, .co-flash-half, .co-flash-cta, .co-flash-sdg-row, .co-flash-metrics, .co-flash-steps, .co-flash-chain { grid-template-columns: 1fr; }
+    .co-flash-title { font-size: 22px; max-width: none; }
+    .co-flash-cta--status { grid-template-columns: 1fr; }
+    .co-flash-status-pill { justify-self: start; }
+    .co-flash-need, .co-flash-who, .co-flash-skills, .co-flash-account, .co-flash-flow, .co-flash-sdg { padding: 14px; }
+}
+@container (max-width: 480px) {
+    .co-flash-facts { grid-template-columns: 1fr; }
+    .co-flash-hero { padding: 18px 16px 16px; }
+    .co-flash-ribbon { padding: 12px 14px; }
+    .co-flash-cta { padding: 14px; gap: 10px; }
+    .co-flash-btns { width: 100%; }
+    .co-flash-btn { width: 100%; justify-content: center; }
+}
 @media (max-width: 980px) {
     .co-flash-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .co-flash-fact--dates { grid-column: span 1; }
