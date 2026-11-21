@@ -556,6 +556,9 @@ export function buildImpactPackageDetailedReport(
                             reach: text(block.unique_beneficiaries, block.beneficiaries_reached),
                             count_method: text(block.reach_counting_method_other, block.reach_counting_method),
                             partner_host: text(block.partner_host),
+                            // V19: explicit "no countable output" and the evidence already attached elsewhere.
+                            no_countable_output: block.no_output === true ? text(block.no_output_reason) || "Declared (no reason given)" : "",
+                            linked_evidence: text(block.evidence_ref),
                             served_people_directly:
                                 block.serves_beneficiaries === true ? "Yes" : block.serves_beneficiaries === false ? "No" : "",
                             who_benefited: [
@@ -589,6 +592,16 @@ export function buildImpactPackageDetailedReport(
                 id: "4.3",
                 title: "Reach",
                 rows: [
+                    row(
+                        "Did the project directly reach people?",
+                        data.section4?.project_summary?.reach_mode === "counted"
+                            ? "Yes — one deduplicated count"
+                            : data.section4?.project_summary?.reach_mode === "unconfirmed"
+                              ? "Yes — unique count not confirmed"
+                              : data.section4?.project_summary?.reach_mode === "none"
+                                ? "No direct human beneficiaries"
+                                : "",
+                    ),
                     row("Distinct people reached", distinctBeneficiaryTotal(data.section4) || text(data.section4?.project_summary?.distinct_total_beneficiaries)),
                     row("Counting method", text(data.section4?.project_summary?.counting_method)),
                     row("Overall overlap", text(data.section4?.project_summary?.overall_overlap)),
@@ -602,6 +615,7 @@ export function buildImpactPackageDetailedReport(
                     row("Before", text(data.section5?.story_before)),
                     row("Now", text(data.section5?.story_now, data.section5?.observed_change)),
                     row("Known because", text(data.section5?.story_because)),
+                    row("Evidence basis", data.section5?.evidence_basis_tags || []),
                     row(
                         "Outcome metrics",
                         outcomes.map((outcome) => ({
@@ -631,6 +645,7 @@ export function buildImpactPackageDetailedReport(
                 rows: [
                     row("Challenges", text(data.section5?.challenges)),
                     row("Challenge tags", data.section5?.challenge_tags || []),
+                    row("Section 4 summary (field-generated)", text(data.section4?.summary_text)),
                 ],
             },
         ],

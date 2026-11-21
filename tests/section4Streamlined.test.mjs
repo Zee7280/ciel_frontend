@@ -57,6 +57,35 @@ test("4.2 community reach is one project-level answer; legacy per-activity count
     assert.match(reachStatusLine({ reach_mode: "counted", distinct_total_beneficiaries: "30", counting_method: "Register" }, []), /^30 unique people .* Source: Register$/);
 });
 
+test("4.2 conflict: a unique total above the activity-level engagements blocks and is called out", async () => {
+    const { reachConflict } = await import("../src/app/dashboard/student/report/utils/section4Streamlined.ts");
+    const acts = [{ beneficiaries_reached: "20" }, { beneficiaries_reached: "10" }];
+    assert.equal(reachConflict({ distinct_total_beneficiaries: "30" }, acts), false);
+    assert.equal(reachConflict({ distinct_total_beneficiaries: "31" }, acts), true);
+    assert.equal(reachConflict({ distinct_total_beneficiaries: "500" }, []), false, "no activity counts → nothing to conflict with");
+    const issues = reachIssues({ reach_mode: "counted", distinct_total_beneficiaries: "31", counting_method: "Register" }, acts);
+    assert.match(issues[0].message, /Conflicting project and activity counts/);
+    assert.match(reachStatusLine({ reach_mode: "counted", distinct_total_beneficiaries: "31", counting_method: "Register" }, acts), /reconcile/);
+});
+
+test("4.3 'How do you know?' chips (evidence basis) and the detailed report carry the new fields; old components are gone", () => {
+    const ui = read("src/app/dashboard/student/report/components/Section4Streamlined.tsx");
+    assert.match(ui, /data-ciel-evidence-basis/);
+    assert.match(ui, /updateSection\("section5", \{ evidence_basis_tags: next/);
+    const builder = read("src/app/dashboard/student/report/impact-package/buildImpactPackageDetailedReport.ts");
+    assert.match(builder, /no_countable_output: block\.no_output === true/);
+    assert.match(builder, /linked_evidence: text\(block\.evidence_ref\)/);
+    assert.match(builder, /"Did the project directly reach people\?"/);
+    assert.match(builder, /row\("Evidence basis", data\.section5\?\.evidence_basis_tags \|\| \[\]\)/);
+    assert.match(builder, /row\("Section 4 summary \(field-generated\)", text\(data\.section4\?\.summary_text\)\)/);
+    const ctx = read("src/app/dashboard/student/report/context/ReportContext.tsx");
+    for (const key of ["no_output?: boolean;", "evidence_ref?: string;", 'reach_mode?: "counted" | "unconfirmed" | "none" | "";', "simple?: boolean;", "evidence_basis_tags?: string[];"]) {
+        assert.ok(ctx.includes(key), key);
+    }
+    assert.throws(() => readFileSync(new URL("../src/app/dashboard/student/report/components/Section4Activities.tsx", import.meta.url)));
+    assert.throws(() => readFileSync(new URL("../src/app/dashboard/student/report/components/Section5Outcomes.tsx", import.meta.url)));
+});
+
 test("4.3: baseline comes from Section 2; the one measurable result is optional but must be complete once started", () => {
     assert.equal(baselineFromSection2({}), "");
     assert.equal(baselineFromSection2({ problem_statement: "Classrooms had no working lights.", affected_group: "Grade 5", affected_count: "30" }), "Classrooms had no working lights. Affected: Grade 5, ~30.");

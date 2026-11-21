@@ -264,10 +264,19 @@ export interface ReportData {
             sdgs?: number[];
             /** V13 ladder UI: which step is open. Completeness is computed from fields. */
             ladder_ui?: { open?: number; allBen?: boolean };
+            /** V19: "No countable output is applicable to this activity" + why. */
+            no_output?: boolean;
+            no_output_reason?: string;
+            /** V19: label of evidence already attached elsewhere in the report (no re-upload). */
+            evidence_ref?: string;
+            /** V19 streamlined card (per-activity reach / delivery steps not collected). */
+            v19?: boolean;
         }>;
         project_summary: {
             distinct_total_beneficiaries: string;
             counting_method: string;
+            /** V19 4.2: one project-level answer — counted / unconfirmed / none. */
+            reach_mode?: "counted" | "unconfirmed" | "none" | "";
             overall_overlap: string;
             overall_delivery_mode: string;
             overall_implementation_model: string[];
@@ -299,6 +308,8 @@ export interface ReportData {
             activity_id?: string | null;
             /** 1–4 sure scale from the ladder (maps onto confidence_level). */
             sure?: number;
+            /** V19: the single optional before / after result (metric, unit, baseline, endline, source). */
+            simple?: boolean;
         }>;
         challenges: string;
         summary_text?: string;
@@ -308,6 +319,8 @@ export interface ReportData {
         story_because?: string;
         /** Tapped chips answering "what was hard?" — compose a starting sentence into `challenges`. */
         challenge_tags?: string[];
+        /** V19 4.3 "How do you know?" chips (evidence basis); the free text stays in `story_because`. */
+        evidence_basis_tags?: string[];
         /** Set once the student taps "Finalise Section 5" — auto-cleared if they edit an outcome afterward. */
         finalized?: boolean;
     };

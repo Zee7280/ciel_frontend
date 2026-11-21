@@ -75,6 +75,16 @@ export const CHALLENGE_TAG_OPTIONS = [
 ] as const;
 export const NO_CHALLENGES_TAG = "No significant challenges";
 
+/** 4.3 "How do you know?" — the evidence basis behind the observed change (V16 list). */
+export const EVIDENCE_BASIS_OPTIONS = [
+    "Before / after photographs",
+    "Attendance / distribution records",
+    "Partner feedback / records",
+    "Student observation only",
+    "No outcome evidence yet",
+] as const;
+export const NO_OUTCOME_EVIDENCE_TAG = "No outcome evidence yet";
+
 export function wordCount(text: unknown): number {
     return String(text ?? "")
         .trim()
@@ -167,9 +177,22 @@ export function reachIssues(summary: ProjectReach | null | undefined, activities
         const out: ActivityIssue[] = [];
         if (!(num(s.distinct_total_beneficiaries) > 0)) out.push({ field: "project_summary.distinct_total_beneficiaries", message: "Enter the unique number of people reached (counted once)" });
         if (!txt(s.counting_method)) out.push({ field: "project_summary.counting_method", message: "Say how the unique count was established" });
+        if (reachConflict(s, activities)) {
+            out.push({ field: "project_summary.distinct_total_beneficiaries", message: "Conflicting project and activity counts: the unique total cannot exceed the activity-level engagements. Reconcile the figures." });
+        }
         return out;
     }
     return [];
+}
+
+/**
+ * Unique people can never exceed the engagements recorded on the activities (a person counted once
+ * cannot be more than everyone counted per activity). Only meaningful when activity counts exist.
+ */
+export function reachConflict(summary: ProjectReach | null | undefined, activities: V19Activity[]): boolean {
+    const unique = num(summary?.distinct_total_beneficiaries);
+    const engagements = activityLevelEngagements(activities);
+    return engagements > 0 && unique > engagements;
 }
 
 /** Legacy drafts carried a deduplicated total without a mode: treat that as "counted". */
@@ -196,7 +219,8 @@ export function reachStatusLine(summary: ProjectReach | null | undefined, activi
     const engText = `${engagements} activity-level engagement${engagements === 1 ? "" : "s"}`;
     if (mode === "counted") {
         const n = num(summary?.distinct_total_beneficiaries);
-        return `${n > 0 ? n.toLocaleString() : "—"} unique people · ${engText} · ${txt(summary?.counting_method) ? `Source: ${txt(summary?.counting_method)}` : "source pending"}`;
+        const conflict = reachConflict(summary, activities) ? " · Conflicting project and activity counts — reconcile" : "";
+        return `${n > 0 ? n.toLocaleString() : "—"} unique people · ${engText} · ${txt(summary?.counting_method) ? `Source: ${txt(summary?.counting_method)}` : "source pending"}${conflict}`;
     }
     if (mode === "none") return `No direct human beneficiaries · ${engText}`;
     return `Unique reach unconfirmed · ${engText} · Unique reach unconfirmed`;

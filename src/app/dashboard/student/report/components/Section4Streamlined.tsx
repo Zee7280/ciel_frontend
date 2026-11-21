@@ -10,7 +10,9 @@ import { reportTextWordMeter } from "../utils/validation";
 import {
     ACTIVITY_STATUS_OPTIONS,
     CHALLENGE_TAG_OPTIONS,
+    EVIDENCE_BASIS_OPTIONS,
     NO_CHALLENGES_TAG,
+    NO_OUTCOME_EVIDENCE_TAG,
     OUTPUT_GROUPS,
     OUTPUT_UNIT_OPTIONS,
     REACH_MODE_OPTIONS,
@@ -203,6 +205,19 @@ export default function Section4Streamlined() {
     };
     const measureErrors = simpleMeasureIssues(simple);
     const measureLine = simpleMeasureChangeLine(simple);
+
+    // ----- 4.3 evidence basis chips ("How do you know?") -----
+    const basisTags: string[] = Array.isArray(section5.evidence_basis_tags) ? section5.evidence_basis_tags : [];
+    const toggleBasis = (tag: string) => {
+        let next: string[];
+        if (tag === NO_OUTCOME_EVIDENCE_TAG) next = basisTags.includes(tag) ? [] : [tag];
+        else next = basisTags.includes(tag) ? basisTags.filter((t) => t !== tag) : [...basisTags.filter((t) => t !== NO_OUTCOME_EVIDENCE_TAG), tag];
+        // Chips compose the "how we know" line when the student has not typed their own.
+        const typed = String(section5.story_because || "").trim();
+        const composed = next.join("; ");
+        const wasComposed = !typed || typed === basisTags.join("; ");
+        updateSection("section5", { evidence_basis_tags: next, ...(wasComposed ? { story_because: composed } : {}) });
+    };
 
     // ----- 4.4 challenges -----
     const tags: string[] = Array.isArray(section5.challenge_tags) ? section5.challenge_tags : [];
@@ -413,8 +428,27 @@ export default function Section4Streamlined() {
                 </div>
                 <div>
                     <p className={kickerCls}>How do you know?</p>
+                    <div className="mt-1.5 flex flex-wrap gap-2" data-ciel-evidence-basis>
+                        {EVIDENCE_BASIS_OPTIONS.map((tag) => {
+                            const on = basisTags.includes(tag);
+                            return (
+                                <button
+                                    key={tag}
+                                    type="button"
+                                    onClick={() => toggleBasis(tag)}
+                                    aria-pressed={on}
+                                    className={clsx(
+                                        "rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition",
+                                        on ? "border-[var(--teal)] bg-[var(--teal-soft)] text-[var(--teal)]" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300",
+                                    )}
+                                >
+                                    {tag}
+                                </button>
+                            );
+                        })}
+                    </div>
                     <input
-                        className={clsx(inputCls, "mt-1.5")}
+                        className={clsx(inputCls, "mt-2")}
                         value={section5.story_because || ""}
                         onChange={(e) => updateSection("section5", { story_because: e.target.value })}
                         placeholder="e.g. Before/after photos in Section 7 or partner feedback; no outcome evidence yet"
