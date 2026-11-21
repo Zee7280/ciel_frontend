@@ -82,6 +82,11 @@ export default function PortalHelpPage({
     submitBlurb = "Describe your issue clearly. Our team or your institution's admin may respond depending on category.",
 }: PortalHelpPageProps) {
     const [tab, setTab] = useState<HelpTab>("tutorials");
+    // Help & Guidance sub-buttons deep-link to a tab (?tab=tutorials for "How It Works", ?tab=faqs).
+    useEffect(() => {
+        const next = new URLSearchParams(window.location.search).get("tab");
+        if (next === "tutorials" || next === "faqs" || next === "my_tickets" || next === "submit" || next === "track") setTab(next);
+    }, []);
     const [faqs, setFaqs] = useState<FaqItem[]>([]);
 
     const [tickets, setTickets] = useState<SupportTicket[]>([]);

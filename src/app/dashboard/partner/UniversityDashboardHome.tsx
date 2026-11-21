@@ -3,6 +3,7 @@
 import Link from "next/link";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
 import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import StakeholderHomeCards from "@/components/ciel/dashboard/StakeholderHomeCards";
 import { pathAreaBadge, usePathAreaCounts } from "@/utils/usePathAreaCounts";
 import {
     UNI_CS_BASE,
@@ -102,21 +103,21 @@ export default function UniversityDashboardHome() {
                 ))}
             </div>
 
-            <MockupSectionHead
-                title="Impact Areas"
-                subtitle="Pick an impact area to see its work, approvals and verified impact."
+            <StakeholderHomeCards
+                role="university"
+                subtitle="Observe the pipeline, keep project records, showcase verified impact and build institutional intelligence. Sub-buttons open inside each card."
+                states={{
+                    monitoring: { count: cs.approvalOpps.length, countLabel: "approval" },
+                    records: { badge: cs.loading ? undefined : `${cs.waiting.length} IN PROGRESS` },
+                    wall: { badge: cs.loading ? undefined : `${cs.deckCards.length} VERIFIED` },
+                }}
             />
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                <MockupActionCard
-                    href={UNI_CS_BASE}
-                    emoji="🌱"
-                    ghost="🌱"
-                    title="Community Service"
-                    subtitle="Institution-level Community Service oversight, faculty allocation, projects and verified impact."
-                    badge="OPEN AREA"
-                    background={MOCKUP_GRADIENTS.teal}
-                    hot={cs.approvalOpps.length + cs.waiting.length > 0}
-                />
+
+            <MockupSectionHead
+                title="Other impact areas"
+                subtitle="Coursework, FYP / Thesis and Startup keep their own institutional views."
+            />
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                 <MockupActionCard
                     href={UNI_CS_COURSEWORK}
                     emoji="📚"

@@ -158,6 +158,11 @@ function DeleteLogDialog({ target, onClose, onDeleted }: { target: DeleteTarget;
 /** CIEL PK admin oversight of Quick Community Work: every log, stuck reviews, faculty reassignment and export. */
 export default function AdminQuickWorkPage() {
     const [filters, setFilters] = useState<AdminQuickWorkFilters>({ status: "", page: 1, limit: PAGE_SIZE });
+    // "QCI Approvals / Published" deep-links to a status queue (?status=admin_review).
+    useEffect(() => {
+        const next = new URLSearchParams(window.location.search).get("status");
+        if (next && STATUS_TABS.some((t) => t.value === next)) setFilters((f) => ({ ...f, status: next as QuickWorkStatus, page: 1 }));
+    }, []);
     const [draft, setDraft] = useState({ search: "", university: "", from: "", to: "" });
     const [list, setList] = useState<AdminQuickWorkList | null>(null);
     const [loading, setLoading] = useState(true);

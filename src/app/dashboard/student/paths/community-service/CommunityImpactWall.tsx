@@ -675,6 +675,10 @@ export default function CommunityImpactWall(_props: {
     const [flash, setFlash] = useState<FlashState | null>(null);
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<"all" | "ranked">("all");
+    // "CII / Badges / Certificates" deep-links to the ranked records (?filter=ranked).
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get("filter") === "ranked") setFilter("ranked");
+    }, []);
     const [sort, setSort] = useState<"recent" | "cii">("recent");
     const [yearFilter, setYearFilter] = useState("all");
 

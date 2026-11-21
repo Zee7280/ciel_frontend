@@ -1,12 +1,37 @@
 "use client";
-import { QUICK_WORK_HREF } from "@/utils/quickWorkApi";
 import { STUDENT_SUBSCRIPTION_PATH, studentNeedsSubscriptionPayment } from "@/utils/studentSubscription";
 
 import Link from "next/link";
 import { clearPathSessionCache } from "@/utils/student-path-session-cache";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, type ComponentType } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, Globe2, PlayCircle, Mail, Archive, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, X, Tent, GraduationCap, Rocket, Leaf, Search, type LucideProps } from "lucide-react";
+import {
+    LayoutDashboard,
+    Users,
+    Settings,
+    PieChart,
+    LogOut,
+    Building2,
+    ShieldAlert,
+    History,
+    Bell,
+    User,
+    MessageSquare,
+    CreditCard,
+    Link2,
+    Globe2,
+    PlayCircle,
+    Mail,
+    Archive,
+    ChevronsLeft,
+    ChevronsRight,
+    ChevronDown,
+    Compass,
+    HelpCircle,
+    BookOpen,
+    X,
+    type LucideProps,
+} from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -31,7 +56,6 @@ import {
     type CielImpactSummary,
 } from "@/utils/cielImpactSummary";
 import { CIEL_PATHS } from "@/utils/cielPaths";
-import PathsBottomSheet from "@/components/ciel/PathsBottomSheet";
 import {
     CIEL_ADMIN_MUTATED_EVENT,
     CIEL_ADMIN_PENDING_COUNTS_EVENT,
@@ -43,6 +67,16 @@ import {
 import { prefetchStudentImpactPortfolio, prefetchStudentPathData } from "@/utils/student-path-prefetch";
 import { QUICK_WORK_FACULTY_PENDING_EVENT, fetchFacultyQuickWorkPending } from "@/utils/quickWorkApi";
 import { refreshStoredUserFromMeApi } from "@/utils/membershipPayment";
+import {
+    FACULTY_CS_HUB,
+    STAKEHOLDER_NAV,
+    STUDENT_CS_HUB,
+    activeMainButton,
+    hrefMatchesLocation,
+    splitHref,
+    stakeholderNavRole,
+    type StakeholderMainButton,
+} from "@/utils/stakeholderNav";
 
 const SIDEBAR_COLLAPSED_KEY = "ciel_sidebar_collapsed";
 const SIDEBAR_EXPANDED_WIDTH = "280px";
@@ -51,8 +85,11 @@ const SIDEBAR_COLLAPSED_WIDTH = "64px";
 type NavItem = {
     label: string;
     href: string;
-    icon: ComponentType<LucideProps>;
+    icon?: ComponentType<LucideProps>;
+    emoji?: string;
     countPill?: number;
+    needsAction?: boolean;
+    onPrefetch?: () => void;
 };
 
 function NavRow({
@@ -97,7 +134,13 @@ function NavRow({
             aria-label={collapsed ? (countPill && countPill > 0 ? `${label} (${countPill > 99 ? "99+" : countPill} pending)` : label) : undefined}
             aria-current={active ? "page" : undefined}
         >
-            {emoji ? <span className="w-7 shrink-0 text-center text-lg leading-none" aria-hidden>{emoji}</span> : Icon ? <Icon className="h-[18px] w-[18px] shrink-0" /> : null}
+            {emoji ? (
+                <span className="w-7 shrink-0 text-center text-lg leading-none" aria-hidden>{emoji}</span>
+            ) : Icon ? (
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+            ) : indent && !collapsed ? (
+                <span className={clsx("ml-2 h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-[#42ddb2]" : "bg-white/35")} aria-hidden />
+            ) : null}
             {!collapsed && <span className="flex-1 truncate">{label}</span>}
             {!collapsed && needsAction && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ciel-amber" aria-label="Needs action" />}
             {collapsed && !!countPill && countPill > 0 && (
@@ -113,6 +156,124 @@ function NavRow({
 function NavSectionLabel({ collapsed, children }: { collapsed: boolean; children: string }) {
     if (collapsed) return <div className="pt-3" />;
     return <p className="px-2.5 pb-2 pt-[18px] text-[11px] font-black uppercase tracking-[0.08em] text-[#6e92a5]">{children}</p>;
+}
+
+/**
+ * A main button with its sub-buttons underneath (Final Stakeholder Dashboard Structure). The label
+ * navigates to the button's landing screen; the chevron opens or closes the sub-buttons. The group
+ * opens by itself while any of its screens is the current page. Collapsed sidebar: icon only.
+ */
+function NavGroup({
+    id,
+    label,
+    emoji,
+    icon: Icon,
+    href,
+    items,
+    open,
+    onToggle,
+    collapsed,
+    active,
+    countPill,
+    isActive,
+}: {
+    id: string;
+    label: string;
+    emoji?: string;
+    icon?: ComponentType<LucideProps>;
+    href?: string;
+    items: NavItem[];
+    open: boolean;
+    onToggle: () => void;
+    collapsed: boolean;
+    active: boolean;
+    countPill?: number;
+    isActive: (href: string) => boolean;
+}) {
+    if (collapsed) {
+        return (
+            <NavRow
+                href={href || items[0]?.href || "#"}
+                label={label}
+                emoji={emoji}
+                icon={Icon}
+                active={active}
+                collapsed
+                countPill={countPill}
+            />
+        );
+    }
+    const headClass = clsx(
+        "ciel-transition relative mb-[5px] flex w-[calc(100%-20px)] items-center gap-[13px] rounded-[14px] py-3.5 pl-3.5 pr-1.5 text-left text-[14px] font-extrabold mx-[10px]",
+        active ? "bg-[#22515b] text-white shadow-[inset_4px_0_0_#42ddb2]" : "text-[#c8d4da] hover:bg-white/[0.055] hover:text-white",
+    );
+    const inner = (
+        <>
+            {emoji ? (
+                <span className="w-7 shrink-0 text-center text-lg leading-none" aria-hidden>{emoji}</span>
+            ) : Icon ? (
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+            ) : null}
+            <span className="flex-1 truncate">{label}</span>
+            {!!countPill && countPill > 0 && (
+                <span className="grid h-6 min-w-6 shrink-0 place-items-center rounded-xl bg-[#355c6b] px-1.5 text-[11px] font-bold text-white">{countPill > 99 ? "99+" : countPill}</span>
+            )}
+        </>
+    );
+    return (
+        <div className="mb-0.5" data-nav-group={id}>
+            <div className={headClass}>
+                {href ? (
+                    <Link
+                        href={href}
+                        scroll
+                        aria-current={active ? "page" : undefined}
+                        className="flex min-w-0 flex-1 items-center gap-[13px] rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42ddb2]"
+                    >
+                        {inner}
+                    </Link>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={onToggle}
+                        aria-expanded={open}
+                        aria-controls={`${id}-items`}
+                        className="flex min-w-0 flex-1 items-center gap-[13px] rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42ddb2]"
+                    >
+                        {inner}
+                    </button>
+                )}
+                <button
+                    type="button"
+                    onClick={onToggle}
+                    aria-expanded={open}
+                    aria-controls={`${id}-items`}
+                    aria-label={open ? `Hide ${label} options` : `Show ${label} options`}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#42ddb2]"
+                >
+                    <ChevronDown className={clsx("h-4 w-4 ciel-transition", open && "rotate-180")} />
+                </button>
+            </div>
+            {open ? (
+                <div id={`${id}-items`} role="group" aria-label={`${label} options`}>
+                    {items.map((item) => (
+                        <NavRow
+                            key={`${item.href}|${item.label}`}
+                            href={item.href}
+                            label={item.label}
+                            icon={item.icon}
+                            active={isActive(item.href)}
+                            countPill={item.countPill}
+                            needsAction={item.needsAction}
+                            collapsed={false}
+                            indent
+                            onPrefetch={item.onPrefetch}
+                        />
+                    ))}
+                </div>
+            ) : null}
+        </div>
+    );
 }
 
 type MenuSection = { heading: string; items: NavItem[] };
@@ -164,7 +325,13 @@ function RoleMenuSheet({
                         : "border-ciel-border text-ciel-text hover:border-ciel-green/40",
                 )}
             >
-                <item.icon className="h-4 w-4 shrink-0" />
+                {item.emoji ? (
+                    <span className="w-5 shrink-0 text-center text-base leading-none" aria-hidden>{item.emoji}</span>
+                ) : item.icon ? (
+                    <item.icon className="h-4 w-4 shrink-0" />
+                ) : (
+                    <span className="ml-1.5 mr-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-60" aria-hidden />
+                )}
                 <span className="min-w-0 flex-1 text-sm font-bold">{item.label}</span>
                 {!!item.countPill && item.countPill > 0 && (
                     <span className="rounded-full bg-ciel-navy/10 px-2 py-0.5 text-[10px] font-bold">
@@ -603,226 +770,210 @@ export default function Sidebar() {
     }, [isStudent]);
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [mobilePathsSheetOpen, setMobilePathsSheetOpen] = useState(false);
 
     const roleSlug = isStudent ? "student" : isPartner ? "partner" : isFaculty ? "faculty" : isInvestor ? "investor" : "admin";
     const dashboardHref = `/dashboard/${roleSlug}`;
     const settingsHref = `/dashboard/${roleSlug}/settings`;
     const helpHref = isAdmin ? "/dashboard/admin/support" : `/dashboard/${roleSlug}/help`;
 
-    const adminHrefCount = useCallback(
+    // ---- Final Stakeholder Dashboard Structure: main buttons + sub-buttons for this role ----
+    const stakeholderRole = stakeholderNavRole(navRole, partnerOrgKind);
+    const stakeholderNav = stakeholderRole ? STAKEHOLDER_NAV[stakeholderRole] : null;
+
+    /** Live count for one link. Keyed by the exact href the menu uses, so a queue shows once. */
+    const countForHref = useCallback(
         (href: string): number | undefined => {
-            if (!isAdmin || !adminCounts) return undefined;
-            const path = href.split("?")[0];
-            switch (path) {
-                case "/dashboard/admin/approvals":
-                    return adminCounts.opportunityApprovals + adminCounts.userApprovals;
-                case "/dashboard/admin/join-applications":
-                    return adminCounts.joinApplications;
-                case "/dashboard/admin/payments":
-                    return adminCounts.payments;
-                case "/dashboard/admin/org-membership":
-                    return adminCounts.orgMembership;
-                case "/dashboard/admin/reports/verify":
-                    return adminCounts.reportsAwaitingAdmin;
-                case "/dashboard/admin/issue-logs":
-                    return adminCounts.issueLogsOpen;
-                case "/dashboard/admin/support":
-                    return adminCounts.supportOpen;
-                case "/dashboard/admin/quick-work":
-                    return adminCounts.quickWork;
-                default:
-                    return undefined;
+            const { path } = splitHref(href);
+            if (path.endsWith("/messages")) return unreadCount || undefined;
+            if (path.endsWith("/notifications")) return notificationUnreadCount || undefined;
+            if (isFaculty) {
+                if (href === `${FACULTY_CS_HUB}?view=review&tab=apps`) return facultyQueueCounts.joinApplications || undefined;
+                if (href === "/dashboard/faculty/report-supervision") return facultyQueueCounts.reportSupervision || undefined;
+                if (href === "/dashboard/faculty/quick-work") return facultyQuickWorkPending || undefined;
             }
+            if (isAdmin && adminCounts) {
+                switch (href) {
+                    case "/dashboard/admin/approvals?tab=pending_admin":
+                        return adminCounts.opportunityApprovals || undefined;
+                    case "/dashboard/admin/join-applications":
+                        return adminCounts.joinApplications || undefined;
+                    case "/dashboard/admin/reports/verify":
+                        return adminCounts.reportsAwaitingAdmin || undefined;
+                    case "/dashboard/admin/quick-work?status=admin_review":
+                        return adminCounts.quickWork || undefined;
+                    case "/dashboard/admin/users":
+                        return adminCounts.userApprovals || undefined;
+                    case "/dashboard/admin/payments":
+                        return adminCounts.payments || undefined;
+                    case "/dashboard/admin/org-membership":
+                        return adminCounts.orgMembership || undefined;
+                    case "/dashboard/admin/issue-logs":
+                        return adminCounts.issueLogsOpen || undefined;
+                    case "/dashboard/admin/support":
+                        return adminCounts.supportOpen || undefined;
+                    default:
+                        return undefined;
+                }
+            }
+            return undefined;
         },
-        [isAdmin, adminCounts],
+        [unreadCount, notificationUnreadCount, isFaculty, facultyQueueCounts, facultyQuickWorkPending, isAdmin, adminCounts],
     );
+
+    const prefetchForHref = useCallback(
+        (href: string): (() => void) | undefined => {
+            if (!isStudent) return undefined;
+            if (href.startsWith(STUDENT_CS_HUB)) return () => prefetchStudentPathData("communityService");
+            if (href === "/dashboard/student/impact") return () => prefetchStudentImpactPortfolio();
+            return undefined;
+        },
+        [isStudent],
+    );
+
+    /** Main buttons with live counts on their sub-buttons (and the sum on the main button). */
+    const mainGroups = useMemo(
+        () =>
+            (stakeholderNav?.mainButtons ?? []).map((main: StakeholderMainButton) => {
+                const items: NavItem[] = main.subButtons.map((sub) => ({
+                    label: sub.label,
+                    href: sub.href,
+                    countPill: countForHref(sub.href),
+                    onPrefetch: prefetchForHref(sub.href),
+                }));
+                const extra = isStudent && main.key === "impact" ? impactHistoryBadge : 0;
+                const total = items.reduce((sum, item) => sum + (item.countPill ?? 0), 0) + extra;
+                return { main, items, countPill: total || undefined };
+            }),
+        [stakeholderNav, countForHref, prefetchForHref, isStudent, impactHistoryBadge],
+    );
+
+    /** The other impact areas keep their own workspaces; Community Service is covered by the main buttons. */
+    const otherAreas = useMemo<NavItem[]>(() => {
+        if (isStudent) {
+            return CIEL_PATHS.filter((path) => path.key !== "communityService").map((path) => ({
+                label: path.label,
+                href: path.href,
+                emoji: path.emoji,
+                needsAction: impactSummary?.pathsStatus?.[path.key]?.needsAction,
+                onPrefetch: () => prefetchStudentPathData(path.key),
+            }));
+        }
+        if (isFaculty) {
+            return [
+                { label: "Coursework Project", href: "/dashboard/faculty/coursework-projects", emoji: "📚" },
+                { label: "Final Year Project (FYP)", href: "/dashboard/faculty/fyp-thesis", emoji: "🎓" },
+                { label: "Startup / Business", href: "/dashboard/faculty/startup-business", emoji: "💼" },
+            ];
+        }
+        if (isPartner && isUniversityPartnerOrg) {
+            return [
+                { label: "Coursework", href: "/dashboard/partner/university-showcase?mode=course-project", emoji: "📚" },
+                { label: "Final Year Project (FYP)", href: "/dashboard/partner/university-showcase?mode=fyp-thesis", emoji: "🎓" },
+                { label: "Startup / Venture", href: "/dashboard/partner/startup-business", emoji: "🚀" },
+            ];
+        }
+        if (isAdmin) {
+            return [
+                { label: "Coursework", href: "/dashboard/admin/path-submissions?tab=course-project", emoji: "📚" },
+                { label: "Final Year Project (FYP)", href: "/dashboard/admin/path-submissions?tab=fyp-thesis", emoji: "🎓" },
+                { label: "Startup / Venture", href: "/dashboard/admin/startup-business", emoji: "🚀" },
+                { label: "Faculty Work · All Universities", href: "/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work", emoji: "🧑‍🏫" },
+            ];
+        }
+        return [];
+    }, [isStudent, isFaculty, isPartner, isUniversityPartnerOrg, isAdmin, impactSummary]);
 
     const withCounts = useCallback(
-        (items: Omit<NavItem, "countPill">[]): NavItem[] =>
-            items.map((item) => ({
-                ...item,
-                countPill:
-                    adminHrefCount(item.href) ??
-                    (item.label === "Messages"
-                        ? unreadCount
-                        : item.label === "Notifications"
-                          ? notificationUnreadCount
-                          : item.label === "Impact" && isStudent
-                            ? impactHistoryBadge
-                            : isFaculty && item.href === "/dashboard/faculty/quick-work"
-                              ? facultyQuickWorkPending
-                              : isFaculty && item.href === "/dashboard/faculty/join-applications"
-                                ? facultyQueueCounts.joinApplications
-                                : isFaculty && item.href === "/dashboard/faculty/report-supervision"
-                                  ? facultyQueueCounts.reportSupervision
-                                  : undefined),
-            })),
-        [unreadCount, notificationUnreadCount, impactHistoryBadge, isStudent, isFaculty, facultyQuickWorkPending, facultyQueueCounts, adminHrefCount],
+        (items: NavItem[]): NavItem[] => items.map((item) => ({ ...item, countPill: item.countPill ?? countForHref(item.href) })),
+        [countForHref],
     );
 
-    const partnerWorkspace = useMemo(
-        () =>
-            withCounts([
-                { label: "My Organization", href: "/dashboard/partner/organization", icon: Building2 },
-                { label: "Browse Opportunities", href: "/dashboard/partner/browse", icon: Search },
-                ...(partnerMembershipNav
-                    ? [{ label: "Membership fee", href: "/dashboard/partner/membership-payment", icon: CreditCard }]
-                    : []),
-                ...(!isUniversityPartnerOrg
-                    ? [{ label: "Participants", href: "/dashboard/partner/participants", icon: Users }]
-                    : []),
-                { label: "Verify Work", href: "/dashboard/partner/verify", icon: CheckCircle },
-                { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
-                { label: "External Records", href: "/dashboard/partner/integrations", icon: Link2 },
-                ...(!isUniversityPartnerOrg ? [{ label: "Impact", href: "/dashboard/partner/community-service?view=impact", icon: FileBarChart }] : []),
-                ...(!isUniversityPartnerOrg
-                    ? [{ label: "Analytics", href: "/dashboard/partner/analytics", icon: BarChart3 }]
-                    : []),
-            ]),
-        [withCounts, partnerMembershipNav, isUniversityPartnerOrg],
-    );
-
-    const partnerMore = useMemo(
-        () =>
-            withCounts([
-                { label: "Messages", href: "/dashboard/partner/messages", icon: MessageSquare },
-                { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },
-                { label: "Notifications", href: "/dashboard/partner/notifications", icon: Bell },
-                { label: "Platform tutorial", href: "/dashboard/partner/tutorials", icon: PlayCircle },
-            ]),
-        [withCounts],
-    );
-
-    const facultyPaths = useMemo(
-        () => [
-            { label: "Community Service", href: "/dashboard/faculty/community-service", emoji: "⛺" },
-            { label: "Coursework Project", href: "/dashboard/faculty/coursework-projects", emoji: "📚" },
-            { label: "Final Year Project (FYP)", href: "/dashboard/faculty/fyp-thesis", emoji: "🎓" },
-            { label: "Startup / Business", href: "/dashboard/faculty/startup-business", emoji: "💼" },
-        ],
-        [],
-    );
-
-    const facultyWorkspace = useMemo(
-        () =>
-            withCounts([
-                // { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
-                { label: "Browse Opportunities", href: "/dashboard/faculty/browse", icon: Search },
-                { label: "Join Application Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
-                { label: "Quick Community Impact", href: "/dashboard/faculty/quick-work", icon: Leaf },
-                { label: "Report Supervision", href: "/dashboard/faculty/report-supervision", icon: CheckCircle },
-                // { label: "Student impact reports", href: "/dashboard/faculty/reports", icon: FileText },
-                // { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
-            ]),
-        [withCounts],
-    );
-
-    const facultyMore = useMemo(
-        () =>
-            withCounts([
-                { label: "Analytics", href: "/dashboard/faculty/analytics", icon: BarChart3 },
-                { label: "Messages", href: "/dashboard/faculty/messages", icon: MessageSquare },
-                { label: "Notifications", href: "/dashboard/faculty/notifications", icon: Bell },
-                { label: "Platform tutorial", href: "/dashboard/faculty/tutorials", icon: PlayCircle },
-            ]),
-        [withCounts],
-    );
-
-    const universityPaths = useMemo(
-        () => [
-            { label: "Community Service", href: "/dashboard/partner/community-service", emoji: "🏕️" },
-            { label: "Coursework", href: "/dashboard/partner/university-showcase?mode=course-project", emoji: "📚" },
-            { label: "Final Year Project (FYP)", href: "/dashboard/partner/university-showcase?mode=fyp-thesis", emoji: "🎓" },
-            { label: "Startup / Venture", href: "/dashboard/partner/startup-business", emoji: "🚀" },
-        ],
-        [],
-    );
-
-    const ngoPaths = useMemo(
-        () => [{ label: "Community Service", href: "/dashboard/partner/community-service", emoji: "🌱" }],
-        [],
-    );
-
-    const adminPaths = useMemo(
-        () => [
-            { label: "Community Service", href: "/dashboard/admin/community-service", emoji: "🏕️" },
-            { label: "Coursework", href: "/dashboard/admin/path-submissions?tab=course-project", emoji: "📚" },
-            { label: "Final Year Project (FYP)", href: "/dashboard/admin/path-submissions?tab=fyp-thesis", emoji: "🎓" },
-            { label: "Startup / Venture", href: "/dashboard/admin/startup-business", emoji: "🚀" },
-        ],
-        [],
-    );
-
-    /**
-     * Admin navigation in the order the work actually happens: approve accounts and organisations,
-     * then the opportunity / application / report queues, then money, then the links that make
-     * universities and vendors work, then records and exports, then communication, then the
-     * admin-only logs. Each group is a labelled section so the sidebar reads as a flow.
-     */
-    const adminGroups = useMemo<MenuSection[]>(
-        () => [
-            {
-                heading: "1 · Accounts & organisations",
-                items: withCounts([
-                    { label: "Users & account approvals", href: "/dashboard/admin/users", icon: Users },
-                    { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
-                    { label: "Faculty ↔ University scope", href: "/dashboard/admin/faculty-university-scope", icon: Link2 },
-                ]),
-            },
-            {
-                heading: "2 · Approval queues",
-                items: withCounts([
-                    { label: "Opportunity approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
-                    { label: "Applications & report approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
-                    { label: "Student reports to verify", href: "/dashboard/admin/reports/verify", icon: FileText },
-                    { label: "Report supervision", href: "/dashboard/admin/report-supervision", icon: CheckCircle },
-                    { label: "Quick Community Impact", href: "/dashboard/admin/quick-work", icon: Leaf },
-                ]),
-            },
-            {
-                heading: "3 · Payments",
-                items: withCounts([
-                    { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
-                    { label: "Student subscriptions", href: "/dashboard/admin/student-subscriptions", icon: CreditCard },
-                    { label: "Org membership fees", href: "/dashboard/admin/org-membership", icon: CreditCard },
-                ]),
-            },
-            {
-                heading: "4 · Records & exports",
-                items: withCounts([
-                    { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
-                    { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
-                    { label: "Community service reporting", href: "/dashboard/admin/cs-reporting", icon: FileBarChart },
-                    { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
-                    { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },
-                    { label: "Follow-up tracker", href: "/dashboard/admin/followups", icon: FileBarChart },
-                    { label: "Integration Hub · university export", href: "/dashboard/admin/integrations", icon: Link2 },
-                ]),
-            },
-            {
-                heading: "5 · Communication",
-                items: withCounts([
-                    { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
-                    { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
-                    { label: "Send email", href: "/dashboard/admin/email", icon: Mail },
-                    { label: "CEP feedback", href: "/dashboard/admin/cep-feedback", icon: MessageSquare },
-                    { label: "Platform tutorial", href: "/dashboard/admin/tutorials", icon: PlayCircle },
-                ]),
-            },
-            {
-                heading: "6 · Logs & system",
-                items: withCounts([
-                    { label: "Issue Logs", href: "/dashboard/admin/issue-logs", icon: ShieldAlert },
-                    { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: History },
-                    { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
-                ]),
-            },
-        ],
-        [withCounts],
-    );
-    const adminWorkspace = useMemo(() => adminGroups.flatMap((g) => g.items), [adminGroups]);
-    const adminMore = useMemo<NavItem[]>(() => [], []);
+    /** Everything outside Community Service: inbox, organisation, platform administration. */
+    const extraSections = useMemo<MenuSection[]>(() => {
+        if (isStudent) {
+            return [
+                {
+                    heading: "Inbox & payments",
+                    items: withCounts([
+                        { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
+                        { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell },
+                        { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
+                    ]),
+                },
+            ];
+        }
+        if (isFaculty) {
+            return [
+                {
+                    heading: "Inbox",
+                    items: withCounts([
+                        { label: "Messages", href: "/dashboard/faculty/messages", icon: MessageSquare },
+                        { label: "Notifications", href: "/dashboard/faculty/notifications", icon: Bell },
+                    ]),
+                },
+            ];
+        }
+        if (isPartner) {
+            return [
+                {
+                    heading: "Organization",
+                    items: withCounts([
+                        { label: "My Organization", href: "/dashboard/partner/organization", icon: Building2 },
+                        ...(partnerMembershipNav
+                            ? [{ label: "Membership fee", href: "/dashboard/partner/membership-payment", icon: CreditCard }]
+                            : []),
+                        { label: "External Records", href: "/dashboard/partner/integrations", icon: Link2 },
+                        { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },
+                    ]),
+                },
+                {
+                    heading: "Inbox",
+                    items: withCounts([
+                        { label: "Messages", href: "/dashboard/partner/messages", icon: MessageSquare },
+                        { label: "Notifications", href: "/dashboard/partner/notifications", icon: Bell },
+                    ]),
+                },
+            ];
+        }
+        if (isAdmin) {
+            return [
+                {
+                    heading: "Accounts & payments",
+                    items: withCounts([
+                        { label: "Users & account approvals", href: "/dashboard/admin/users", icon: Users },
+                        { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
+                        { label: "Faculty ↔ University scope", href: "/dashboard/admin/faculty-university-scope", icon: Link2 },
+                        { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
+                        { label: "Student subscriptions", href: "/dashboard/admin/student-subscriptions", icon: CreditCard },
+                        { label: "Org membership fees", href: "/dashboard/admin/org-membership", icon: CreditCard },
+                    ]),
+                },
+                {
+                    heading: "Records & communication",
+                    items: withCounts([
+                        { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
+                        { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
+                        { label: "Reports & moderation", href: "/dashboard/admin/reports", icon: ShieldAlert },
+                        { label: "Follow-up tracker", href: "/dashboard/admin/followups", icon: History },
+                        { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
+                        { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
+                        { label: "Send email", href: "/dashboard/admin/email", icon: Mail },
+                        { label: "CEP feedback", href: "/dashboard/admin/cep-feedback", icon: MessageSquare },
+                        { label: "Platform tutorial", href: "/dashboard/admin/tutorials", icon: PlayCircle },
+                    ]),
+                },
+                {
+                    heading: "System & logs",
+                    items: withCounts([
+                        { label: "Issue Logs", href: "/dashboard/admin/issue-logs", icon: ShieldAlert },
+                        { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: History },
+                        { label: "All-Fields Analytics Console", href: "/dashboard/admin/master-analytics", icon: Globe2 },
+                    ]),
+                },
+            ];
+        }
+        return [];
+    }, [isStudent, isFaculty, isPartner, isAdmin, partnerMembershipNav, withCounts]);
 
     const investorPaths = useMemo(
         () => [
@@ -842,151 +993,97 @@ export default function Sidebar() {
         ],
         [],
     );
-
     const investorDash = investorPaths.slice(0, 2);
     const investorDealFlow = investorPaths.slice(2, 8);
     const investorCielYou = investorPaths.slice(8);
 
-    const investorWorkspace = useMemo(() => withCounts([]), [withCounts]);
-
-    const workspaceLinks = isPartner ? partnerWorkspace : isFaculty ? facultyWorkspace : isAdmin ? adminWorkspace : isInvestor ? investorWorkspace : [];
-    const moreLinksRole = isPartner ? partnerMore : isFaculty ? facultyMore : isAdmin ? adminMore : [];
-    const rolePaths = isFaculty
-        ? facultyPaths
-        : isPartner && isUniversityPartnerOrg
-          ? universityPaths
-          : isPartner
-            ? ngoPaths
-          : isAdmin
-            ? adminPaths
-            : isInvestor
-              ? investorPaths
-              : [];
-    const impactHref = isFaculty
-        ? "/dashboard/faculty/impact"
-        : isPartner && isUniversityPartnerOrg
-          ? "/dashboard/partner/community-service?view=wall"
-          : isAdmin
-            ? "/dashboard/admin/community-service?view=wall"
-            : null;
-    const impactLabel = "My Impact Wall";
-    const impactEmoji = isAdmin ? "🏆" : isPartner && isUniversityPartnerOrg ? "🏆" : "🏅";
-
     const footerLinks = useMemo(() => {
         const items: NavItem[] = [];
+        if (isStudent) items.push({ label: "My Profile", href: "/dashboard/student/profile", icon: User });
         if (isFaculty) items.push({ label: "My Profile", href: "/dashboard/faculty/profile", icon: User });
         items.push({ label: "Settings", href: settingsHref, icon: Settings });
         items.push({
-            label: isInvestor ? "Help & Deal Desk" : "Help",
+            label: isInvestor ? "Help & Deal Desk" : isAdmin ? "Support desk" : "Help",
             href: isInvestor ? "/dashboard/investor?view=agreements" : helpHref,
             icon: HelpCircle,
-            countPill: isAdmin ? adminHrefCount(helpHref) : undefined,
+            countPill: isAdmin ? countForHref(helpHref) : undefined,
         });
         return items;
-    }, [isFaculty, isInvestor, isAdmin, settingsHref, helpHref, adminHrefCount]);
+    }, [isStudent, isFaculty, isInvestor, isAdmin, settingsHref, helpHref, countForHref]);
+
+    const conditionalDashboardRows = useMemo<NavItem[]>(() => {
+        const rows: NavItem[] = [];
+        if (isStudent && studentSubscriptionNav) rows.push({ label: "Subscription fee", href: STUDENT_SUBSCRIPTION_PATH, emoji: "💳" });
+        return rows;
+    }, [isStudent, studentSubscriptionNav]);
 
     const allRoleHrefs = useMemo(
         () => [
             dashboardHref,
-            ...rolePaths.map((l) => l.href),
-            ...(impactHref ? [impactHref] : []),
-            ...workspaceLinks.map((l) => l.href),
-            ...moreLinksRole.map((l) => l.href),
+            ...conditionalDashboardRows.map((l) => l.href),
+            ...mainGroups.flatMap((g) => [g.main.href, ...g.items.map((l) => l.href)]),
+            ...otherAreas.map((l) => l.href),
+            ...extraSections.flatMap((s) => s.items.map((l) => l.href)),
             ...footerLinks.map((l) => l.href),
+            ...(isInvestor ? investorPaths.map((l) => l.href) : []),
         ],
-        [dashboardHref, rolePaths, impactHref, workspaceLinks, moreLinksRole, footerLinks],
+        [dashboardHref, conditionalDashboardRows, mainGroups, otherAreas, extraSections, footerLinks, isInvestor, investorPaths],
     );
 
-    const isNavActive = (href: string) => {
-        const [hrefPath, hrefQuery] = href.split("?");
-        const hrefParams = hrefQuery ? new URLSearchParams(hrefQuery) : null;
-        const hrefTab = hrefParams?.get("tab");
-        const hrefMode = hrefParams?.get("mode");
-        const hrefArea = hrefParams?.get("area");
-        const hrefView = hrefParams?.get("view");
-        if (hrefArea) {
-            return pathname === hrefPath && searchParams.get("area") === hrefArea;
+    const paramCount = (href: string) => Array.from(splitHref(href).params.keys()).length;
+
+    /**
+     * A link is active when its path and every query parameter it names match the current URL,
+     * unless a sibling link is a more specific match (more parameters, or a longer path).
+     */
+    const isNavActive = (href: string): boolean => {
+        const { path: hrefPath, params } = splitHref(href);
+        const hrefView = params.get("view");
+        if (isInvestor && hrefView) {
+            const v = searchParams.get("view") || "";
+            const aliases: Record<string, string[]> = {
+                overview: ["overview", "home", ""],
+                discover: ["discover", "showcase"],
+                match: ["match", "rankings", "rank"],
+                pipeline: ["pipeline", "saved"],
+            };
+            const list = aliases[hrefView];
+            if (list) return pathname === hrefPath && list.includes(v);
         }
-        if (hrefView) {
-            if (isInvestor) {
-                const v = searchParams.get("view") || "";
-                const aliases: Record<string, string[]> = {
-                    overview: ["overview", "home", ""],
-                    discover: ["discover", "showcase"],
-                    match: ["match", "rankings", "rank"],
-                    pipeline: ["pipeline", "saved"],
-                };
-                const list = aliases[hrefView];
-                if (list) return pathname === hrefPath && list.includes(v);
-            }
-            return pathname === hrefPath && (!hrefTab || searchParams.get("tab") === hrefTab) && searchParams.get("view") === hrefView;
-        }
-        if (hrefTab) {
-            if (hrefTab === "fyp-thesis" && searchParams.get("view") === "faculty-work") return false;
-            return pathname === hrefPath && searchParams.get("tab") === hrefTab;
-        }
-        if (hrefMode) {
-            return pathname === hrefPath && searchParams.get("mode") === hrefMode;
-        }
-        if (hrefPath === "/dashboard/admin/path-submissions") {
-            // Bare "Path submissions" link: only active when no tab/view query selects a specific path.
-            if (pathname === hrefPath) return !searchParams.get("tab") && !searchParams.get("view");
-            return pathname.startsWith(`${hrefPath}/`);
-        }
-        if (hrefPath === dashboardHref) return pathname === hrefPath;
-        if (hrefPath === "/dashboard/student/payments" && pathname === "/dashboard/student/payment") return true;
-        if (hrefPath === "/dashboard/student/impact" && pathname.startsWith("/dashboard/student/analytics")) return true;
-        if (hrefPath === "/dashboard/student/paths/community-service" && pathname.startsWith("/dashboard/student/create-opportunity")) return true;
-        if (hrefPath === "/dashboard/student/paths/community-service" && pathname.startsWith("/dashboard/student/browse")) return true;
-        if (
-            hrefPath === "/dashboard/faculty/community-service" &&
-            (pathname.startsWith("/dashboard/faculty/create-opportunity") ||
-                pathname.startsWith("/dashboard/faculty/my-opportunities") ||
-                pathname.startsWith("/dashboard/faculty/approvals") ||
-                pathname.startsWith("/dashboard/faculty/join-applications") ||
-                pathname.startsWith("/dashboard/faculty/reports") ||
-                pathname.startsWith("/dashboard/faculty/attendance-review"))
-        ) {
-            return true;
-        }
-        if (
-            hrefPath === "/dashboard/partner/community-service" &&
-            !isUniversityPartnerOrg &&
-            (pathname.startsWith("/dashboard/partner/requests") ||
-                pathname.startsWith("/dashboard/partner/verify") ||
-                pathname.startsWith("/dashboard/partner/verification") ||
-                pathname.startsWith("/dashboard/partner/reports") ||
-                pathname.startsWith("/dashboard/partner/attendance-review"))
-        ) {
-            return true;
-        }
+        if (hrefPath === dashboardHref) return pathname === hrefPath && paramCount(href) === 0;
         if (pathname === hrefPath) {
-            const currentView = searchParams.get("view");
-            if (currentView && !hrefView) {
-                const siblingOwnsView = allRoleHrefs.some((other) => {
-                    if (other === href) return false;
-                    const [otherPath, otherQuery] = other.split("?");
-                    if (otherPath !== hrefPath || !otherQuery) return false;
-                    return new URLSearchParams(otherQuery).get("view") === currentView;
-                });
-                if (siblingOwnsView) return false;
-            }
-            return true;
+            if (!hrefMatchesLocation(href, pathname, searchParams)) return false;
+            const mine = paramCount(href);
+            const moreSpecific = allRoleHrefs.some(
+                (other) =>
+                    other !== href &&
+                    splitHref(other).path === hrefPath &&
+                    paramCount(other) > mine &&
+                    hrefMatchesLocation(other, pathname, searchParams),
+            );
+            return !moreSpecific;
         }
-        const longerChild = allRoleHrefs.some(
-            (other) => other !== hrefPath && other.startsWith(`${hrefPath}/`) && (pathname === other || pathname.startsWith(`${other}/`)),
-        );
-        if (longerChild) return false;
-        return pathname.startsWith(`${hrefPath}/`);
+        if (!pathname.startsWith(`${hrefPath}/`)) return false;
+        if (paramCount(href) > 0) return false;
+        const longerChild = allRoleHrefs.some((other) => {
+            const otherPath = splitHref(other).path;
+            return otherPath !== hrefPath && otherPath.startsWith(`${hrefPath}/`) && (pathname === otherPath || pathname.startsWith(`${otherPath}/`));
+        });
+        return !longerChild;
     };
 
-    const studentMoreLinks = withCounts([
-        { label: "Impact", href: "/dashboard/student/impact", icon: PieChart },
-        { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
-        { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
-        { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell },
-        { label: "Platform tutorial", href: "/dashboard/student/tutorials", icon: PlayCircle },
-    ]);
+    // Which main button owns the current page: it opens by itself. Manual toggles are remembered
+    // until the route changes.
+    const activeMain = stakeholderNav ? activeMainButton(stakeholderNav, pathname, searchParams) : null;
+    const locationKey = `${pathname}?${searchParams.toString()}`;
+    const [groupToggles, setGroupToggles] = useState<{ location: string; open: Record<string, boolean> }>({ location: "", open: {} });
+    const openGroups = groupToggles.location === locationKey ? groupToggles.open : {};
+    const isGroupOpen = (key: string, fallback: boolean) => (key in openGroups ? openGroups[key] : fallback);
+    const toggleGroup = (key: string, fallback: boolean) =>
+        setGroupToggles((prev) => {
+            const open = prev.location === locationKey ? prev.open : {};
+            return { location: locationKey, open: { ...open, [key]: !(key in open ? open[key] : fallback) } };
+        });
 
     const mobilePrimary =
         isFaculty
@@ -995,39 +1092,58 @@ export default function Sidebar() {
               ? { label: "Organization", href: "/dashboard/partner/organization", icon: Building2 }
               : isInvestor
                 ? { label: "Profile", href: "/dashboard/investor?view=profile", icon: Building2 }
-              : { label: "Settings", href: settingsHref, icon: Settings };
+                : isStudent
+                  ? { label: "Profile", href: "/dashboard/student/profile", icon: User }
+                  : { label: "Settings", href: settingsHref, icon: Settings };
 
-    const adminPathIcons: ComponentType<LucideProps>[] = [Tent, BookOpen, GraduationCap, Rocket];
-    const adminMenuSections: MenuSection[] | undefined = isAdmin
+    const mobileSections: MenuSection[] = isInvestor
         ? [
-              { heading: "My Dashboard", items: [{ label: "Dashboard", href: dashboardHref, icon: LayoutDashboard }] },
-              {
-                  heading: "Impact Areas",
-                  items: adminPaths.map((p, i) => ({ label: p.label, href: p.href, icon: adminPathIcons[i] ?? BookOpen })),
-              },
-              {
-                  heading: "Intelligence",
-                  items: [
-                      { label: impactLabel, href: impactHref!, icon: FileBarChart },
-                      { label: "Impact Intelligence Hub", href: "/dashboard/admin/analytics", icon: BarChart3 },
-                      { label: "Faculty Work · All Universities", href: "/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work", icon: Users },
-                  ],
-              },
-              ...adminGroups,
+              { heading: "My Dashboard", items: investorDash },
+              { heading: "Deal Flow", items: investorDealFlow },
+              { heading: "CIEL & You", items: investorCielYou },
               { heading: "Account", items: footerLinks },
           ]
-        : undefined;
+        : [
+              { heading: "My Dashboard", items: [{ label: "Dashboard", href: dashboardHref, icon: LayoutDashboard }, ...conditionalDashboardRows] },
+              ...mainGroups.map((g) => ({ heading: `${g.main.emoji} ${g.main.label}`, items: g.items })),
+              { heading: "Other impact areas", items: otherAreas },
+              ...extraSections,
+              { heading: "Account", items: footerLinks },
+          ];
 
-    const mobileMenuItems = [
-        ...rolePaths.map((p) => ({ label: p.label, href: p.href, icon: BookOpen })),
-        ...(impactHref ? [{ label: impactLabel, href: impactHref, icon: FileBarChart }] : []),
-        ...(isAdmin
-            ? [{ label: "Faculty Work · All Universities", href: "/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work", icon: BookOpen }]
-            : []),
-        ...workspaceLinks,
-        ...moreLinksRole,
-        ...footerLinks,
-    ];
+    const dashboardTitle = isFaculty
+        ? "Faculty Impact Dashboard"
+        : isUniversityPartnerOrg
+          ? "University Dashboard"
+          : isStudent
+            ? "Student Impact Dashboard"
+            : isInvestor
+              ? "CIEL Investor Hub"
+              : isAdmin
+                ? "Super Admin Dashboard"
+                : isPartner
+                  ? partnerOrgLabel === "HEC / Government"
+                      ? "HEC / Govt Dashboard"
+                      : partnerOrgLabel === "Corporate Partner"
+                        ? "Corporate Dashboard"
+                        : partnerOrgKind === "ngo"
+                          ? "NGO Dashboard"
+                          : "Partner Dashboard"
+                  : "Dashboard";
+
+    const menuTitle = isInvestor
+        ? "Investor Hub"
+        : isUniversityPartnerOrg
+          ? "University menu"
+          : isPartner
+            ? partnerOrgKind === "ngo"
+                ? "NGO menu"
+                : "Partner menu"
+            : isFaculty
+              ? "Faculty menu"
+              : isStudent
+                ? "Student menu"
+                : "Admin menu";
 
     return (
         <>
@@ -1054,27 +1170,7 @@ export default function Sidebar() {
                             <span className="text-[15px] font-bold leading-[1.25] text-white">
                                 Community Impact <br /> Education Lab
                             </span>
-                            <span className="mt-1 text-[11px] tracking-wide text-[#7ed0e4]">
-                                {isFaculty
-                                    ? "Faculty Impact Dashboard"
-                                    : isUniversityPartnerOrg
-                                      ? "University Dashboard"
-                                      : isStudent
-                                        ? "Student Impact Dashboard"
-                                        : isInvestor
-                                          ? "CIEL Investor Hub"
-                                          : isAdmin
-                                            ? "Super Admin Dashboard"
-                                            : isPartner
-                                              ? partnerOrgLabel === "HEC / Government"
-                                                ? "HEC / Govt Dashboard"
-                                                : partnerOrgLabel === "Corporate Partner"
-                                                  ? "Corporate Dashboard"
-                                                  : partnerOrgKind === "ngo"
-                                                    ? "NGO Dashboard"
-                                                    : "Partner Dashboard"
-                                            : "Dashboard"}
-                            </span>
+                            <span className="mt-1 text-[11px] tracking-wide text-[#7ed0e4]">{dashboardTitle}</span>
                         </div>
                     )}
                 </Link>
@@ -1096,40 +1192,19 @@ export default function Sidebar() {
                     <>
                         <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
                         {investorDash.map((link) => (
-                            <NavRow
-                                key={link.href}
-                                href={link.href}
-                                label={link.label}
-                                emoji={link.emoji}
-                                active={isNavActive(link.href)}
-                                collapsed={collapsed}
-                            />
+                            <NavRow key={link.href} href={link.href} label={link.label} emoji={link.emoji} active={isNavActive(link.href)} collapsed={collapsed} />
                         ))}
                         <NavSectionLabel collapsed={collapsed}>Deal Flow</NavSectionLabel>
                         {investorDealFlow.map((link) => (
-                            <NavRow
-                                key={link.href}
-                                href={link.href}
-                                label={link.label}
-                                emoji={link.emoji}
-                                active={isNavActive(link.href)}
-                                collapsed={collapsed}
-                            />
+                            <NavRow key={link.href} href={link.href} label={link.label} emoji={link.emoji} active={isNavActive(link.href)} collapsed={collapsed} />
                         ))}
                         <NavSectionLabel collapsed={collapsed}>CIEL & You</NavSectionLabel>
                         {investorCielYou.map((link) => (
-                            <NavRow
-                                key={link.href}
-                                href={link.href}
-                                label={link.label}
-                                emoji={link.emoji}
-                                active={isNavActive(link.href)}
-                                collapsed={collapsed}
-                            />
+                            <NavRow key={link.href} href={link.href} label={link.label} emoji={link.emoji} active={isNavActive(link.href)} collapsed={collapsed} />
                         ))}
                         {!collapsed && <InvestorPlanCard />}
                     </>
-                ) : isStudent ? (
+                ) : (
                     <>
                         <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
                         <NavRow
@@ -1138,168 +1213,91 @@ export default function Sidebar() {
                             emoji="🏠"
                             active={pathname === dashboardHref}
                             collapsed={collapsed}
-                            onPrefetch={() => {
-                                void fetchStudentDashboardData({ redirectToLogin: false });
-                                void fetchImpactSummary({ redirectToLogin: false });
-                            }}
+                            onPrefetch={
+                                isStudent
+                                    ? () => {
+                                          void fetchStudentDashboardData({ redirectToLogin: false });
+                                          void fetchImpactSummary({ redirectToLogin: false });
+                                      }
+                                    : undefined
+                            }
                         />
-                        {studentSubscriptionNav ? (
-                            <NavRow
-                                href={STUDENT_SUBSCRIPTION_PATH}
-                                label="Subscription fee"
-                                emoji="💳"
-                                active={isNavActive(STUDENT_SUBSCRIPTION_PATH)}
-                                collapsed={collapsed}
-                            />
-                        ) : null}
-                        <NavSectionLabel collapsed={collapsed}>My Impact Areas</NavSectionLabel>
-                        {CIEL_PATHS.map((path) => (
-                            <NavRow
-                                key={path.key}
-                                href={path.href}
-                                label={path.label}
-                                emoji={path.emoji}
-                                active={isNavActive(path.href) && !pathname.startsWith(QUICK_WORK_HREF)}
-                                needsAction={impactSummary?.pathsStatus?.[path.key]?.needsAction}
-                                countPill={path.key === "communityService" ? impactSummary?.activeEngagements : undefined}
-                                collapsed={collapsed}
-                                onPrefetch={() => {
-                                    prefetchStudentPathData(path.key);
-                                }}
-                            />
+                        {conditionalDashboardRows.map((row) => (
+                            <NavRow key={row.href} href={row.href} label={row.label} emoji={row.emoji} active={isNavActive(row.href)} collapsed={collapsed} />
                         ))}
-                        <NavSectionLabel collapsed={collapsed}>Quick Community Impact</NavSectionLabel>
-                        <NavRow
-                            href={QUICK_WORK_HREF}
-                            label="Quick Impact Log"
-                            emoji="⚡"
-                            active={pathname.startsWith(QUICK_WORK_HREF)}
-                            collapsed={collapsed}
-                        />
-                        {!collapsed && <div className="mx-0 my-4 border-t border-white/[0.09]" />}
-                        <NavSectionLabel collapsed={collapsed}>My Portfolio</NavSectionLabel>
-                        <NavRow
-                            href="/dashboard/student/impact"
-                            label="My Impact Portfolio"
-                            emoji="🏆"
-                            active={isNavActive("/dashboard/student/impact")}
-                            countPill={impactHistoryBadge}
-                            collapsed={collapsed}
-                            onPrefetch={() => prefetchStudentImpactPortfolio()}
-                        />
-                        <NavSectionLabel collapsed={collapsed}>More</NavSectionLabel>
-                        {studentMoreLinks.filter((link) => link.href !== "/dashboard/student/impact").map((link) => (
-                            <NavRow
-                                key={link.href}
-                                href={link.href}
-                                label={link.label}
-                                icon={link.icon}
-                                active={isNavActive(link.href)}
-                                countPill={link.countPill}
-                                collapsed={collapsed}
-                            />
-                        ))}
-                        {!collapsed && (
-                            <div className="mx-3.5 mt-[18px] rounded-[14px] bg-white/[0.055] p-3.5 text-[11px] leading-[1.55] text-[#a9c2cc]">
-                                <b className="text-white">Tip</b>
-                                <br />
-                                Open the Guidance card in each area before starting. Your draft saves automatically as you work.
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <>
-                        <NavSectionLabel collapsed={collapsed}>My Dashboard</NavSectionLabel>
-                        <NavRow href={dashboardHref} label="Dashboard" emoji="🏠" active={pathname === dashboardHref} collapsed={collapsed} />
-                        {rolePaths.length > 0 ? (
+
+                        {stakeholderNav ? (
                             <>
-                                <NavSectionLabel collapsed={collapsed}>
-                                    {isFaculty ? "Impact Areas" : isInvestor ? "Deal Flow" : "Impact Areas"}
-                                </NavSectionLabel>
-                                {rolePaths.map((link) => (
+                                <NavSectionLabel collapsed={collapsed}>Community Service</NavSectionLabel>
+                                {mainGroups.map(({ main, items, countPill }) => {
+                                    const active = activeMain?.key === main.key;
+                                    return (
+                                        <NavGroup
+                                            key={main.key}
+                                            id={`nav-${stakeholderNav.role}-${main.key}`}
+                                            label={main.label}
+                                            emoji={main.emoji}
+                                            href={main.href}
+                                            items={items}
+                                            open={isGroupOpen(main.key, active)}
+                                            onToggle={() => toggleGroup(main.key, active)}
+                                            collapsed={collapsed}
+                                            active={active}
+                                            countPill={countPill}
+                                            isActive={isNavActive}
+                                        />
+                                    );
+                                })}
+                            </>
+                        ) : null}
+
+                        {otherAreas.length > 0 ? (
+                            <>
+                                <NavSectionLabel collapsed={collapsed}>Other impact areas</NavSectionLabel>
+                                {otherAreas.map((link) => (
                                     <NavRow
                                         key={link.href}
                                         href={link.href}
                                         label={link.label}
                                         emoji={link.emoji}
                                         active={isNavActive(link.href)}
+                                        needsAction={link.needsAction}
                                         collapsed={collapsed}
+                                        onPrefetch={link.onPrefetch}
                                     />
                                 ))}
-                                {impactHref && isFaculty ? (
-                                    <>
-                                        <NavRow
-                                            href={impactHref}
-                                            label={impactLabel}
-                                            emoji={impactEmoji}
-                                            active={isNavActive(impactHref)}
-                                            collapsed={collapsed}
-                                            impact
-                                        />
-                                        {!collapsed && (
-                                            <p className="mb-4 ml-14 mt-1 text-[10px] leading-snug text-[#7fa2b0]">
-                                                One Faculty Impact Wall combining approved Community Service, Coursework, FYP / Thesis and Startup / Business impact.
-                                            </p>
-                                        )}
-                                    </>
-                                ) : null}
-                                {impactHref && !isFaculty ? (
-                                    <>
-                                        {!collapsed && <div className="mx-0 my-4 border-t border-white/[0.09]" />}
-                                        <NavSectionLabel collapsed={collapsed}>
-                                            {isAdmin ? "Intelligence" : "Institutional Impact"}
-                                        </NavSectionLabel>
-                                        <NavRow
-                                            href={impactHref}
-                                            label={impactLabel}
-                                            emoji={impactEmoji}
-                                            active={isNavActive(impactHref)}
-                                            collapsed={collapsed}
-                                            impact
-                                        />
-                                        {isAdmin ? (
-                                            <NavRow
-                                                href="/dashboard/admin/analytics"
-                                                label="Impact Intelligence Hub"
-                                                emoji="📊"
-                                                active={isNavActive("/dashboard/admin/analytics")}
-                                                collapsed={collapsed}
-                                            />
-                                        ) : null}
-                                        {isAdmin ? (
-                                            <NavRow
-                                                href="/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work"
-                                                label="Faculty Work · All Universities"
-                                                emoji="🧑‍🏫"
-                                                active={isNavActive("/dashboard/admin/path-submissions?tab=fyp-thesis&view=faculty-work")}
-                                                collapsed={collapsed}
-                                            />
-                                        ) : null}
-                                        {isUniversityPartnerOrg ? (
-                                            <NavRow
-                                                href="/dashboard/partner/university-analytics"
-                                                label="Overall Impact Analytics"
-                                                emoji="📊"
-                                                active={isNavActive("/dashboard/partner/university-analytics")}
-                                                collapsed={collapsed}
-                                            />
-                                        ) : null}
-                                        {!collapsed && isUniversityPartnerOrg && (
-                                            <div className="mx-3.5 mt-2 rounded-[14px] bg-white/[0.055] p-3.5 text-[11px] leading-[1.55] text-[#a9c2cc]">
-                                                <b className="text-white">University View</b>
-                                                <br />
-                                                Approved faculty work from all departments flows automatically into the relevant impact wall. Analytics access is controlled by CIEL PK subscription.
-                                            </div>
-                                        )}
-                                    </>
-                                ) : null}
                             </>
                         ) : null}
+
                         {isAdmin ? (
-                            adminGroups.map((group) => (
-                                <div key={group.heading}>
-                                    <NavSectionLabel collapsed={collapsed}>{group.heading}</NavSectionLabel>
-                                    {group.items.map((link) => (
+                            <>
+                                <NavSectionLabel collapsed={collapsed}>Platform administration</NavSectionLabel>
+                                {extraSections.map((section) => {
+                                    const key = `admin-${section.heading}`;
+                                    const active = section.items.some((item) => isNavActive(item.href));
+                                    const total = section.items.reduce((sum, item) => sum + (item.countPill ?? 0), 0);
+                                    return (
+                                        <NavGroup
+                                            key={key}
+                                            id={key.replace(/[^a-z0-9-]+/gi, "-").toLowerCase()}
+                                            label={section.heading}
+                                            icon={section.heading.startsWith("Accounts") ? Users : section.heading.startsWith("Records") ? Archive : ShieldAlert}
+                                            items={section.items}
+                                            open={isGroupOpen(key, active)}
+                                            onToggle={() => toggleGroup(key, active)}
+                                            collapsed={collapsed}
+                                            active={active}
+                                            countPill={total || undefined}
+                                            isActive={isNavActive}
+                                        />
+                                    );
+                                })}
+                            </>
+                        ) : (
+                            extraSections.map((section) => (
+                                <div key={section.heading}>
+                                    <NavSectionLabel collapsed={collapsed}>{section.heading}</NavSectionLabel>
+                                    {section.items.map((link) => (
                                         <NavRow
                                             key={link.href}
                                             href={link.href}
@@ -1312,33 +1310,6 @@ export default function Sidebar() {
                                     ))}
                                 </div>
                             ))
-                        ) : (
-                            <>
-                                <NavSectionLabel collapsed={collapsed}>{isInvestor ? "Organisation" : "Workspace"}</NavSectionLabel>
-                                {workspaceLinks.map((link) => (
-                                    <NavRow
-                                        key={link.href}
-                                        href={link.href}
-                                        label={link.label}
-                                        icon={link.icon}
-                                        active={isNavActive(link.href)}
-                                        countPill={link.countPill}
-                                        collapsed={collapsed}
-                                    />
-                                ))}
-                                <NavSectionLabel collapsed={collapsed}>More</NavSectionLabel>
-                                {moreLinksRole.map((link) => (
-                                    <NavRow
-                                        key={link.href}
-                                        href={link.href}
-                                        label={link.label}
-                                        icon={link.icon}
-                                        active={isNavActive(link.href)}
-                                        countPill={link.countPill}
-                                        collapsed={collapsed}
-                                    />
-                                ))}
-                            </>
                         )}
                     </>
                 )}
@@ -1348,24 +1319,17 @@ export default function Sidebar() {
             </div>
 
             <div className="shrink-0 space-y-1 border-t border-white/10 p-3">
-                {isStudent ? (
-                    <>
-                        <NavRow href="/dashboard/student/profile" label="My Profile" icon={User} active={isNavActive("/dashboard/student/profile")} collapsed={collapsed} />
-                        <NavRow href="/dashboard/student/settings" label="Settings" icon={Settings} active={isNavActive("/dashboard/student/settings")} collapsed={collapsed} />
-                        <NavRow href="/dashboard/student/help" label="Help" icon={HelpCircle} active={isNavActive("/dashboard/student/help")} collapsed={collapsed} />
-                    </>
-                ) : (
-                    footerLinks.map((link) => (
-                        <NavRow
-                            key={link.href}
-                            href={link.href}
-                            label={link.label}
-                            icon={link.icon}
-                            active={isNavActive(link.href)}
-                            collapsed={collapsed}
-                        />
-                    ))
-                )}
+                {footerLinks.map((link) => (
+                    <NavRow
+                        key={link.href}
+                        href={link.href}
+                        label={link.label}
+                        icon={link.icon}
+                        active={isNavActive(link.href)}
+                        countPill={link.countPill}
+                        collapsed={collapsed}
+                    />
+                ))}
                 <button
                     type="button"
                     onClick={handleLogout}
@@ -1380,102 +1344,53 @@ export default function Sidebar() {
             </div>
         </aside>
 
-        {isStudent ? (
-            <>
-                <nav
-                    className="fixed inset-x-0 bottom-0 z-50 border-t border-ciel-border bg-white/95 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
-                    aria-label="Dashboard navigation"
+        <nav
+            className="fixed inset-x-0 bottom-0 z-50 border-t border-ciel-border bg-white/95 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
+            aria-label="Dashboard navigation"
+        >
+            <div className="flex items-stretch justify-between gap-1">
+                <Link
+                    href={dashboardHref}
+                    className={clsx(
+                        "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-ciel-md px-2 py-2 text-[10px] font-bold ciel-transition",
+                        pathname === dashboardHref ? "bg-ciel-green-soft text-ciel-green-deep" : "text-ciel-text-mid hover:bg-ciel-page",
+                    )}
                 >
-                    <div className="flex items-stretch justify-between gap-1">
-                        {[
-                            { label: "Dashboard", href: "/dashboard/student", icon: LayoutDashboard },
-                            { label: "Paths", href: "#paths", icon: Compass, isPathsTrigger: true },
-                            { label: "Profile", href: "/dashboard/student/profile", icon: User },
-                        ].map((item) => {
-                            const active = !item.isPathsTrigger && isNavActive(item.href);
-                            const commonClass = clsx(
-                                "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-ciel-md px-2 py-2 text-[10px] font-bold ciel-transition",
-                                active ? "bg-ciel-green-soft text-ciel-green-deep" : "text-ciel-text-mid hover:bg-ciel-page",
-                            );
-                            if (item.isPathsTrigger) {
-                                return (
-                                    <button
-                                        key={item.label}
-                                        type="button"
-                                        onClick={() => setMobilePathsSheetOpen(true)}
-                                        className={commonClass}
-                                    >
-                                        <item.icon className="h-5 w-5" />
-                                        <span>{item.label}</span>
-                                    </button>
-                                );
-                            }
-                            return (
-                                <Link key={item.label} href={item.href} className={commonClass}>
-                                    <item.icon className="h-5 w-5" />
-                                    <span>{item.label}</span>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </nav>
-                <PathsBottomSheet
-                    open={mobilePathsSheetOpen}
-                    onClose={() => setMobilePathsSheetOpen(false)}
-                    pathsStatus={impactSummary?.pathsStatus}
-                />
-            </>
-        ) : (
-            <>
-                <nav
-                    className="fixed inset-x-0 bottom-0 z-50 border-t border-ciel-border bg-white/95 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
-                    aria-label="Dashboard navigation"
+                    <LayoutDashboard className="h-5 w-5" />
+                    <span>Dashboard</span>
+                </Link>
+                <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(true)}
+                    className={clsx(
+                        "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-ciel-md px-2 py-2 text-[10px] font-bold ciel-transition",
+                        mobileMenuOpen ? "bg-ciel-green-soft text-ciel-green-deep" : "text-ciel-text-mid hover:bg-ciel-page",
+                    )}
                 >
-                    <div className="flex items-stretch justify-between gap-1">
-                        <Link
-                            href={dashboardHref}
-                            className={clsx(
-                                "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-ciel-md px-2 py-2 text-[10px] font-bold ciel-transition",
-                                pathname === dashboardHref ? "bg-ciel-green-soft text-ciel-green-deep" : "text-ciel-text-mid hover:bg-ciel-page",
-                            )}
-                        >
-                            <LayoutDashboard className="h-5 w-5" />
-                            <span>Dashboard</span>
-                        </Link>
-                        <button
-                            type="button"
-                            onClick={() => setMobileMenuOpen(true)}
-                            className={clsx(
-                                "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-ciel-md px-2 py-2 text-[10px] font-bold ciel-transition",
-                                mobileMenuOpen ? "bg-ciel-green-soft text-ciel-green-deep" : "text-ciel-text-mid hover:bg-ciel-page",
-                            )}
-                        >
-                            <Compass className="h-5 w-5" />
-                            <span>Menu</span>
-                        </button>
-                        <Link
-                            href={mobilePrimary.href}
-                            className={clsx(
-                                "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-ciel-md px-2 py-2 text-[10px] font-bold ciel-transition",
-                                isNavActive(mobilePrimary.href) ? "bg-ciel-green-soft text-ciel-green-deep" : "text-ciel-text-mid hover:bg-ciel-page",
-                            )}
-                        >
-                            <mobilePrimary.icon className="h-5 w-5" />
-                            <span>{mobilePrimary.label}</span>
-                        </Link>
-                    </div>
-                </nav>
-                <RoleMenuSheet
-                    open={mobileMenuOpen}
-                    onClose={() => setMobileMenuOpen(false)}
-                    title={isInvestor ? "Investor Hub" : isUniversityPartnerOrg ? "University menu" : isPartner ? "Partner menu" : isFaculty ? "Faculty menu" : "Admin menu"}
-                    items={mobileMenuItems}
-                    sections={adminMenuSections}
-                    onSignOut={isAdmin ? handleLogout : undefined}
-                    isActive={isNavActive}
-                />
-            </>
-        )}
+                    <Compass className="h-5 w-5" />
+                    <span>Menu</span>
+                </button>
+                <Link
+                    href={mobilePrimary.href}
+                    className={clsx(
+                        "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-ciel-md px-2 py-2 text-[10px] font-bold ciel-transition",
+                        isNavActive(mobilePrimary.href) ? "bg-ciel-green-soft text-ciel-green-deep" : "text-ciel-text-mid hover:bg-ciel-page",
+                    )}
+                >
+                    <mobilePrimary.icon className="h-5 w-5" />
+                    <span>{mobilePrimary.label}</span>
+                </Link>
+            </div>
+        </nav>
+        <RoleMenuSheet
+            open={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            title={menuTitle}
+            items={mobileSections.flatMap((s) => s.items)}
+            sections={mobileSections}
+            onSignOut={handleLogout}
+            isActive={isNavActive}
+        />
         </>
     );
 }

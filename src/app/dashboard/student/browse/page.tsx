@@ -462,6 +462,11 @@ export default function StudentBrowseOpportunitiesPage() {
     const [sortMode, setSortMode] = useState<"live" | "newest" | "oldest">("live");
     // Open on Live: students land on listings they can still join, not the expired backlog.
     const [feedTab, setFeedTab] = useState<BrowseFeedTab>("live");
+    // "My Applications" in the Opportunities menu deep-links to the Applied feed (?tab=applied).
+    useEffect(() => {
+        const next = new URLSearchParams(window.location.search).get("tab");
+        if (next === "all" || next === "live" || next === "applied" || next === "expiring" || next === "expired") setFeedTab(next);
+    }, []);
     const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
     const [hoursLogged, setHoursLogged] = useState(0);
     const [hoursTarget, setHoursTarget] = useState(16);

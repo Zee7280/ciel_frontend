@@ -67,7 +67,7 @@ test("WhatsApp links in the app are handed to the WhatsApp app / web client by t
 test("a revision blinks on the student's Community Service tile and on My Opportunities / My Reports", () => {
     const home = read("src/app/dashboard/student/page.tsx");
     assert.match(home, /canEditReturnedOpportunity\(row\)/, "counts opportunities a reviewer sent back");
-    assert.match(home, /alertCount=\{card\.key === "communityService" \? csRevisionCount : undefined\}/);
+    assert.match(home, /opportunities: \{ count: csRevisionCount, countLabel: "revision" \}/, "Opportunities home card blinks with the returned count");
     const hub = read("src/app/dashboard/student/paths/community-service/CommunityServiceHub.tsx");
     assert.match(hub, /title="My Opportunities"[\s\S]*?alertCount=\{oppActionCount\}/);
     assert.match(hub, /title="My Reports"[\s\S]*?alertCount=\{reportActionCount\}/);
@@ -125,9 +125,9 @@ test("Browse Opportunities is offered to Faculty, Partner, NGO and University fr
     for (const p of ["src/app/dashboard/faculty/browse/page.tsx", "src/app/dashboard/partner/browse/page.tsx"]) {
         assert.match(read(p), /<ExploreOpportunitiesView variant="dashboard" \/>/, p);
     }
-    const sidebar = read("src/components/Sidebar.tsx");
-    assert.match(sidebar, /href: "\/dashboard\/partner\/browse"/);
-    assert.match(sidebar, /href: "\/dashboard\/faculty\/browse"/);
+    const nav = read("src/utils/stakeholderNav.ts");
+    assert.match(nav, /href: "\/dashboard\/partner\/browse"/);
+    assert.match(nav, /href: "\/dashboard\/faculty\/browse"/);
 });
 
 test("a phone number is never shown as the reviewer's name on the student card", () => {
@@ -206,5 +206,5 @@ test("dashboard tiles can blink a notification count, and faculty review tiles u
     assert.match(chrome, /motion-reduce:animate-none/);
     assert.match(chrome, /\$\{alerts\} \$\{alertNoun\}\$\{alerts === 1 \? "" : "s"\}/, "1 NOTIFICATION / 2 NOTIFICATIONS");
     assert.match(facultyCs, /title="Review Opportunities"[\s\S]*?alertCount=\{pendingApprovalsHero\}/);
-    assert.match(facultyHome, /title="Community Service"[\s\S]*?alertCount=\{communityActions\}/);
+    assert.match(facultyHome, /approvals: \{ count: communityActions, countLabel: "approval" \}/, "Approvals home card blinks with the pending count");
 });

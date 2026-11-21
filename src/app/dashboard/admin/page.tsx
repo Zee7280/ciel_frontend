@@ -18,6 +18,7 @@ import {
     MockupSectionHead,
     MockupStatBars,
 } from "@/components/ciel/dashboard/MockupChrome";
+import StakeholderHomeCards from "@/components/ciel/dashboard/StakeholderHomeCards";
 
 type SdgDistributionPoint = {
     name: string;
@@ -297,12 +298,25 @@ export default function AdminDashboard() {
                 </div>
             ) : null}
 
-            <MockupSectionHead
-                title="Super Admin Command Center"
-                subtitle="Choose an area below to open its workflow."
+            <StakeholderHomeCards
+                role="admin"
+                title="Community Service · Command Center"
+                subtitle="Seven buttons cover the national pipeline: opportunities, approval queues, project records, the Impact Wall, AI tools, exports and QCI. Sub-buttons open inside each card."
+                states={{
+                    queues: {
+                        count: counts ? counts.opportunityApprovals + counts.joinApplications + counts.reportsAwaitingAdmin : 0,
+                        countLabel: "pending item",
+                    },
+                    qci: { count: counts?.quickWork ?? 0, countLabel: "QCI log" },
+                }}
             />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {AREA_CARDS.map((c) => {
+
+            <MockupSectionHead
+                title="Other impact areas"
+                subtitle="Coursework, FYP and Startup keep their own command monitors."
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {AREA_CARDS.filter((c) => !c.href.includes("/community-service")).map((c) => {
                     const live =
                         c.href.includes("fyp-thesis") ? paths.fyp : c.href.includes("startup-business") ? paths.venture : null;
                     return (
@@ -314,15 +328,6 @@ export default function AdminDashboard() {
                         />
                     );
                 })}
-                <AreaCard
-                    href="/dashboard/admin/analytics"
-                    emoji={"\u{1F4CA}"}
-                    ghost={"\u{1F3C6}"}
-                    title="Impact Intelligence Hub"
-                    subtitle="Overall statistics, AI Rankings for Coursework/FYP/Startup, Community Service Composite Indicator Scores and Level badges, batches, university comparisons and impact trends."
-                    background={MOCKUP_GRADIENTS.green}
-                    full
-                />
             </div>
 
             <section className="mt-5 min-w-0 rounded-[22px] border border-[#dde5ea] bg-white p-4 shadow-[0_8px_22px_rgba(24,52,64,.05)] sm:p-5" aria-label="Needs your action">

@@ -25,6 +25,7 @@ import {
     MockupPanel,
     MockupSectionHead,
 } from "@/components/ciel/dashboard/MockupChrome";
+import StakeholderHomeCards from "@/components/ciel/dashboard/StakeholderHomeCards";
 
 interface RecommendedOpportunity {
     id: string;
@@ -147,12 +148,22 @@ export default function StudentDashboardPage() {
                 rightStat={{ value: `${completion}%`, label: "overall current-work completion" }}
             />
 
+            <StakeholderHomeCards
+                role="student"
+                title="Community Service"
+                subtitle="Five buttons, one journey: Opportunity → Report → CIEL PK review → approved impact. Sub-buttons open inside each card."
+                states={{
+                    opportunities: { count: csRevisionCount, countLabel: "revision" },
+                    impact: { badge: portfolioCount ? `${portfolioCount} VERIFIED` : undefined },
+                }}
+            />
+
             <MockupSectionHead
-                title="My Impact Dashboard"
-                subtitle="Choose an area below to start or continue your work."
+                title="Other impact areas"
+                subtitle="Coursework, FYP and Startup keep their own workspaces. Your portfolio combines every approved record."
             />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {PATH_CARDS.map((card) => (
+                {PATH_CARDS.filter((card) => card.key !== "communityService").map((card) => (
                     <MockupActionCard
                         key={card.key}
                         href={card.href}
@@ -162,8 +173,6 @@ export default function StudentDashboardPage() {
                         subtitle={viewSummary?.pathsStatus[card.key]?.detail || card.subtitle}
                         badge={card.badge}
                         background={card.background}
-                        hot={card.key === "communityService" && csRevisionCount > 0}
-                        alertCount={card.key === "communityService" ? csRevisionCount : undefined}
                         onPrefetch={() => prefetchStudentPathData(card.key)}
                     />
                 ))}
@@ -172,10 +181,9 @@ export default function StudentDashboardPage() {
                     emoji="🏆"
                     ghost="🏅"
                     title="My Impact Portfolio"
-                    subtitle="See all approved Community Service, Coursework, FYP and Startup records in one place."
-                    badge="VIEW PORTFOLIO"
+                    subtitle="All approved Community Service, Coursework, FYP and Startup records in one place."
+                    badge="ALL AREAS"
                     background={MOCKUP_GRADIENTS.green}
-                    full
                     onPrefetch={() => prefetchStudentImpactPortfolio()}
                 />
             </div>

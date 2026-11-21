@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
-import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import { COMMAND_HERO, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
+import StakeholderHomeCards from "@/components/ciel/dashboard/StakeholderHomeCards";
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
 import { usePartnerOpportunityReview } from "@/components/faculty/FacultyOpportunityReviewActions";
 import {
     NGO_CS_APPROVALS,
     NGO_CS_BASE,
-    NGO_CS_CREATE_FORM,
     NGO_CS_IMPACT,
     NGO_CS_MY_OPPS,
     useNgoCommunityServiceData,
@@ -20,7 +20,8 @@ const TONE_CLASS = {
     bad: "text-[#b34c4c]",
 } as const;
 
-export default function NgoDashboardHome() {
+/** NGO, HEC / Government and corporate partners share this home; `role` only changes button wording. */
+export default function NgoDashboardHome({ role = "ngo" }: { role?: "ngo" | "partner" }) {
     const cs = useNgoCommunityServiceData();
     const partnerReview = usePartnerOpportunityReview(cs.reload);
     const dash = (n: number) => (cs.loading ? "—" : String(n));
@@ -122,43 +123,16 @@ export default function NgoDashboardHome() {
                 />
             </div>
 
-            <MockupSectionHead title="Quick actions" />
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-                <MockupActionCard
-                    href={NGO_CS_CREATE_FORM}
-                    emoji="🚀"
-                    title="Create opportunity"
-                    subtitle="Post a new community service opportunity for students."
-                    badge="NEW"
-                    background={MOCKUP_GRADIENTS.teal}
-                />
-                <MockupActionCard
-                    href={NGO_CS_MY_OPPS}
-                    emoji="📋"
-                    title="My opportunities"
-                    subtitle="Drafts, reviews, live listings and applicants."
-                    badge={cs.loading ? "…" : `${cs.mine.length} TOTAL`}
-                    background={MOCKUP_GRADIENTS.navy}
-                    hot={cs.createCounts.action > 0}
-                />
-                <MockupActionCard
-                    href={`${NGO_CS_APPROVALS}?tab=pending`}
-                    emoji="✅"
-                    title="Verify work"
-                    subtitle="Approve opportunities that name your organization."
-                    badge={cs.loading ? "…" : `${cs.pendingApprovals.length} WAITING`}
-                    background={MOCKUP_GRADIENTS.orange}
-                    hot={cs.pendingApprovals.length > 0}
-                />
-                <MockupActionCard
-                    href={NGO_CS_IMPACT}
-                    emoji="🏆"
-                    title="Impact wall"
-                    subtitle="Verified community service linked to your organization."
-                    badge={cs.loading ? "…" : `${cs.deckCards.length} VERIFIED`}
-                    background={MOCKUP_GRADIENTS.green}
-                />
-            </div>
+            <StakeholderHomeCards
+                role={role}
+                subtitle="Create, approve, track, then see verified impact and insights for the projects linked to your organization. Sub-buttons open inside each card."
+                states={{
+                    opportunities: { hot: cs.createCounts.action > 0, badge: cs.loading ? undefined : `${cs.mine.length} TOTAL` },
+                    approvals: { count: cs.pendingApprovals.length, countLabel: "approval" },
+                    tracking: { badge: cs.loading ? undefined : `${cs.pipeline.length} LINKED` },
+                    impact: { badge: cs.loading ? undefined : `${cs.deckCards.length} VERIFIED` },
+                }}
+            />
             {partnerReview.dialogs}
         </div>
     );

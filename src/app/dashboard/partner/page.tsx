@@ -28,5 +28,5 @@ export default function PartnerDashboard() {
 
     // NGO, HEC / Government and corporate partners share one home: they create opportunities,
     // approve work that names them and track verified impact the same way.
-    return <NgoDashboardHome />;
+    return <NgoDashboardHome role={orgKind === "ngo" ? "ngo" : "partner"} />;
 }
