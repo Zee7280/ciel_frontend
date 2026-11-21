@@ -242,6 +242,7 @@ function ResourceCard({
                             className={inputClasses}
                         />
                     ) : null}
+                    <FieldError message={getFieldError(`resources.${idx}.type`)} />
                     <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
                 </div>
                 <div className="space-y-1.5">
@@ -282,6 +283,7 @@ function ResourceCard({
                             className={inputClasses}
                         />
                     ) : null}
+                    <FieldError message={getFieldError(`resources.${idx}.unit`)} />
                     <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
                 </div>
                 <div className="space-y-1.5">
@@ -307,6 +309,7 @@ function ResourceCard({
                         className={inputClasses}
                     />
                 ) : null}
+                <FieldError message={getFieldError(`resources.${idx}.sources`)} />
                 <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
             </div>
 
@@ -321,6 +324,7 @@ function ResourceCard({
                         className={inputClasses}
                     />
                 ) : null}
+                <FieldError message={getFieldError(`resources.${idx}.verification`)} />
             </div>
 
             {/* Contributor & accountability — every contribution needs a value, a person and a trail */}

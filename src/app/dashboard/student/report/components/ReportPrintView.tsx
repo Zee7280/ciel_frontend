@@ -3,6 +3,7 @@ import { useReportForm } from "../context/ReportContext";
 import type { ReportData } from "../context/ReportContext";
 import { Landmark } from "lucide-react";
 import { resolveReportCii } from "../utils/resolveReportCii";
+import { evidenceEthicsConfirmed } from "../utils/validation";
 import { CII_BREAKDOWN_ORDER, CII_SECTION_LABELS, CII_SECTION_MAX, ciiSectionWeightLabel } from "../utils/ciiSectionWeights";
 import {
     buildIndividualRosterFromSection1,
@@ -1733,6 +1734,9 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
                         />
                     )}
                     <QandA q="Observed change narrative" a={data.section5.observed_change} fullWidth />
+                    <QandA q="How do you know? (evidence basis, 4.3)" a={data.section5.story_because} fullWidth />
+                    <QandA q="Evidence methods (4.3)" a={data.section5.evidence_basis_tags} />
+                    <QandA q="Challenge tags (4.3)" a={data.section5.challenge_tags} />
                     <QandA q="Core implementation challenges" a={data.section5.challenges} fullWidth />
                     <QandA q="Section summary" a={data.section5.summary_text} fullWidth />
                 </div>
@@ -1805,8 +1809,13 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
                                     p.pakistan_contact_email?.trim()
                                         ? `Email: ${p.pakistan_contact_email}`
                                         : "",
+                                    p.designation?.trim() ? `Designation: ${p.designation}` : "",
                                     p.role?.length ? `Role: ${p.role.join(", ")}` : "",
-                                    p.contribution?.length ? `Contribution: ${p.contribution.join(", ")}` : "",
+                                    p.contribution_line?.trim()
+                                        ? `Contribution: ${p.contribution_line}`
+                                        : p.contribution?.length
+                                          ? `Contribution: ${p.contribution.join(", ")}`
+                                          : "",
                                     p.verification ? `Verification: ${p.verification}` : "",
                                 ].filter(Boolean).join(" | ")}
                             />
@@ -1836,6 +1845,10 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
                     <QandA q="Who can see this evidence?" a={mediaVisibilityTitle(data.section8.media_visible) || "Restricted"} />
                     <QandA q="Primary evidence types" a={data.section8.evidence_types} />
                     <QandA q="Evidence description" a={data.section8.description} fullWidth />
+                    <QandA
+                        q="Authenticity, consent & privacy confirmation (8.2)"
+                        a={evidenceEthicsConfirmed(data.section8.ethical_compliance) ? "Confirmed by the student (student-reported)" : "Not confirmed"}
+                    />
                     {isPublicMediaVisibility(data.section8.media_visible) ? (
                         <FileListQA q="Evidence files" files={data.section8.evidence_files} fullWidth />
                     ) : (
@@ -1881,6 +1894,10 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
                             <CompetencyScoresTable scores={data.section9.competency_scores} />
                         </div>
                     </div>
+                    <QandA q="Skills grown (9.2)" a={data.section9.skills_grown} />
+                    <QandA q="The biggest thing I learned (9.2)" a={data.section9.reflection_biggest_learning} />
+                    <QandA q="A moment that changed how I see things (9.2)" a={data.section9.reflection_moment} />
+                    <QandA q="An academic skill I actually applied (9.2)" a={data.section9.reflection_discipline_help} />
                     <QandA q="Academic–professional synthesis" a={data.section9.academic_application} fullWidth />
                     <QandA q="Personal narrative & identity growth" a={data.section9.personal_learning} fullWidth />
                     <QandA q="Sustainability & systems reflection" a={data.section9.sustainability_reflection} fullWidth />
@@ -1901,6 +1918,17 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
                     <QandA q="Policy influence" a={data.section10.policy_influence} />
                     </div>
                     <QandA q="Detailed roadmap for future continuity" a={data.section10.continuation_details} fullWidth />
+                    <QandA q="What keeps it going (10.3)" a={data.section10.continuation_keep_going} />
+                    <QandA q="Biggest risk to continuation" a={data.section10.continuation_risk} />
+                    <QandA
+                        q="Final report declaration & electronic sign-off (10.5)"
+                        a={
+                            (data.section11?.final_declaration || []).filter(Boolean).length
+                                ? `${(data.section11?.final_declaration || []).filter(Boolean).length}/5 declarations acknowledged · signed by ${data.section11?.signature_name || "—"}${data.section11?.signed_at ? ` on ${new Date(data.section11.signed_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}`
+                                : "Not signed yet"
+                        }
+                        fullWidth
+                    />
                     <QandA q="Section summary" a={data.section10.summary_text} fullWidth />
                     {followupSummaryRows(data.section10).map((row) => (
                         <QandA key={row.label} q={row.label} a={row.value} fullWidth={row.fullWidth} />

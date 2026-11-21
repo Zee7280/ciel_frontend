@@ -43,11 +43,10 @@ export function hasPublicSharePermission(section8: unknown): boolean {
         row.ethical_compliance && typeof row.ethical_compliance === "object"
             ? (row.ethical_compliance as Record<string, unknown>)
             : {};
-    return (
-        ethics.privacy_respected === true ||
-        row.consent_informed === true ||
-        row.consent_authentic === true
-    );
+    // Legacy single-flag drafts only. The V19 authenticity / consent confirmation (ethical_compliance.*)
+    // is NOT public-share permission: that stays an explicit, separate tick.
+    void ethics;
+    return row.consent_informed === true || row.consent_authentic === true;
 }
 
 export function mediaVisibilityTitle(value: unknown): string {

@@ -453,6 +453,7 @@ export default function Section4Streamlined() {
                         onChange={(e) => updateSection("section5", { story_because: e.target.value })}
                         placeholder="e.g. Before/after photos in Section 7 or partner feedback; no outcome evidence yet"
                     />
+                    <FieldError message={getFieldError("story_because")} />
                 </div>
 
                 <div className="rounded-xl border border-slate-200">

@@ -348,6 +348,13 @@ export function validateSection3(data: any): ValidationResult {
     }
 
     asList(data.secondary_sdgs).forEach((sdg: any, index: number) => {
+        // V19 3.2 — a student-discovered SDG is only credible with its Target and Indicator.
+        if (!String(sdg?.target_id || '').trim()) {
+            errors.push({ field: `secondary_sdgs.${index}.target_id`, message: `Additional SDG ${index + 1}: choose the closest genuine target` });
+        }
+        if (!String(sdg?.indicator_id || '').trim()) {
+            errors.push({ field: `secondary_sdgs.${index}.indicator_id`, message: `Additional SDG ${index + 1}: the indicator is mandatory` });
+        }
         pushWordRange(errors, `secondary_sdgs.${index}.justification_text`, sdg?.justification_text, 'Justification');
     });
 
@@ -411,6 +418,13 @@ export function validateSection5(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     data = asObj(data);
     pushWordRange(errors, 'observed_change', data.observed_change, 'Observed change narrative');
+    // V19 4.3 — the results story has three blanks; "How do you know?" is the evidence basis of the claim.
+    if (!String(data.story_because || '').trim() && !asList(data.evidence_basis_tags).length) {
+        errors.push({
+            field: 'story_because',
+            message: 'How do you know? — name the evidence behind the change (or say that no change could be measured yet)',
+        });
+    }
 
     // V19: the one before / after result is optional; when started it must be complete. Older
     // detailed outcomes (no `simple` flag) keep their original rules.
@@ -467,6 +481,22 @@ export function validateSection6(data: any): ValidationResult {
             resources.forEach((res: any, index: number) => {
                 const row = asObj(res);
                 // One clear line beats a 50-word minimum — just require it's said.
+                // V19 6.2 — type, quantity/value, unit, source(s) and verification method(s) make an entry complete.
+                if (!String(row.type || '').trim()) {
+                    errors.push({ field: `resources.${index}.type`, message: 'Choose the resource type' });
+                }
+                if (!String(row.amount ?? '').trim()) {
+                    errors.push({ field: `resources.${index}.amount`, message: 'Enter the amount or quantity' });
+                }
+                if (!String(row.unit || '').trim()) {
+                    errors.push({ field: `resources.${index}.unit`, message: 'Choose the unit' });
+                }
+                if (!asList(row.sources).length) {
+                    errors.push({ field: `resources.${index}.sources`, message: 'Choose at least one source for this resource' });
+                }
+                if (!asList(row.verification).length) {
+                    errors.push({ field: `resources.${index}.verification`, message: 'Choose at least one verification method' });
+                }
                 if (!String(row.purpose || '').trim()) {
                     errors.push({ field: `resources.${index}.purpose`, message: 'Say what this resource made possible' });
                 }
@@ -591,11 +621,27 @@ export function validateSection8(data: any): ValidationResult {
         pushWordRange(errors, 'description', data.description, 'What does your evidence show?', true, 'evidence_caption');
     }
 
+    // V19 8.2 — the consolidated authenticity / consent / privacy confirmation is mandatory for every report.
+    if (!evidenceEthicsConfirmed(data.ethical_compliance)) {
+        errors.push({
+            field: 'ethical_compliance',
+            message: 'Confirm that the evidence is authentic, relates to this project, and that consent and privacy details are reported accurately',
+        });
+    }
+
     const visibility = resolveMediaVisibility(data.media_visible);
     if (isPublicMediaVisibility(visibility) && !hasPublicSharePermission(data)) {
         errors.push({ field: 'public_share_permission', message: 'I have permission to publicly share this evidence.' });
     }
     return { isValid: errors.length === 0, errors };
+}
+
+/** All four wizard flags — one confirmation statement in the Section 8 UI (mirrors the backend gate). */
+export const EVIDENCE_ETHICS_FLAGS = ['authentic', 'informed_consent', 'no_harm', 'privacy_respected'] as const;
+export function evidenceEthicsConfirmed(value: unknown): boolean {
+    if (!value || typeof value !== 'object') return false;
+    const flags = value as Record<string, unknown>;
+    return EVIDENCE_ETHICS_FLAGS.every((key) => flags[key] === true);
 }
 
 /**

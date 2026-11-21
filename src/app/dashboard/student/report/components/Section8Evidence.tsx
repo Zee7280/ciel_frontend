@@ -10,7 +10,7 @@ import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
-import { countWords } from "../utils/validation";
+import { EVIDENCE_ETHICS_FLAGS, countWords, evidenceEthicsConfirmed } from "../utils/validation";
 import {
     DEFAULT_MEDIA_VISIBILITY,
     hasPublicSharePermission,
@@ -475,6 +475,37 @@ export default function Section8Evidence() {
                         </div>
                     </div>
                 ) : null}
+
+                {/* V19 8.2 — one consolidated authenticity / consent / privacy confirmation (mandatory). */}
+                <div data-testid="evidence-ethics-confirmation">
+                    <Label className={fieldLabel}>
+                        Authenticity, consent &amp; privacy confirmation <span className="text-rose-500">*</span>
+                    </Label>
+                    <label
+                        className={clsx(
+                            "mt-2 flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-[12.5px] leading-relaxed text-slate-700",
+                            evidenceEthicsConfirmed(section8.ethical_compliance) ? "border-[#0e7d74] bg-[#fbfefd]" : "border-[#cbe7e3] bg-white",
+                        )}
+                    >
+                        <input
+                            type="checkbox"
+                            className="mt-1 h-4 w-4 accent-[#0e7d74]"
+                            checked={evidenceEthicsConfirmed(section8.ethical_compliance)}
+                            onChange={(e) =>
+                                update(
+                                    "ethical_compliance",
+                                    Object.fromEntries(EVIDENCE_ETHICS_FLAGS.map((flag) => [flag, e.target.checked])),
+                                )
+                            }
+                        />
+                        <span>
+                            I/we confirm that this evidence is authentic and relates to this project. I/we have reported consent and
+                            privacy details accurately, and understand that evidence without appropriate permission must not be shared
+                            publicly. False submissions may result in rejection and institutional action.
+                        </span>
+                    </label>
+                    <FieldError message={getFieldError("ethical_compliance")} />
+                </div>
 
                 <div>
                     <Label className={fieldLabel}>Who can see this evidence?</Label>

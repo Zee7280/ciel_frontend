@@ -923,6 +923,10 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                 subIndicator={sdg.sub_indicator || ""}
                                                 onChange={(patch) => updateSecondary(index, patch)}
                                             />
+                                            <div className="px-4 sm:px-5">
+                                                <FieldError message={getFieldError(`secondary_sdgs.${index}.target_id`)} />
+                                                <FieldError message={getFieldError(`secondary_sdgs.${index}.indicator_id`)} />
+                                            </div>
                                             <div className="space-y-2 border-t border-slate-100 bg-white p-4 sm:p-5">
                                                 <p className={fieldLabelClass}>
                                                     Alignment justification
