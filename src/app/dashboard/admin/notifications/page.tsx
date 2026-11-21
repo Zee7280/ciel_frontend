@@ -7,6 +7,7 @@ import { notificationDisplayType } from "@/utils/notificationTone";
 import { authenticatedFetch } from "@/utils/api";
 import { broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { toast } from "sonner";
+import { relatedLink } from "@/utils/notificationLink";
 
 interface Notification {
     id: number;
@@ -25,25 +26,6 @@ interface Notification {
 
 const PAGE_SIZE = 20;
 
-/** Only same-origin relative paths are linkable (avoids javascript:/external URLs). */
-function safePath(value: unknown): string | null {
-    if (typeof value !== "string") return null;
-    const v = value.trim();
-    return v.startsWith("/") && !v.startsWith("//") ? v : null;
-}
-
-function relatedLink(n: Notification): string | null {
-    const direct = safePath(n.link) ?? safePath(n.url) ?? safePath(n.target);
-    if (direct) return direct;
-    for (const bag of [n.data, n.payload, n.metadata]) {
-        if (bag && typeof bag === "object") {
-            const o = bag as Record<string, unknown>;
-            const found = safePath(o.link) ?? safePath(o.url) ?? safePath(o.target) ?? safePath(o.href);
-            if (found) return found;
-        }
-    }
-    return null;
-}
 
 export default function AdminNotificationsPage() {
     const [isLoading, setIsLoading] = useState(true);

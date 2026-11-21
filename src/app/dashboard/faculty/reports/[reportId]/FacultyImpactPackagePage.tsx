@@ -9,6 +9,9 @@ import { HubBackButton } from "@/components/ciel/community-service/CommunityServ
 import ImpactPackage from "@/app/dashboard/student/report/impact-package/ImpactPackage";
 import type { ImpactPackageTab } from "@/app/dashboard/student/report/impact-package/impactPackageTabs";
 import { coerceFlashReportData, unwrapFacultyReportPayload } from "./facultyAiEvaluation.helpers";
+import ReportPackageLockedPanel from "@/components/verify/ReportPackageLockedPanel";
+import { isPackageLockedResponse, isReportPackageReleased } from "@/utils/reportPackageRelease";
+import type { CommunityReviewRow } from "@/utils/reviewQueue";
 
 export default function FacultyImpactPackagePage({
     reportId,
@@ -19,6 +22,8 @@ export default function FacultyImpactPackagePage({
 }) {
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
+    /** Submitted but not yet approved by CIEL PK Admin: the package stays closed (backend answers 403). */
+    const [locked, setLocked] = useState(false);
     const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
 
     useEffect(() => {
@@ -30,8 +35,13 @@ export default function FacultyImpactPackagePage({
         let cancelled = false;
         setLoading(true);
         setLoadError(false);
+        setLocked(false);
         authenticatedFetch(`/api/v1/faculty/reports/${reportId}`)
             .then(async (response) => {
+                if (isPackageLockedResponse(response?.status)) {
+                    if (!cancelled) setLocked(true);
+                    return null;
+                }
                 if (!response?.ok) {
                     toast.error("Impact Package is not available for this report.");
                     return null;
@@ -47,6 +57,10 @@ export default function FacultyImpactPackagePage({
                 const rec = unwrapFacultyReportPayload(payload as Record<string, unknown>);
                 if (!rec || typeof rec !== "object") {
                     setLoadError(true);
+                    return;
+                }
+                if (!isReportPackageReleased(rec as CommunityReviewRow)) {
+                    setLocked(true);
                     return;
                 }
                 setRaw(prepareReportForVerifyDossier(rec) as Record<string, unknown>);
@@ -70,7 +84,9 @@ export default function FacultyImpactPackagePage({
     return (
         <div className="mx-auto max-w-[1180px] px-4 py-4">
             <HubBackButton href="/dashboard/faculty/community-service" label="← Back to Community Service" />
-            {loading ? (
+            {locked ? (
+                <ReportPackageLockedPanel backHref="/dashboard/faculty/community-service?view=projects" backLabel="Back to Project Supervision" />
+            ) : loading ? (
                 <div className="flex min-h-[50vh] items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-teal-700" />
                 </div>

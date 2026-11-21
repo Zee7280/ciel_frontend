@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
-import { CheckCircle2, Clock, Eye, FileText, Loader2, Search } from "lucide-react";
+import { CheckCircle2, Clock, Eye, FileText, Loader2, Search, Lock } from "lucide-react";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting } from "@/utils/reviewQueue";
+import { REPORT_PACKAGE_LOCK_MESSAGE, isReportPackageReleased } from "@/utils/reportPackageRelease";
 import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
@@ -300,16 +301,27 @@ export default function FacultyStudentReportsPage() {
                                                 <td className="px-4 py-3 align-top">{getStatusBadge(report.status)}</td>
                                                 <td className="px-4 py-3 align-top">{getReviewBadge(report)}</td>
                                                 <td className="px-4 py-3 text-right align-top">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            router.push(`/dashboard/faculty/reports/${report.id}?view=dossier`)
-                                                        }
-                                                        className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
-                                                    >
-                                                        <Eye className="h-3.5 w-3.5" />
-                                                        Open Impact Package
-                                                    </button>
+                                                    {isReportPackageReleased(report) ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                router.push(`/dashboard/faculty/reports/${report.id}?view=dossier`)
+                                                            }
+                                                            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
+                                                        >
+                                                            <Eye className="h-3.5 w-3.5" />
+                                                            Open Impact Package
+                                                        </button>
+                                                    ) : (
+                                                        <span
+                                                            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-dashed border-amber-300 bg-amber-50 px-2.5 text-xs font-semibold text-amber-800"
+                                                            title={REPORT_PACKAGE_LOCK_MESSAGE}
+                                                            data-testid="list-package-locked"
+                                                        >
+                                                            <Lock className="h-3.5 w-3.5" />
+                                                            Opens after CIEL PK approval
+                                                        </span>
+                                                    )}
                                                     {report.project_id ? (
                                                         <Link
                                                             href={`/dashboard/faculty/attendance-review?projectId=${encodeURIComponent(report.project_id)}`}

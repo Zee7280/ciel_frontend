@@ -1048,12 +1048,13 @@ export default function UniversityCommunityServiceHub() {
                                         <CommunityQueueCard
                                             key={row.id}
                                             href={`/dashboard/partner/verify/${encodeURIComponent(row.id)}?package=1`}
+                                            locked={tab !== "done"}
                                             title={row.project_title || "Report"}
                                             student={row.student_name || "Student"}
                                             org={row.organization_name}
                                             hours={row.hours}
                                             tone={tab === "done" ? "approved" : "waiting"}
-                                            cta="Open report (read-only) →"
+                                            cta="Open approved package (read-only) →"
                                         />
                                     ))}
                                 </div>
@@ -1086,8 +1087,19 @@ export default function UniversityCommunityServiceHub() {
                                     {deckCards.map((c) => (
                                         <tr key={c.id} className="border-t border-[#edf2f4]">
                                             <td className="px-3 py-3">
-                                                <b className="block text-[#16313d]">{c.project_title}</b>
+                                                <Link
+                                                    href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1&doc=flashcard`}
+                                                    className="block font-bold text-[#16313d] hover:text-[#0e7d74] hover:underline"
+                                                    data-testid="approved-record-flashcard-link"
+                                                >
+                                                    {c.project_title}
+                                                </Link>
                                                 <span className="text-[11px] text-[#6b7c86]">{displayRecordId(c, "RPT")} · {c.department}</span>
+                                                <span className="mt-1 flex flex-wrap gap-x-2 text-[11px] font-bold text-[#0e7d74]">
+                                                    <Link href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1&doc=flashcard`} className="hover:underline">Impact flashcard</Link>
+                                                    <Link href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1&doc=report`} className="hover:underline">Detailed report</Link>
+                                                    <Link href={`/dashboard/partner/verify/${encodeURIComponent(c.id)}?package=1&doc=evidence`} className="hover:underline">Evidence</Link>
+                                                </span>
                                             </td>
                                             <td className="px-3 py-3 text-[#4f6068]">
                                                 {c.student_name}

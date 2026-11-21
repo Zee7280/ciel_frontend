@@ -231,3 +231,16 @@
 .ipkg-modal .modal-body{padding:16px;overflow:auto;display:flex;justify-content:center}
 .ipkg-modal .modal-body img,.ipkg-modal .modal-body video{max-width:100%;max-height:62vh;display:block;margin:auto}
 .ipkg-modal .modal-body iframe{width:100%;height:62vh;border:0}
+
+/* Print: entry tables (activities, attendance, members…) must fit the sheet instead of being cut
+   where the on-screen horizontal scroll ends. Fixed layout + wrapping shows every column. */
+@media print{
+.ipkg .dr-table-wrap{overflow:visible!important;max-width:100%}
+.ipkg table.dr-table{table-layout:fixed;width:100%;font-size:7px;line-height:1.3;border-collapse:collapse}
+.ipkg .dr-table th{white-space:normal;font-size:6.5px;line-height:1.25;overflow-wrap:anywhere;word-break:break-word}
+.ipkg .dr-table td{max-width:none;overflow-wrap:anywhere;word-break:break-word;hyphens:auto}
+.ipkg .dr-table td:not(.dr-n){min-width:0}
+.ipkg .dr-table .dr-n{width:14px}
+.ipkg .dr-table .dr-clip{display:block;-webkit-line-clamp:unset;line-clamp:unset;overflow:visible}
+.ipkg .dr-table tr{break-inside:avoid}
+}

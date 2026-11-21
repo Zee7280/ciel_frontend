@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Search, Filter, Edit, Trash2, Eye, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
+import { FileText, Search, Filter, Edit, Trash2, Eye, CheckCircle, Clock, XCircle, Loader2, Lock } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { REPORT_PACKAGE_LOCK_MESSAGE, isReportPackageReleased } from "@/utils/reportPackageRelease";
 import { distinctBeneficiaryTotal } from "@/app/dashboard/student/report/utils/activityReach";
 import { toast } from "sonner";
 
@@ -372,7 +373,16 @@ export default function PartnerReportsPage() {
                                         )}
                                 </div>
                                 <div className="flex gap-2 shrink-0">
-                                    {isStudentImpactReportRow(report) ? (
+                                    {isStudentImpactReportRow(report) && !isReportPackageReleased(report) ? (
+                                        <span
+                                            className="p-2 text-amber-600 rounded-lg"
+                                            title={REPORT_PACKAGE_LOCK_MESSAGE}
+                                            aria-label="Opens after CIEL PK approval"
+                                            data-testid="list-package-locked"
+                                        >
+                                            <Lock className="w-4 h-4" />
+                                        </span>
+                                    ) : isStudentImpactReportRow(report) ? (
                                         <Link
                                             href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}?package=1`}
                                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -438,14 +448,19 @@ export default function PartnerReportsPage() {
                             <p className="text-sm text-slate-500 mb-4">
                                 Submitted: {formatSubmittedLabel(report)}
                             </p>
-                            {isStudentImpactReportRow(report) && (
-                                <Link
-                                    href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}?package=1`}
-                                    className="mb-3 inline-flex text-sm font-semibold text-[#0e7d74] hover:underline"
-                                >
-                                    View Impact Package
-                                </Link>
-                            )}
+                            {isStudentImpactReportRow(report) &&
+                                (isReportPackageReleased(report) ? (
+                                    <Link
+                                        href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}?package=1`}
+                                        className="mb-3 inline-flex text-sm font-semibold text-[#0e7d74] hover:underline"
+                                    >
+                                        View Impact Package
+                                    </Link>
+                                ) : (
+                                    <p className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-amber-800" title={REPORT_PACKAGE_LOCK_MESSAGE}>
+                                        <Lock className="h-3.5 w-3.5" /> Opens after CIEL PK approval
+                                    </p>
+                                ))}
 
                             {/* Metrics */}
                             <div className="grid grid-cols-2 gap-4 mb-4">

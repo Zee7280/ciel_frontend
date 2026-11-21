@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { FacultyCsReportRow } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { isFacultyCommunityLiveCard, normalizeReviewStatus } from "@/utils/reviewQueue";
+import { REPORT_PACKAGE_LOCK_MESSAGE, isReportPackageReleased } from "@/utils/reportPackageRelease";
 import { formatDisplayId } from "@/utils/displayIds";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 
@@ -173,6 +174,9 @@ export default function ProjectMonitorCard({
         : null;
     const org = displayOrganizationName(row.organization_name);
     const live = isFacultyCommunityLiveCard(row);
+    // No one opens the package before CIEL PK Admin approves the report: status only until then.
+    const released = live || isReportPackageReleased(row);
+    const reportOpenHref = released ? reportHref : undefined;
     const members =
         row.member_hours && row.member_hours.length
             ? row.member_hours
@@ -187,8 +191,10 @@ export default function ProjectMonitorCard({
         : row.student_email;
     const status = live
         ? { title: "Verified", text: "Impact package is live for connected stakeholders.", nextTitle: "No action required from you", nextText: "Hours and the verified package stay available here.", nextCls: "" }
-        : reportHref
+        : reportHref && released
           ? { title: "Submitted", text: "The student submitted the Community Service report.", nextTitle: "Open the submitted report", nextText: "Review the locked package when you are ready.", nextCls: "next" }
+          : reportHref
+            ? { title: "Submitted", text: "The student submitted the Community Service report.", nextTitle: "Awaiting CIEL PK approval", nextText: "The Impact Package opens here once CIEL PK Admin approves the report.", nextCls: "warn" }
           : fillingReport
             ? {
                   title: "Report in progress",
@@ -327,10 +333,18 @@ export default function ProjectMonitorCard({
                             {remind ? <RemindButtons email={remindTo} title={row.project_title} roleLabel={remind.roleLabel} /> : null}
                         </>
                     )}
-                    {reportHref ? (
-                        <Link href={reportHref} className="rounded-[10px] bg-[#0e7d74] px-3 py-2 text-[12px] font-black text-white">
+                    {reportOpenHref ? (
+                        <Link href={reportOpenHref} className="rounded-[10px] bg-[#0e7d74] px-3 py-2 text-[12px] font-black text-white">
                             Open report
                         </Link>
+                    ) : reportHref ? (
+                        <span
+                            className="rounded-[10px] border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-[12px] font-black text-amber-800"
+                            title={REPORT_PACKAGE_LOCK_MESSAGE}
+                            data-testid="monitor-package-locked"
+                        >
+                            🔒 Opens after CIEL PK approval
+                        </span>
                     ) : null}
                     {row.project_id && hoursHrefFor ? (
                         <Link

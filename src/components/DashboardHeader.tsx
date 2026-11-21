@@ -9,6 +9,7 @@ import {
     readDashboardNavRoleFromStorage,
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
+import { relatedLink } from "@/utils/notificationLink";
 import { authenticatedFetch } from "@/utils/api";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
 import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
@@ -158,6 +159,8 @@ type HeaderNotification = {
     message: string;
     isRead: boolean;
     createdAt: string;
+    /** Same-origin dashboard path the notice opens (e.g. the approved Impact Package). */
+    link?: string | null;
 };
 
 function DashboardHeaderInner() {
@@ -386,6 +389,17 @@ function DashboardHeaderInner() {
         router.push(notificationHref);
     };
 
+    /** A notice with a link opens its screen directly; others open the notifications list. */
+    const openNotification = (notification: HeaderNotification) => {
+        const target = relatedLink(notification);
+        if (!target) {
+            goNotifications();
+            return;
+        }
+        setNotifOpen(false);
+        router.push(target);
+    };
+
     const formatNotifDate = (iso: string) => {
         try {
             return new Date(iso).toLocaleDateString(undefined, {
@@ -511,7 +525,7 @@ function DashboardHeaderInner() {
                                                     <li key={notification.id}>
                                                         <button
                                                             type="button"
-                                                            onClick={goNotifications}
+                                                            onClick={() => openNotification(notification)}
                                                             className={`flex w-full overflow-hidden rounded-xl border bg-white text-left shadow-sm transition hover:shadow-md ${
                                                                 unread
                                                                     ? "border-slate-200/90 ring-1 ring-slate-900/[0.04]"

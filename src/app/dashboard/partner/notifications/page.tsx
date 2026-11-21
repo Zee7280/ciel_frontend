@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, CheckCircle, Trash2, Filter, Loader2, AlertCircle, Info, Clock, XCircle } from "lucide-react";
+import { Bell, CheckCircle, Trash2, Filter, Loader2, AlertCircle, Info, Clock, XCircle, ExternalLink } from "lucide-react";
 import { notificationDisplayType } from "@/utils/notificationTone";
 import { authenticatedFetch } from "@/utils/api";
 import { broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { toast } from "sonner";
+import Link from "next/link";
+import { relatedLink } from "@/utils/notificationLink";
 
 interface Notification {
     id: number;
@@ -14,6 +16,8 @@ interface Notification {
     message: string;
     isRead: boolean;
     createdAt: string;
+    /** Same-origin dashboard path the notice opens (e.g. the approved Impact Package). */
+    link?: string | null;
 }
 
 export default function PartnerNotificationsPage() {
@@ -173,6 +177,19 @@ export default function PartnerNotificationsPage() {
                                     </div>
                                     <p className="text-slate-600 text-sm mb-3 whitespace-pre-line">{notification.message}</p>
                                     <div className="flex gap-2">
+                                        {relatedLink(notification) ? (
+                                            <Link
+                                                href={relatedLink(notification) as string}
+                                                onClick={() => {
+                                                    if (!notification.isRead) void markAsRead(notification.id);
+                                                }}
+                                                className="text-xs font-semibold text-[#0e7d74] hover:text-[#0b665f] flex items-center gap-1"
+                                                data-testid="notification-open-link"
+                                            >
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                Open
+                                            </Link>
+                                        ) : null}
                                         {!notification.isRead && (
                                             <button
                                                 onClick={() => markAsRead(notification.id)}

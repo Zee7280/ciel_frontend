@@ -12,6 +12,7 @@ import {
     type OpportunityApplicationListRow,
 } from "@/utils/opportunityApplicationsAdmin";
 import { isCommunityReportRejected, isFacultyCommunityLiveCard, isFacultyCommunityWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
+import { isReportPackageReleased } from "@/utils/reportPackageRelease";
 import { displayRecordId, formatOpportunityCode } from "@/utils/displayIds";
 import { displayOrganizationName } from "@/utils/displayOrganizationName";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
@@ -394,8 +395,8 @@ export function useFacultyCommunityServiceData() {
                           ? "AI report quality ready · evidence pending"
                           : "Analyzer not run"
                 }`,
-                href: `${FACULTY_CS_REPORTS}/${row.id}`,
-                cta: "Open Impact Package",
+                href: isReportPackageReleased(row) ? `${FACULTY_CS_REPORTS}/${row.id}` : `${FACULTY_CS_REPORTS}?tab=waiting`,
+                cta: isReportPackageReleased(row) ? "Open Impact Package" : "Awaiting CIEL PK approval →",
                 studentEmail: row.student_email,
             })),
         ],

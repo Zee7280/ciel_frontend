@@ -19,6 +19,9 @@ import { toast } from 'sonner';
 import clsx from 'clsx';
 import ReportPrintView from '../../../student/report/components/ReportPrintView';
 import { prepareReportForVerifyDossier } from '@/utils/reportTeamScope';
+import ReportPackageLockedPanel from "@/components/verify/ReportPackageLockedPanel";
+import { isPackageLockedResponse, isReportPackageReleased } from "@/utils/reportPackageRelease";
+import type { CommunityReviewRow } from "@/utils/reviewQueue";
 import { AttendanceLogsDossierTable } from "@/components/verify/AttendanceLogsDossierTable";
 import { buildSection1AttendanceParticipantNameMap } from "@/utils/attendanceLogDisplay";
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
@@ -256,6 +259,8 @@ function ReportDetailPage() {
             : "/dashboard/partner/reports";
     const [report, setReport] = useState<ReportDetail | null>(null);
     const [loading, setLoading] = useState(true);
+    /** Submitted but not yet approved by CIEL PK Admin: the package stays closed (backend answers 403). */
+    const [locked, setLocked] = useState(false);
     const [feedback, setFeedback] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
@@ -333,8 +338,14 @@ function ReportDetailPage() {
                 // Backend might return { success, data } or { report }
                 const raw = data.data || data.report || data;
                 const prepared = prepareReportForVerifyDossier(raw as Record<string, unknown>);
+                if (!isReportPackageReleased(prepared as CommunityReviewRow)) {
+                    setLocked(true);
+                    return;
+                }
                 setReport(prepared as unknown as ReportDetail);
                 setQualityAlerts(checkReportQuality(prepared));
+            } else if (isPackageLockedResponse(response?.status)) {
+                setLocked(true);
             } else {
                 const errorText = await response?.text().catch(() => 'No error text');
                 console.error('❌ API Error:', response?.status, errorText);
@@ -420,6 +431,14 @@ function ReportDetailPage() {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+            </div>
+        );
+    }
+
+    if (!report && locked) {
+        return (
+            <div className="min-h-screen bg-slate-50 px-4 py-8">
+                <ReportPackageLockedPanel backHref={reportsInboxHref} backLabel="Back to impact reports" />
             </div>
         );
     }

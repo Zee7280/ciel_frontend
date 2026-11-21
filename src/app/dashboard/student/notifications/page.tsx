@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Bell, CheckCircle, Clock, Info, Loader2, Trash2, XCircle } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Info, Loader2, Trash2, XCircle, ExternalLink } from "lucide-react";
 import { notificationDisplayType } from "@/utils/notificationTone";
 import { authenticatedFetch } from "@/utils/api";
 import { broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { toast } from "sonner";
+import Link from "next/link";
+import { relatedLink } from "@/utils/notificationLink";
 
 interface Notification {
     id: number;
@@ -14,6 +16,8 @@ interface Notification {
     message: string;
     isRead: boolean;
     createdAt: string;
+    /** Same-origin dashboard path the notice opens (e.g. the approved Impact Package). */
+    link?: string | null;
 }
 
 export default function StudentNotificationsPage() {
@@ -277,6 +281,19 @@ export default function StudentNotificationsPage() {
                                             </div>
                                             <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">{notification.message}</p>
                                             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                                                {relatedLink(notification) ? (
+                                                    <Link
+                                                        href={relatedLink(notification) as string}
+                                                        onClick={() => {
+                                                            if (unread) void markAsRead(notification.id);
+                                                        }}
+                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:border-blue-200 hover:bg-blue-50"
+                                                        data-testid="notification-open-link"
+                                                    >
+                                                        <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} />
+                                                        Open
+                                                    </Link>
+                                                ) : null}
                                                 {unread ? (
                                                     <button
                                                         type="button"
