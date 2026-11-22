@@ -11,6 +11,7 @@ import clsx from "clsx";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { EvidenceMediaPreview } from "./ui/EvidenceMediaPreview";
+import { evidenceItemKind } from "../utils/evidencePreviewKind";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
@@ -118,7 +119,7 @@ function CheckGrid({
                             "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                             active
                                 ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
                         )}
                     >
                         {opt}
@@ -130,7 +131,8 @@ function CheckGrid({
 }
 
 function FilePreview({ file }: { file: any }) {
-    const isImage = file?.type?.startsWith("image/") || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
+    // Read the kind from the MIME type, the stored name or the URL — a saved record is often just `{ url }`.
+    const isImage = evidenceItemKind(file) === "image";
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
 
     useEffect(() => {
@@ -565,13 +567,11 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                         <button
                             type="button"
                             onClick={() => update("has_partners", "no")}
-                            className={clsx(
-                                "rounded-xl border-2 p-5 text-center transition-colors",
-                                has_partners === "no"
-                                    ? "border-indigo-500 bg-indigo-50 shadow-sm"
-                                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
-                            )}
+                            aria-pressed={has_partners === "no"}
+                            data-ciel-choice-card="has_partners:no"
+                            className="cer-choice-card rounded-xl p-5 text-center transition-colors"
                         >
+                            {has_partners === "no" ? <span className="cer-choice-card-tag">✓ Selected</span> : null}
                             <p className="text-2xl">🎒</p>
                             <p className="mt-2 text-sm font-semibold text-slate-900">We worked independently</p>
                             <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
@@ -582,13 +582,11 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                         <button
                             type="button"
                             onClick={() => update("has_partners", "yes")}
-                            className={clsx(
-                                "rounded-xl border-2 p-5 text-center transition-colors",
-                                has_partners === "yes"
-                                    ? "border-indigo-500 bg-indigo-50 shadow-sm"
-                                    : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
-                            )}
+                            aria-pressed={has_partners === "yes"}
+                            data-ciel-choice-card="has_partners:yes"
+                            className="cer-choice-card rounded-xl p-5 text-center transition-colors"
                         >
+                            {has_partners === "yes" ? <span className="cer-choice-card-tag">✓ Selected</span> : null}
                             <p className="text-2xl">🤝</p>
                             <p className="mt-2 text-sm font-semibold text-slate-900">Others were involved</p>
                             <p className="mt-1.5 text-xs leading-relaxed text-slate-500">

@@ -8,6 +8,9 @@ import { FieldError } from "./ui/FieldError";
 import { SingleSelect } from "./ui/SingleSelect";
 import clsx from "clsx";
 import { FIELD_WORD_POLICY, wordRangeLabel, reportTextWordMeter } from "../utils/validation";
+import { generateAISummary } from "../utils/aiSummarizer";
+import { sectionSummarySource, sectionSummarySync } from "../utils/sectionSummarySync";
+import { composeSection2SmartDraft } from "../utils/section2SmartDraft";
 import {
     CONSENT_OPTIONS,
     RISK_FACTOR_OPTIONS,
@@ -196,6 +199,7 @@ const DISCIPLINES = [
 
 export default function Section2ProjectContext({ projectData }: Section2Props) {
     const { data, updateSection, getFieldError, isReportSectionsReadOnly } = useReportForm();
+    const [isRewritingSummary, setIsRewritingSummary] = useState(false);
     const isReadOnly = isReportSectionsReadOnly;
 
     const sectionData = data.section2;
@@ -468,42 +472,79 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const charCount = (sectionData.problem_statement || "").length;
     const disciplineCharCount = (sectionData.discipline_contribution || "").length;
 
-    const generateSmartDraft = () => {
+    /**
+     * 2.2 "Rewrite with AI": refreshes the statement the rubric reads right now, instead of only on
+     * Next. The AI paragraph is stored as `summary_text` with the fingerprint of the answers it was
+     * written from, so the banner's "AI summary — what the rubric will read" shows the same text
+     * and reports it as matching the current answers. If the AI is unavailable, a factual local
+     * paragraph is composed from the answers instead (no filler, no estimates).
+     */
+    const rewriteSummaryWithAi = async () => {
         const problem = (sectionData.problem_statement || "").trim();
         if (!problem) {
             toast.error("Answer question 1 first.");
             return;
         }
-        const who = (sectionData.affected_group || "").trim();
-        const num = (sectionData.affected_count || "").trim();
-        const gaps = (sectionData.system_gaps || []).map((g) =>
-            g === "Other"
-                ? formatSystemGapsOtherLabels(resolveSystemGapsOtherEntries(sectionData))
-                : g,
-        );
-        const sources = formatBaselineEvidenceForDisplay(sectionData)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-        const disc = sectionData.discipline === "Other…"
-            ? (sectionData.discipline_other || "").trim()
-            : (sectionData.discipline || "").trim();
-        const how = (sectionData.discipline_contribution || "").trim();
-        let text = `Before our project began, ${problem.replace(/\.$/, "")}. `;
-        if (who) {
-            text += `This weighed most heavily on ${num ? `roughly ${num} ` : ""}${who.replace(/\.$/, "")}, for whom the situation was a daily reality rather than a statistic. `;
+        if (isRewritingSummary) return;
+        setIsRewritingSummary(true);
+        try {
+            // Fingerprint of the exact answers this rewrite is built from (same check Next uses).
+            const summarySource = sectionSummarySource(sectionData);
+            const fallback = () =>
+                composeSection2SmartDraft({
+                    problem,
+                    affectedGroup: sectionData.affected_group,
+                    affectedCount: sectionData.affected_count,
+                    gaps: (sectionData.system_gaps || []).map((g) =>
+                        g === "Other"
+                            ? formatSystemGapsOtherLabels(resolveSystemGapsOtherEntries(sectionData))
+                            : g,
+                    ),
+                    sources: formatBaselineEvidenceForDisplay(sectionData)
+                        .split(",")
+                        .map((t) => t.trim())
+                        .filter(Boolean),
+                    discipline:
+                        sectionData.discipline === "Other…"
+                            ? (sectionData.discipline_other || "").trim()
+                            : (sectionData.discipline || "").trim(),
+                    contribution: sectionData.discipline_contribution,
+                });
+
+            const result = await generateAISummary("section2", sectionData);
+            if (result.summary?.trim()) {
+                lastAutoSummaryRef.current = "";
+                updateSection("section2", {
+                    summary_text: result.summary.trim(),
+                    summary_source: summarySource,
+                    baseline_smart_draft: "",
+                });
+                toast.success("AI summary rewritten from your current answers.");
+                return;
+            }
+            if (result.error) {
+                toast.error(result.error);
+                return;
+            }
+            // AI not configured / skipped: still give the student one clean statement to work from.
+            const composed = fallback();
+            if (composed) {
+                lastAutoSummaryRef.current = "";
+                updateSection("section2", {
+                    summary_text: composed,
+                    summary_source: summarySource,
+                    baseline_smart_draft: "",
+                });
+                toast.message("AI is not available right now — the statement was composed from your answers instead.");
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not rewrite the summary.");
+        } finally {
+            setIsRewritingSummary(false);
         }
-        if (gaps.length) {
-            text += `At its core, the gap came down to ${listJoin(gaps.map((g) => g.toLowerCase()))} — needs that were visible but going unmet. `;
-        }
-        if (sources.length) {
-            text += `Our understanding was not guesswork: it was grounded in ${listJoin(sources.map((s) => s.toLowerCase()))}. `;
-        }
-        if (disc && how) {
-            text += `Coming from ${disc}, ${how.replace(/\.$/, "")} — which is why a structured intervention, rather than goodwill alone, was the right response.`;
-        }
-        updateSection("section2", { baseline_smart_draft: text.trim() });
     };
+
+    const summarySync = sectionSummarySync(sectionData);
 
     const fieldClass = "min-h-[110px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-[var(--teal)] focus:bg-white focus:ring-2 focus:ring-[var(--aqua-soft)]";
     const chipClass = (isSel: boolean) =>
@@ -820,26 +861,45 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 <div className="cer-secl">
                     <span className="cer-secn">2.2</span>
                     <h2>Your baseline statement</h2>
-                    <span className="cer-tag auto">Builds itself live</span>
+                    <span className={clsx("cer-tag", summarySync === "stale" ? "" : "auto")}>
+                        {summarySync === "fresh"
+                            ? "AI-written · matches your answers"
+                            : summarySync === "stale"
+                                ? "Needs a rewrite"
+                                : "Builds itself live"}
+                    </span>
                 </div>
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-800">
+                <p className="text-xs text-slate-500">
+                    This is the one statement the rubric reads — it is the same paragraph as “AI summary — what the rubric will read” in the summary panel.
+                    It builds itself from your answers; the AI rewrites it when you press Next, or right now with the button below.
+                </p>
+                <div
+                    className={clsx(
+                        "rounded-xl border px-4 py-3 text-sm leading-relaxed text-slate-800",
+                        summarySync === "fresh"
+                            ? "border-[#25b8d8] bg-[#f0fbfd]"
+                            : "border-dashed border-slate-300 bg-slate-50",
+                    )}
+                    data-testid="section2-baseline-statement"
+                >
                     {sectionData.summary_text?.trim()
                         ? sectionData.summary_text
                         : <span className="text-slate-400">Answer the questions above — your statement appears here…</span>}
                 </div>
+                {summarySync === "stale" ? (
+                    <p className="text-xs font-medium text-amber-700">
+                        You changed an answer after this was written. Press the button below (or Next) to rewrite it from your current answers.
+                    </p>
+                ) : null}
                 {!isReadOnly ? (
                     <button
                         type="button"
-                        onClick={generateSmartDraft}
-                        className="rounded-full border border-[#25b8d8] bg-[#f0fbfd] px-4 py-2 text-sm font-semibold text-[#0e7490]"
+                        onClick={rewriteSummaryWithAi}
+                        disabled={isRewritingSummary}
+                        className="rounded-full border border-[#25b8d8] bg-[#f0fbfd] px-4 py-2 text-sm font-semibold text-[#0e7490] disabled:cursor-wait disabled:opacity-60"
                     >
-                        ✨ Generate smart draft summary — one strong paragraph
+                        {isRewritingSummary ? "Rewriting from your answers…" : "✨ Rewrite with AI from my current answers"}
                     </button>
-                ) : null}
-                {sectionData.baseline_smart_draft?.trim() ? (
-                    <div className="rounded-xl border border-[#25b8d8] bg-[#f0fbfd] px-4 py-3 text-sm leading-relaxed text-slate-800">
-                        {sectionData.baseline_smart_draft}
-                    </div>
                 ) : null}
             </section>
 

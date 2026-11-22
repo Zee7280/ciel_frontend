@@ -26,6 +26,11 @@ import {
     reachStatusLine,
     simpleMeasureChangeLine,
     simpleMeasureIssues,
+    legacyOutcomeIssues,
+    legacyOutcomeLabel,
+    legacyOutcomeToSimple,
+    outcomeIsMeasured,
+    splitOutcomes,
     suggestedUnitForOutput,
     wordCount,
     type ReachMode,
@@ -135,7 +140,8 @@ function WordMeter({ count, min, max }: { count: number; min: number; max: numbe
  * keys so older drafts, scoring and the impact package keep working.
  */
 export default function Section4Streamlined() {
-    const { data, updateSection, getFieldError } = useReportForm();
+    const { data, updateSection, getFieldError, isReportSectionsReadOnly } = useReportForm();
+    const isReadOnly = Boolean(isReportSectionsReadOnly);
     const section2 = (data.section2 || {}) as Record<string, unknown>;
     const section4 = data.section4 || { activity_blocks: [], project_summary: {} };
     const section5 = data.section5 || { observed_change: "", measurable_outcomes: [], challenges: "" };
@@ -153,7 +159,7 @@ export default function Section4Streamlined() {
         const out: string[] = [];
         const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
         logs.forEach((log, i) => {
-            if (log?.evidence_file) out.push(`Attendance evidence · ${log.date || `session ${i + 1}`}${log.location ? ` · ${log.location}` : ""}`);
+            if (log?.evidence_file || (typeof log?.evidence_url === "string" && log.evidence_url.trim())) out.push(`Attendance evidence · ${log.date || `session ${i + 1}`}${log.location ? ` · ${log.location}` : ""}`);
         });
         const files = (data.section8?.evidence_files || []) as Array<{ name?: string }>;
         files.forEach((f, i) => out.push(`Evidence file · ${f?.name || `file ${i + 1}`}`));
@@ -169,13 +175,24 @@ export default function Section4Streamlined() {
     // ----- 4.3 results -----
     const baseline = baselineFromSection2(section2);
     const outcomes = Array.isArray(section5.measurable_outcomes) ? section5.measurable_outcomes : [];
-    const simpleIndex = outcomes.findIndex((o) => (o as SimpleMeasure).simple === true);
-    const simple = simpleIndex >= 0 ? (outcomes[simpleIndex] as SimpleMeasure) : null;
-    const legacyOutcomeCount = outcomes.filter((o) => (o as SimpleMeasure).simple !== true).length;
-    const [measureOpen, setMeasureOpen] = useState<boolean>(Boolean(simple));
+    const outcomeSplit = splitOutcomes(outcomes);
+    const { simple, simpleIndex } = outcomeSplit;
+    // Earlier-version rows that still say something: shown below the form so they can be finished or
+    // removed (a hidden row must never be the reason a report cannot be submitted).
+    const legacyRows = outcomeSplit.legacy;
+    const legacyOutcomeCount = legacyRows.filter(({ row }) => outcomeIsMeasured(row) && !legacyOutcomeIssues(row, 0).length).length;
+    const legacyIncompleteCount = legacyRows.length - legacyOutcomeCount;
+    const [measureOpen, setMeasureOpen] = useState<boolean>(Boolean(simple) || legacyRows.length > 0);
     useEffect(() => {
-        if (simple) setMeasureOpen(true);
-    }, [simple]);
+        if (simple || legacyRows.length) setMeasureOpen(true);
+    }, [simple, legacyRows.length]);
+    // The old form saved an empty outcome row by default; it carries nothing, so drop it once seen.
+    useEffect(() => {
+        if (!outcomeSplit.blankIndexes.length || isReadOnly) return;
+        const blank = new Set(outcomeSplit.blankIndexes);
+        updateSection("section5", { measurable_outcomes: outcomes.filter((_, i) => !blank.has(i)) });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [outcomeSplit.blankIndexes.length]);
 
     const setSimple = (patch: Partial<SimpleMeasure>) => {
         const base: SimpleMeasure = simple || {
@@ -201,7 +218,18 @@ export default function Section4Streamlined() {
     };
     const clearSimple = () => {
         updateSection("section5", { measurable_outcomes: outcomes.filter((o) => (o as SimpleMeasure).simple !== true) });
-        setMeasureOpen(false);
+        if (!legacyRows.length) setMeasureOpen(false);
+    };
+    const removeLegacy = (index: number) => {
+        updateSection("section5", { measurable_outcomes: outcomes.filter((_, i) => i !== index) });
+    };
+    /** Moves an earlier-version row into the editable V19 result (only when there is no result yet). */
+    const adoptLegacy = (index: number) => {
+        const row = outcomes[index] as Record<string, unknown> | undefined;
+        if (!row || simple) return;
+        const adopted = legacyOutcomeToSimple(row);
+        updateSection("section5", { measurable_outcomes: [adopted, ...outcomes.filter((_, i) => i !== index)] });
+        setMeasureOpen(true);
     };
     const measureErrors = simpleMeasureIssues(simple);
     const measureLine = simpleMeasureChangeLine(simple);
@@ -239,6 +267,7 @@ export default function Section4Streamlined() {
                 howWeKnow: section5.story_because,
                 measure: simple,
                 legacyOutcomeCount,
+                legacyIncompleteCount,
                 challenges: section5.challenges,
                 challengeTags: tags,
             }),
@@ -509,10 +538,46 @@ export default function Section4Streamlined() {
                                     </button>
                                 ) : null}
                             </div>
-                            {legacyOutcomeCount ? (
-                                <p className="text-[11px] text-slate-500">
-                                    {legacyOutcomeCount} earlier before/after comparison{legacyOutcomeCount === 1 ? "" : "s"} from the previous report version stay saved with this report.
-                                </p>
+                            {legacyRows.length ? (
+                                <div className="space-y-2" data-ciel-legacy-outcomes>
+                                    <p className="text-[11px] font-semibold text-slate-600">
+                                        {legacyRows.length} earlier before/after comparison{legacyRows.length === 1 ? "" : "s"} from the previous report version
+                                        {legacyIncompleteCount ? " — incomplete rows must be finished or removed before you submit." : "."}
+                                    </p>
+                                    {legacyRows.map(({ row, index }, position) => {
+                                        const issues = legacyOutcomeIssues(row, position);
+                                        const unit = String(row.unit_other || row.unit || "").trim();
+                                        return (
+                                            <div key={String(row.id || index)} className={clsx("rounded-lg border px-3 py-2 text-[11.5px]", issues.length ? "border-rose-200 bg-rose-50/40" : "border-slate-200 bg-slate-50")}>
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <p className="font-semibold text-slate-800">
+                                                        {legacyOutcomeLabel(row)}: {String(row.baseline ?? "").trim() || "—"} → {String(row.endline ?? "").trim() || "—"}{unit ? ` ${unit}` : ""}
+                                                        {String(row.measurement_explanation || "").trim() ? <span className="font-normal text-slate-500"> · {String(row.measurement_explanation).trim()}</span> : null}
+                                                    </p>
+                                                    {!isReadOnly ? (
+                                                        <span className="flex gap-3">
+                                                            {!simple ? (
+                                                                <button type="button" onClick={() => adoptLegacy(index)} className="text-[11px] font-bold text-[var(--teal)] hover:underline">
+                                                                    Edit as my result
+                                                                </button>
+                                                            ) : null}
+                                                            <button type="button" onClick={() => removeLegacy(index)} className="text-[11px] font-bold text-rose-600 hover:underline">
+                                                                Remove
+                                                            </button>
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                                {issues.length ? (
+                                                    <ul className="mt-1 list-disc pl-4 text-[11px] text-rose-700">
+                                                        {issues.map((issue) => (
+                                                            <li key={issue.field}>{issue.message}</li>
+                                                        ))}
+                                                    </ul>
+                                                ) : null}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             ) : null}
                         </div>
                     ) : null}

@@ -26,6 +26,8 @@ const IGNORED_KEYS = new Set([
     "summary_text",
     "summary_source",
     "summary_text_generated",
+    // Legacy Section 2.2 local draft: a preview, never an answer the AI summary is written from.
+    "baseline_smart_draft",
     "media_usage",
     "public_share_permission",
     "evidence_files",

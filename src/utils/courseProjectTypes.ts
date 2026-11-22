@@ -1,3 +1,4 @@
+import { stripLeadingEmoji } from "./stripLeadingEmoji";
 // Shared types + summary composition for the Course Project coursework wizard, flash card, and decks.
 // Mirrors ciel_backend/src/paths/entities/course-project-entry.entity.ts
 
@@ -320,7 +321,7 @@ function joinList(a: string[]) {
     return a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
 }
 export function stripEmoji(s: string) {
-    return (s || "").replace(/^[^\s]+\s/, "");
+    return stripLeadingEmoji(s);
 }
 
 /** Human-readable "name: value unit (status)" line for one structured result — shared by the summary composer, the flash card, and the Merit Model. */

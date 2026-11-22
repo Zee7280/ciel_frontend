@@ -1,7 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import {
+import { registerHooks } from "node:module";
+
+// `section4Streamlined.ts` imports the shared chip-label helper without an extension (as the Next
+// bundle expects); Node's type stripping needs one, so resolve "./x" -> "./x.ts" for this test only.
+registerHooks({
+    resolve(specifier, context, nextResolve) {
+        try {
+            return nextResolve(specifier, context);
+        } catch (error) {
+            if (specifier.startsWith(".") && !/\.[a-z]+$/i.test(specifier)) return nextResolve(`${specifier}.ts`, context);
+            throw error;
+        }
+    },
+});
+
+const {
     activityIssues,
     baselineFromSection2,
     buildSection4Summary,
@@ -14,7 +29,13 @@ import {
     simpleMeasureChangeLine,
     simpleMeasureIssues,
     suggestedUnitForOutput,
-} from "../src/app/dashboard/student/report/utils/section4Streamlined.ts";
+    legacyOutcomeIssues,
+    legacyOutcomeLabel,
+    legacyOutcomeToSimple,
+    outcomeHasContent,
+    outcomeIsMeasured,
+    splitOutcomes,
+} = await import("../src/app/dashboard/student/report/utils/section4Streamlined.ts");
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const subs = (c) => (c === "Education" ? ["Tutoring", "Other"] : []);
@@ -174,6 +195,107 @@ test("the report wizard renders the streamlined Section 4 (activities, reach, re
     const validation = read("src/app/dashboard/student/report/utils/validation.ts");
     assert.match(validation, /observed_change: \{ min: 8, max: 100 \}/);
     assert.match(validation, /reachIssues\(asObj\(data\.project_summary\), activityBlocks\)/);
-    assert.match(validation, /simpleMeasureIssues\(simpleRow \? asObj\(simpleRow\) : null\)/);
+    assert.match(validation, /simpleMeasureIssues\(split\.simple \? asObj\(split\.simple\) : null\)/);
     assert.match(validation, /challengeTagIssues\(data\.challenge_tags\)/);
+});
+
+test("'No significant challenges' keeps its 'No' in the composed summary and reads as a sentence, with or without a narrative", () => {
+    const none = buildSection4Summary({ activities: [], challengeTags: ["No significant challenges"] });
+    assert.equal(none.challengesText, "No significant challenges were reported.");
+    assert.doesNotMatch(none.challengesText, /Reported challenges: significant/);
+    const withNote = buildSection4Summary({ activities: [], challengeTags: ["No significant challenges"], challenges: "Weather delayed one session." });
+    assert.equal(withNote.challengesText, "No significant challenges were reported. Weather delayed one session.");
+    // Emoji chips still lose only their emoji.
+    const tagged = buildSection4Summary({ activities: [], challengeTags: ["⏰ Not enough time", "📊 Missing baseline / follow-up data"] });
+    assert.equal(tagged.challengesText, "Reported challenges: Not enough time, Missing baseline / follow-up data. Limitations narrative pending.");
+});
+
+test("the live banner does not count 'No significant challenges' as a limitation", () => {
+    const chrome = read("src/app/dashboard/student/report/ReportFormChrome.tsx");
+    assert.match(chrome, /noChallenges \? "No significant challenges reported\." : challenges \? `\$\{plural\(challenges, "limitation"\)\} named\.` : ""/);
+});
+
+
+test("earlier-version outcome rows: a blank row is nothing, a row with content is legacy, the V19 result is found by its flag", () => {
+    const blank = { id: "old-1", outcome_area: "", metric: "", baseline: "", endline: "", unit: "", confidence_level: ["Student-reported"] };
+    const legacy = { id: "old-2", outcome_sub_category: "Attendance", baseline: "55", endline: "", unit: "%" };
+    const simple = { id: "oc-1", simple: true, metric: "QA calculation test", baseline: "55", endline: "" };
+    assert.equal(outcomeHasContent(blank), false);
+    assert.equal(outcomeHasContent(legacy), true);
+    assert.equal(outcomeIsMeasured(legacy), false);
+    assert.equal(outcomeIsMeasured({ ...legacy, endline: "72" }), true);
+    const split = splitOutcomes([blank, simple, legacy]);
+    assert.equal(split.simpleIndex, 1);
+    assert.equal(split.simple.metric, "QA calculation test");
+    assert.deepEqual(split.blankIndexes, [0]);
+    assert.deepEqual(split.legacy.map((l) => l.index), [2]);
+    assert.equal(legacyOutcomeLabel(legacy), "Attendance");
+    assert.ok(legacyOutcomeIssues(legacy, 0).some((i) => i.field === "measurable_outcomes.0.endline"));
+    // Adopting a legacy row into the editable V19 result keeps its numbers and maps its unit.
+    const adopted = legacyOutcomeToSimple({ ...legacy, unit: "households", measurement_explanation: "School register" });
+    assert.equal(adopted.simple, true);
+    assert.equal(adopted.metric, "Attendance");
+    assert.equal(adopted.baseline, "55");
+    assert.equal(adopted.unit, "Other");
+    assert.equal(adopted.unit_other, "households");
+    assert.equal(legacyOutcomeToSimple({ ...legacy, unit: "%" }).unit, "%");
+});
+
+test("the auto summary names a started-but-incomplete result and does not call a blank row a retained comparison", () => {
+    const half = buildSection4Summary({ activities: [], measure: { simple: true, metric: "QA calculation test", baseline: "55", endline: "" }, legacyOutcomeCount: 0 });
+    assert.match(half.resultsText, /The before \/ after result \(QA calculation test\) is started but incomplete — finish it or clear it before submitting\./);
+    assert.doesNotMatch(half.resultsText, /previously recorded quantitative comparison/);
+    const retained = buildSection4Summary({ activities: [], measure: null, legacyOutcomeCount: 1 });
+    assert.match(retained.resultsText, /1 previously recorded quantitative comparison was retained/);
+    const incompleteLegacy = buildSection4Summary({ activities: [], measure: null, legacyIncompleteCount: 1 });
+    assert.match(incompleteLegacy.resultsText, /No comparable before-and-after measurements were reported\. 1 earlier comparison is incomplete — finish or remove it in 4\.3\./);
+});
+
+test("wizard wiring: blank legacy rows are dropped, legacy rows with content are shown with Remove / Edit-as-my-result, validation and banner use the shared helpers", () => {
+    const component = read("src/app/dashboard/student/report/components/Section4Streamlined.tsx");
+    assert.match(component, /const outcomeSplit = splitOutcomes\(outcomes\);/);
+    assert.match(component, /if \(!outcomeSplit\.blankIndexes\.length \|\| isReadOnly\) return;/);
+    assert.match(component, /data-ciel-legacy-outcomes/);
+    assert.match(component, /Edit as my result/);
+    assert.match(component, /onClick=\{\(\) => removeLegacy\(index\)\}/);
+    assert.match(component, /legacyIncompleteCount,/);
+    const validation = read("src/app/dashboard/student/report/utils/validation.ts");
+    assert.match(validation, /const split = splitOutcomes\(asList\(data\.measurable_outcomes\)\);/);
+    assert.match(validation, /split\.legacy\.forEach\(\(\{ row \}, index\) => \{\s*legacyOutcomeIssues\(row, index\)/);
+    assert.doesNotMatch(validation, /legacyOutcomes\.forEach/);
+    for (const file of ["src/app/dashboard/student/report/ReportFormChrome.tsx", "src/app/dashboard/student/report/impact-package/buildImpactPackageModel.ts"]) {
+        const src = read(file);
+        assert.match(src, /pickNumber\(o\.baseline\) != null && pickNumber\(o\.endline\) != null\)/, file);
+        assert.doesNotMatch(src, /\(o\.baseline \|\| o\.endline\)\)/, file);
+    }
+});
+
+test("a blank before / after field is never read as 0 (banner, impact package, final summary)", () => {
+    for (const file of ["src/app/dashboard/student/report/ReportFormChrome.tsx", "src/app/dashboard/student/report/impact-package/buildImpactPackageModel.ts"]) {
+        const src = read(file);
+        assert.match(src, /function pickNumber\(value: unknown\): number \| null \{[\s\S]*?if \(!text\) return null;/, file);
+    }
+    const s11 = read("src/app/dashboard/student/report/components/Section11Summary.tsx");
+    assert.match(s11, /if \(!bText \|\| !eText\) return null;/);
+});
+
+test("legacy row rules match the submit gates: the explanation is required and sized like a short note; adopted numbers are plain", () => {
+    const row = { outcome_area: "Health", outcome_sub_category: "Attendance", metric_category: "Count", metric: "Days", baseline: "1,200", endline: "~1,450", unit: "days", confidence_level: ["Directly measured"] };
+    const noExplanation = legacyOutcomeIssues(row, 0);
+    assert.deepEqual(noExplanation.map((i) => i.field), ["measurable_outcomes.0.measurement_explanation"]);
+    assert.match(noExplanation[0].message, /^Measurement explanation must be 10–80 words \(0 current\)$/);
+    assert.deepEqual(legacyOutcomeIssues({ ...row, measurement_explanation: "too short" }, 0).map((i) => i.message), ["Measurement explanation must be 10–80 words (2 current)"]);
+    assert.deepEqual(legacyOutcomeIssues({ ...row, measurement_explanation: "Compared the school register four weeks before and four weeks after the workshops." }, 0), []);
+    const adopted = legacyOutcomeToSimple(row);
+    assert.equal(adopted.baseline, "1200");
+    // "~1,450" is not a number: the field comes back empty for the student to re-enter.
+    assert.equal(adopted.endline, "");
+    assert.equal(legacyOutcomeToSimple({ ...row, endline: "1,450" }).endline, "1450");
+    assert.equal(legacyOutcomeToSimple({ ...row, baseline: "n/a" }).baseline, "");
+    // validateSection5 relies on the helper alone (no second explanation check).
+    const validation = read("src/app/dashboard/student/report/utils/validation.ts");
+    assert.doesNotMatch(validation, /pushWordRange\(errors, `measurable_outcomes\.\$\{index\}\.measurement_explanation`/);
+    // 4.1 evidence chooser sees saved logs' evidence_url too.
+    const component = read("src/app/dashboard/student/report/components/Section4Streamlined.tsx");
+    assert.match(component, /log\?\.evidence_file \|\| \(typeof log\?\.evidence_url === "string" && log\.evidence_url\.trim\(\)\)/);
 });

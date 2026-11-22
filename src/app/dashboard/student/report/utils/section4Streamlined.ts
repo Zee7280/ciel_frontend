@@ -1,3 +1,5 @@
+import { stripLeadingEmoji } from "../../../../../utils/stripLeadingEmoji";
+import { SHORT_NOTE_MAX_WORDS, SHORT_NOTE_MIN_WORDS } from "./section4Ladder";
 /**
  * V19 "streamlined" Section 4 (Activities & Outputs) — pure helpers shared by the wizard UI, the
  * live validation and the auto-generated section summary. Deliberately dependency-free so the
@@ -265,6 +267,117 @@ export function simpleMeasureChangeLine(m: SimpleMeasure | null | undefined): st
     return `${txt(m.metric)}: ${b} → ${e} = ${sign}${diff}${unitWord}${rel} · student-reported, not independently verified. Attribution not established.`;
 }
 
+/**
+ * Older report versions stored several detailed outcome rows (no `simple` flag), and the old form
+ * created an empty row by default. Such a row carries no information: it must never block submit
+ * or be counted as a "previously recorded comparison".
+ */
+export function outcomeHasContent(row: unknown): boolean {
+    if (!row || typeof row !== "object") return false;
+    const r = row as Record<string, unknown>;
+    return [
+        r.metric,
+        r.metric_other,
+        r.outcome_area,
+        r.outcome_sub_category,
+        r.unit,
+        r.unit_other,
+        r.baseline,
+        r.endline,
+        r.measurement_explanation,
+    ].some((v) => txt(v) !== "");
+}
+
+/** A comparison worth reporting: something named, and both numbers present. */
+export function outcomeIsMeasured(row: unknown): boolean {
+    if (!row || typeof row !== "object") return false;
+    const r = row as Record<string, unknown>;
+    const named = txt(r.metric) || txt(r.metric_other) || txt(r.outcome_sub_category) || txt(r.outcome_area);
+    return Boolean(named) && txt(r.baseline) !== "" && Number.isFinite(num(r.baseline)) && txt(r.endline) !== "" && Number.isFinite(num(r.endline));
+}
+
+export type OutcomeSplit = {
+    /** The V19 single result (`simple: true`), if any, with its index in the stored list. */
+    simple: SimpleMeasure | null;
+    simpleIndex: number;
+    /** Earlier-version rows that hold information, with their stored index. */
+    legacy: Array<{ row: Record<string, unknown>; index: number }>;
+    /** Earlier-version rows with nothing in them (safe to drop). */
+    blankIndexes: number[];
+};
+
+/** Splits the stored `measurable_outcomes` list the way the form, validation and summary all read it. */
+export function splitOutcomes(list: unknown): OutcomeSplit {
+    const rows = Array.isArray(list) ? list : [];
+    const out: OutcomeSplit = { simple: null, simpleIndex: -1, legacy: [], blankIndexes: [] };
+    rows.forEach((entry, index) => {
+        const row = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+        if (row.simple === true) {
+            if (out.simpleIndex < 0) {
+                out.simple = row as SimpleMeasure;
+                out.simpleIndex = index;
+            }
+            return;
+        }
+        if (outcomeHasContent(row)) out.legacy.push({ row, index });
+        else out.blankIndexes.push(index);
+    });
+    return out;
+}
+
+/** Label for an earlier-version row as the student named it. */
+export function legacyOutcomeLabel(row: Record<string, unknown>): string {
+    const metric = txt(row.metric);
+    const metricName = /^other$/i.test(metric) ? txt(row.metric_other) : "";
+    return txt(row.outcome_sub_category) || metricName || metric || txt(row.outcome_area) || "Earlier comparison";
+}
+
+/** The original detailed-outcome rules, applied only to rows that hold information. */
+export function legacyOutcomeIssues(row: Record<string, unknown>, index: number): ActivityIssue[] {
+    const f = (key: string) => `measurable_outcomes.${index}.${key}`;
+    const out: ActivityIssue[] = [];
+    if (!txt(row.outcome_area)) out.push({ field: f("outcome_area"), message: "Outcome category is required" });
+    if (!txt(row.outcome_sub_category) && txt(row.outcome_area) !== "Other") out.push({ field: f("outcome_sub_category"), message: "Outcome sub-category is required" });
+    if (!txt(row.metric_category)) out.push({ field: f("metric_category"), message: "Metric category is required" });
+    if (!txt(row.metric)) out.push({ field: f("metric"), message: "Primary metric unit is required" });
+    else if (/^other$/i.test(txt(row.metric)) && !txt(row.metric_other)) out.push({ field: f("metric_other"), message: "Please specify the custom metric unit" });
+    if (txt(row.baseline) === "") out.push({ field: f("baseline"), message: "Baseline value is required" });
+    if (txt(row.endline) === "") out.push({ field: f("endline"), message: "Endline value is required" });
+    if (!txt(row.unit)) out.push({ field: f("unit"), message: "Unit of measurement is required" });
+    const confidence = Array.isArray(row.confidence_level) ? row.confidence_level.map(txt).filter(Boolean) : [txt(row.confidence_level)].filter(Boolean);
+    if (!confidence.length) out.push({ field: f("confidence_level"), message: "At least one confidence level is required" });
+    // Same rule as the submit gates (frontend validateSection5 and the backend): the explanation is
+    // required and sized like every short note, so the card, the summary and Next all agree.
+    const words = txt(row.measurement_explanation).split(/\s+/).filter(Boolean).length;
+    if (words < SHORT_NOTE_MIN_WORDS || words > SHORT_NOTE_MAX_WORDS) {
+        out.push({ field: f("measurement_explanation"), message: `Measurement explanation must be ${SHORT_NOTE_MIN_WORDS}–${SHORT_NOTE_MAX_WORDS} words (${words} current)` });
+    }
+    return out;
+}
+
+/**
+ * Turns an earlier-version row into the V19 single result so the student can finish or correct it
+ * in the form instead of carrying a hidden row they cannot edit.
+ */
+export function legacyOutcomeToSimple(row: Record<string, unknown>): SimpleMeasure {
+    return {
+        ...row,
+        id: txt(row.id) || `oc-${Date.now().toString(36)}`,
+        simple: true,
+        metric: legacyOutcomeLabel(row) === "Earlier comparison" ? "" : legacyOutcomeLabel(row),
+        outcome_sub_category: legacyOutcomeLabel(row) === "Earlier comparison" ? "" : legacyOutcomeLabel(row),
+        outcome_area: txt(row.outcome_area) || "Observed result",
+        metric_category: txt(row.metric_category) || "Measured result",
+        unit: SIMPLE_MEASURE_UNITS.includes(txt(row.unit)) ? txt(row.unit) : txt(row.unit) ? "Other" : "",
+        unit_other: SIMPLE_MEASURE_UNITS.includes(txt(row.unit)) ? txt(row.unit_other) : txt(row.unit) || txt(row.unit_other),
+        // Old rows may hold "1,200" or "~40"; the number input and the backend need a plain number.
+        baseline: txt(row.baseline) && Number.isFinite(num(row.baseline)) ? String(num(row.baseline)) : "",
+        endline: txt(row.endline) && Number.isFinite(num(row.endline)) ? String(num(row.endline)) : "",
+        measurement_explanation: txt(row.measurement_explanation),
+        confidence_level: Array.isArray(row.confidence_level) && row.confidence_level.length ? row.confidence_level : ["Student-reported"],
+    };
+}
+
 export function challengeTagIssues(tags: unknown): ActivityIssue[] {
     const list = Array.isArray(tags) ? tags.map(txt).filter(Boolean) : [];
     if (!list.length) return [{ field: "challenge_tags", message: "Select one or more challenges, or No significant challenges" }];
@@ -293,7 +406,10 @@ export type Section4SummaryInput = {
     observedChange?: string;
     howWeKnow?: string;
     measure?: SimpleMeasure | null;
+    /** Earlier-version rows that hold a complete before / after comparison. */
     legacyOutcomeCount?: number;
+    /** Earlier-version rows that hold information but are incomplete (shown in 4.3 to finish or remove). */
+    legacyIncompleteCount?: number;
     challenges?: string;
     challengeTags?: string[];
 };
@@ -348,18 +464,39 @@ export function buildSection4Summary(input: Section4SummaryInput): Section4Summa
     const change = txt(input.observedChange);
     const know = txt(input.howWeKnow);
     const measureLine = simpleMeasureChangeLine(input.measure);
+    const measureStarted = Boolean(input.measure) && simpleMeasureIssues(input.measure).length > 0;
+    const measureName = txt(input.measure?.metric);
     const legacy = input.legacyOutcomeCount || 0;
+    const legacyIncomplete = input.legacyIncompleteCount || 0;
+    const measureText = measureLine
+        ? measureLine
+        : measureStarted
+          ? `The before / after result${measureName ? ` (${measureName})` : ""} is started but incomplete — finish it or clear it before submitting.`
+          : legacy
+            ? `${legacy} previously recorded quantitative comparison${legacy === 1 ? " was" : "s were"} retained from the earlier report version.`
+            : "No comparable before-and-after measurements were reported.";
+    const legacyNote = legacyIncomplete
+        ? ` ${legacyIncomplete} earlier comparison${legacyIncomplete === 1 ? " is" : "s are"} incomplete — finish or remove ${legacyIncomplete === 1 ? "it" : "them"} in 4.3.`
+        : "";
     const resultsText = [
         change ? change.replace(/[.!?]+$/, "") + "." : "Observed changes have not been described.",
         know ? `Evidence basis: ${know.replace(/[.!?]+$/, "")}.` : "Evidence basis not yet supplied.",
-        measureLine || (legacy ? `${legacy} previously recorded quantitative comparison${legacy === 1 ? " was" : "s were"} retained from the earlier report version.` : "No comparable before-and-after measurements were reported."),
+        `${measureText}${legacyNote}`,
     ].join(" ");
 
-    const tags = (input.challengeTags || []).map((t) => t.replace(/^[^\s]+\s/, "")).filter(Boolean);
-    const challengesText = txt(input.challenges)
-        ? `${tags.length ? `Reported challenges: ${tags.join(", ")}. ` : ""}${txt(input.challenges)}`
+    const tags = (input.challengeTags || []).map((t) => stripLeadingEmoji(t)).filter(Boolean);
+    const noneReported = tags.some((t) => t.toLowerCase() === NO_CHALLENGES_TAG.toLowerCase());
+    const tagLine = noneReported
+        ? "No significant challenges were reported."
         : tags.length
-          ? `Reported challenges: ${tags.join(", ")}. Limitations narrative pending.`
+          ? `Reported challenges: ${tags.join(", ")}.`
+          : "";
+    const challengesText = txt(input.challenges)
+        ? `${tagLine ? `${tagLine} ` : ""}${txt(input.challenges)}`
+        : tagLine
+          ? noneReported
+              ? tagLine
+              : `${tagLine} Limitations narrative pending.`
           : "Challenges and limitations not yet documented.";
 
     const text = [

@@ -4,7 +4,7 @@
  */
 
 import { SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MAX_WORDS } from './section4Ladder';
-import { activityIssues, challengeTagIssues, reachIssues, simpleMeasureIssues } from './section4Streamlined';
+import { activityIssues, challengeTagIssues, legacyOutcomeIssues, reachIssues, simpleMeasureIssues, splitOutcomes } from './section4Streamlined';
 import { GLOBAL_ACTIVITY_TAXONOMY } from './globalActivityTaxonomy';
 import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
 import { riskBlockErrors } from './riskSafeguarding';
@@ -428,33 +428,13 @@ export function validateSection5(data: any): ValidationResult {
 
     // V19: the one before / after result is optional; when started it must be complete. Older
     // detailed outcomes (no `simple` flag) keep their original rules.
-    const outcomes = asList(data.measurable_outcomes);
-    const simpleRow = outcomes.find((o: any) => asObj(o).simple === true);
-    simpleMeasureIssues(simpleRow ? asObj(simpleRow) : null).forEach((i) => errors.push(i));
-    const legacyOutcomes = outcomes.filter((o: any) => asObj(o).simple !== true);
-    {
-        legacyOutcomes.forEach((outcome: any, index: number) => {
-            const row = asObj(outcome);
-            if (!row.outcome_area) errors.push({ field: `measurable_outcomes.${index}.outcome_area`, message: 'Outcome category is required' });
-            if (!row.outcome_sub_category && row.outcome_area !== 'Other') errors.push({ field: `measurable_outcomes.${index}.outcome_sub_category`, message: 'Outcome sub-category is required' });
-            if (!row.metric_category) errors.push({ field: `measurable_outcomes.${index}.metric_category`, message: 'Metric category is required' });
-            if (!row.metric) errors.push({ field: `measurable_outcomes.${index}.metric`, message: 'Primary metric unit is required' });
-            if (/^other$/i.test(String(row.metric || '').trim()) && !String(row.metric_other || '').trim()) {
-                errors.push({ field: `measurable_outcomes.${index}.metric_other`, message: 'Please specify the custom metric unit' });
-            }
-            if (row.baseline === '') errors.push({ field: `measurable_outcomes.${index}.baseline`, message: 'Baseline value is required' });
-            if (row.endline === '') errors.push({ field: `measurable_outcomes.${index}.endline`, message: 'Endline value is required' });
-            if (!row.unit) errors.push({ field: `measurable_outcomes.${index}.unit`, message: 'Unit of measurement is required' });
-            const hasConfidence = Array.isArray(row.confidence_level)
-                ? row.confidence_level.length > 0
-                : Boolean(String(row.confidence_level || '').trim());
-            if (!hasConfidence) {
-                errors.push({ field: `measurable_outcomes.${index}.confidence_level`, message: 'At least one confidence level is required' });
-            }
-            
-            pushWordRange(errors, `measurable_outcomes.${index}.measurement_explanation`, row.measurement_explanation, 'Measurement explanation');
-        });
-    }
+    // Blank earlier-version rows (the old form saved one by default) carry nothing and never block;
+    // rows with information keep the original detailed rules and are shown in 4.3 to finish or remove.
+    const split = splitOutcomes(asList(data.measurable_outcomes));
+    simpleMeasureIssues(split.simple ? asObj(split.simple) : null).forEach((i) => errors.push(i));
+    split.legacy.forEach(({ row }, index) => {
+        legacyOutcomeIssues(row, index).forEach((i) => errors.push(i));
+    });
 
     challengeTagIssues(data.challenge_tags).forEach((i) => errors.push(i));
     pushWordRange(errors, 'challenges', data.challenges, 'Challenges description');

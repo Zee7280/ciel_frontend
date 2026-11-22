@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useRef } from "react";
+import { stripLeadingEmoji } from "@/utils/stripLeadingEmoji";
 import { Label } from "./ui/label";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
@@ -49,7 +50,7 @@ const SKILL_ALIASES: Record<string, string[]> = {
 };
 
 function stripEmoji(s: string): string {
-    return (s || "").replace(/^[^\s]+\s/, "");
+    return stripLeadingEmoji(s);
 }
 function lowerFirst(text: string): string {
     const t = (text || "").trim();

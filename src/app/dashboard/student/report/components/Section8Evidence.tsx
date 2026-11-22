@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { FileText, Image as ImageIcon, Music as MusicIcon, Trash2, Video as VideoIcon } from "lucide-react";
 import { EvidenceMediaPreview } from "./ui/EvidenceMediaPreview";
-import { evidencePreviewKind } from "../utils/evidencePreviewKind";
+import { evidenceItemFileName, evidenceItemUrl, evidencePreviewKind } from "../utils/evidencePreviewKind";
 import { Label } from "./ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useReportForm } from "../context/ReportContext";
@@ -175,8 +175,17 @@ function useEvidencePreviewUrl(file: EvidenceFileItem, wanted: boolean): string 
 
 /** Renders the contents of a `.cer-ph` tile: the real image thumbnail when one is available,
  *  otherwise a generic icon — evidence is always shown as a picture tile, never a file-list row. */
+/** The stored file's own name (never the caption shown on the tile) and the URL it lives at. */
+const getStoredFileName = (file: EvidenceFileItem) => (isNativeFile(file) ? file.name || "" : evidenceItemFileName(file));
+const getStoredUrl = (file: EvidenceFileItem) => (isNativeFile(file) ? "" : evidenceItemUrl(file));
+
+/** Items from earlier sections are shown under a caption ("Field visit — 2026-10-10"), so the kind
+ *  must be read from the file's MIME type, its real name or its URL — not from that caption. */
+const getEvidenceKind = (file: EvidenceFileItem, fallbackName: string) =>
+    evidencePreviewKind(getFileType(file), getStoredFileName(file) || fallbackName, getStoredUrl(file));
+
 function EvidenceFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
-    const kind = evidencePreviewKind(getFileType(file), name);
+    const kind = getEvidenceKind(file, name);
     const previewUrl = useEvidencePreviewUrl(file, kind === "image");
 
     if (kind === "image" && previewUrl) {
@@ -200,10 +209,11 @@ function EvidenceFilePreview({ file, name }: { file: EvidenceFileItem; name: str
 
 function EvidenceFullFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
     const mimeType = getFileType(file);
-    const kind = evidencePreviewKind(mimeType, name);
-    // Images, video and audio play inline; other files still get their open link.
+    const kind = getEvidenceKind(file, name);
+    // Images, video, audio and PDFs show inline; other files still get their open link (and the
+    // dialog sniffs an unknown stored file before giving up).
     const previewUrl = useEvidencePreviewUrl(file, kind !== "file" || !isNativeFile(file));
-    return <EvidenceMediaPreview url={previewUrl} name={name} mimeType={mimeType} />;
+    return <EvidenceMediaPreview url={previewUrl} name={name} mimeType={mimeType} fileName={getStoredFileName(file) || null} />;
 }
 
 function evidenceTypeOn(selected: string[], id: string) {
@@ -238,9 +248,20 @@ export default function Section8Evidence() {
     const collectedElsewhere = useMemo(() => {
         const items: { file: EvidenceFileItem; label: string; source: string }[] = [];
         (data.section1?.attendance_logs || []).forEach((log) => {
-            if (log.evidence_file) {
+            // Saved logs come back with `evidence_url`; unsaved ones hold the File (or the uploaded URL)
+            // in `evidence_file`. A bare `true` marker carries nothing to show, so fall back to the URL.
+            const stored = log.evidence_file as unknown;
+            const file: EvidenceFileItem | null =
+                typeof stored === "string" && stored.trim()
+                    ? stored
+                    : stored && typeof stored === "object"
+                        ? (stored as EvidenceFileItem)
+                        : typeof log.evidence_url === "string" && log.evidence_url.trim()
+                            ? log.evidence_url
+                            : null;
+            if (file) {
                 items.push({
-                    file: log.evidence_file,
+                    file,
                     label: log.date ? `Field visit — ${log.date}` : (log.activity_type || "Attendance evidence"),
                     source: "Attendance (Sec 1)",
                 });

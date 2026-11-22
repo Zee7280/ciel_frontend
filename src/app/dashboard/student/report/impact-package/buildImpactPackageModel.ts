@@ -104,7 +104,10 @@ function pickString(...values: unknown[]): string {
 function pickNumber(value: unknown): number | null {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string") {
-        const n = Number(value.replace(/,/g, "").replace(/%/g, "").trim());
+        const text = value.replace(/,/g, "").replace(/%/g, "").trim();
+        // A blank field is "not measured", never 0 (Number("") is 0).
+        if (!text) return null;
+        const n = Number(text);
         return Number.isFinite(n) ? n : null;
     }
     return null;
@@ -364,7 +367,7 @@ export function buildImpactPackageModel(
     const outputRows = acts.flatMap((block) => (Array.isArray(block.outputs) ? block.outputs : [])).filter((row) => String(row?.quantity ?? "").trim());
     const reachCount = distinctBeneficiaryTotal(data.section4) || pickNumber(data.section2?.affected_count) || 0;
     const outcomes = Array.isArray(data.section5?.measurable_outcomes) ? data.section5.measurable_outcomes : [];
-    const measured = outcomes.filter((o) => pickString(o.metric, o.outcome_area) && (o.baseline || o.endline));
+    const measured = outcomes.filter((o) => pickString(o.metric, o.outcome_area) && pickNumber(o.baseline) != null && pickNumber(o.endline) != null);
     const numericChange = measured
         .map((o) => ({
             label: pickString(o.metric, o.outcome_area) || "Reported change",

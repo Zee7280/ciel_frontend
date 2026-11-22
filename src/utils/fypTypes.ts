@@ -2,6 +2,7 @@
 // Mirrors ciel_backend/src/paths/entities/fyp-entry.entity.ts
 
 import type { FypAiAnalysis, FypAiAnalysisLock } from "@/utils/fypAiAnalysis";
+import { stripLeadingEmoji } from "./stripLeadingEmoji";
 
 export interface FypTeamMember {
     name: string;
@@ -269,7 +270,7 @@ function joinList(a: string[]) {
     return a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
 }
 export function stripEmoji(s: string) {
-    return (s || "").replace(/^[^\s]+\s/, "");
+    return stripLeadingEmoji(s);
 }
 function article(s: string) {
     return /^[aeiou]/i.test(s) ? "an" : "a";

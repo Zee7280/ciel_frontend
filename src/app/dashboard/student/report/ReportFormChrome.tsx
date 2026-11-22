@@ -44,7 +44,10 @@ function pickString(...values: unknown[]): string {
 function pickNumber(value: unknown): number | null {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string") {
-        const n = Number(value.replace(/,/g, "").trim());
+        const text = value.replace(/,/g, "").trim();
+        // A blank field is "not measured", never 0 (Number("") is 0).
+        if (!text) return null;
+        const n = Number(text);
         return Number.isFinite(n) ? n : null;
     }
     return null;
@@ -149,7 +152,8 @@ function chromeAgg(data: ReportData, projectData?: unknown) {
     const reachCount = distinctBeneficiaryTotal(data.section4) || pickNumber(data.section2?.affected_count) || 0;
     const reach = reachCount > 0 ? String(reachCount) : "";
     const outcomes = Array.isArray(data.section5?.measurable_outcomes) ? data.section5.measurable_outcomes : [];
-    const measured = outcomes.filter((o) => pickString(o.metric, o.outcome_area) && (o.baseline || o.endline));
+    // A measured change needs a name and both numbers; a half-filled row (before only) is not one.
+    const measured = outcomes.filter((o) => pickString(o.metric, o.outcome_area) && pickNumber(o.baseline) != null && pickNumber(o.endline) != null);
     const pcts = measured
         .map((o) => {
             const b = pickNumber(o.baseline);
@@ -1024,6 +1028,14 @@ function SectionSummaryStats({
 /** How the saved AI summary relates to the answers now on screen. */
 type BannerAiSync = SectionSummarySync;
 
+/** Default way a step's AI summary is refreshed; Section 2 also has a "Rewrite with AI" button in 2.2. */
+const DEFAULT_AI_REWRITE_HINT = "when you press Next on this step";
+
+/** Note text with the step's rewrite path filled in ({rewrite} placeholder). */
+export function aiSyncNoteText(note: string, rewriteHint: string = DEFAULT_AI_REWRITE_HINT): string {
+    return note.replace("{rewrite}", rewriteHint);
+}
+
 const AI_SYNC_NOTE: Record<Exclude<BannerAiSync, "none">, { tag: string; note: string; color: string; background: string }> = {
     fresh: {
         tag: "✓ MATCHES YOUR CURRENT ANSWERS",
@@ -1033,13 +1045,13 @@ const AI_SYNC_NOTE: Record<Exclude<BannerAiSync, "none">, { tag: string; note: s
     },
     stale: {
         tag: "⚠ WRITTEN FROM EARLIER ANSWERS",
-        note: "You changed this section after the AI summary was written. The live summary above is current; the AI summary is rewritten from your answers when you press Next on this step.",
+        note: "You changed this section after the AI summary was written. The live summary above is current; the AI summary is rewritten from your answers {rewrite}.",
         color: "#9a6700",
         background: "#fff6e8",
     },
     unchecked: {
         tag: "SAVED SUMMARY · NOT YET RE-CHECKED",
-        note: "Saved before summaries were checked against the answers. Compare it with the live summary above; pressing Next on this step rewrites it from your current answers.",
+        note: "Saved before summaries were checked against the answers. Compare it with the live summary above; it is rewritten from your current answers {rewrite}.",
         color: "#5c6672",
         background: "#eef1f4",
     },
@@ -1051,6 +1063,7 @@ function BannerShell({
     children,
     ai,
     aiSync = "unchecked",
+    aiRewriteHint = DEFAULT_AI_REWRITE_HINT,
     live,
     stats,
 }: {
@@ -1059,6 +1072,8 @@ function BannerShell({
     children?: ReactNode;
     ai?: string;
     aiSync?: BannerAiSync;
+    /** How this step's AI summary gets rewritten (shown when it is stale / unchecked). */
+    aiRewriteHint?: string;
     /** Plain-language summary built from the answers on screen (always current). */
     live?: string;
     stats?: ReactNode;
@@ -1098,7 +1113,7 @@ function BannerShell({
                             {ai}
                         </div>
                         {sync?.note ? (
-                            <p style={{ margin: "-4px 0 10px", fontSize: 10, lineHeight: 1.55, color: sync.color }}>{sync.note}</p>
+                            <p style={{ margin: "-4px 0 10px", fontSize: 10, lineHeight: 1.55, color: sync.color }}>{aiSyncNoteText(sync.note, aiRewriteHint)}</p>
                         ) : null}
                     </>
                 ) : null}
@@ -1293,16 +1308,18 @@ export function liveSectionSummary(uiStep: number, data: ReportData, a: ReturnTy
     }
     if (uiStep === 4) {
         const reach = sectionFourReach(data);
-        const challenges = (Array.isArray(data.section5?.challenge_tags) ? data.section5.challenge_tags : []).filter(
+        const challengeTagList = (Array.isArray(data.section5?.challenge_tags) ? data.section5.challenge_tags : []).filter(
             (tag) => !isSummaryOtherChoice(tag),
-        ).length;
+        );
+        const noChallenges = challengeTagList.some((tag) => /^no significant challenges$/i.test(String(tag).trim()));
+        const challenges = noChallenges ? 0 : challengeTagList.length;
         if (!a.acts.length && !a.measured.length) return "No activities or measured outcomes saved yet.";
         return [
             `${plural(a.acts.length, "activity", "activities")} with ${plural(a.outputs, "countable output")}, reaching ${reach ? `${reach} unique ${reach === 1 ? "person" : "people"}` : "no recorded beneficiaries yet"}.`,
             a.measured.length
                 ? `${plural(a.measured.length, "measured change")}${a.bestPct != null ? `, best ${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : ""}.`
                 : "No baseline → endline measurement yet.",
-            challenges ? `${plural(challenges, "limitation")} named.` : "",
+            noChallenges ? "No significant challenges reported." : challenges ? `${plural(challenges, "limitation")} named.` : "",
         ]
             .filter(Boolean)
             .join(" ");
@@ -1412,7 +1429,13 @@ export function ReportLiveBanner({
 
     if (step === 2) {
         return (
-            <BannerShell step={2} title={baseline ? `“${baseline}”` : "Your baseline, in your words"} ai={aiShown} aiSync={aiSync} live={live} stats={<SectionSummaryStats uiStep={2} data={data} agg={a} />}>
+            <BannerShell
+                step={2}
+                title={baseline ? `“${baseline}”` : "Your baseline, in your words"}
+                ai={aiShown} aiSync={aiSync} live={live}
+                aiRewriteHint="when you press Next on this step, or right away with “Rewrite with AI” under 2.2"
+                stats={<SectionSummaryStats uiStep={2} data={data} agg={a} />}
+            >
                 {data.section2?.problem_statement ? (
                     <>
                         <div className="cer-bsec">BASELINE STATEMENT</div>

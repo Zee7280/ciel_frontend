@@ -541,8 +541,12 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const outcomes = Array.isArray(section5?.measurable_outcomes) ? section5.measurable_outcomes : [];
     const measuredPcts = outcomes
         .map((o) => {
-            const b = Number(String(o.baseline ?? "").replace(/,/g, ""));
-            const e = Number(String(o.endline ?? "").replace(/,/g, ""));
+            const bText = String(o.baseline ?? "").replace(/,/g, "").trim();
+            const eText = String(o.endline ?? "").replace(/,/g, "").trim();
+            // A blank before / after field is "not measured", never 0.
+            if (!bText || !eText) return null;
+            const b = Number(bText);
+            const e = Number(eText);
             if (!Number.isFinite(b) || !Number.isFinite(e) || b === 0) return null;
             return Math.round(((e - b) / b) * 100);
         })
