@@ -89,7 +89,7 @@ function hasPartnerSignal(record: Record<string, unknown>) {
 export function ngoMineBucket(row: OppRow): "drafts" | "review" | "action" | "published" | "closed" {
     if (normalizeReviewStatus(row.status) === "draft") return "drafts";
     if (canEditReturnedOpportunity(row)) return "action";
-    if (isOpportunityPermanentlyRejected(row) || normalizeReviewStatus(row.status) === "rejected") return "closed";
+    if (isOpportunityPermanentlyRejected(row) || ["rejected", "closed"].includes(normalizeReviewStatus(row.status))) return "closed";
     if (isOpportunityPubliclyLive(row) || normalizeReviewStatus(row.status) === "live") return "published";
     return "review";
 }

@@ -200,6 +200,7 @@ function ReportFormContent() {
         nextStep,
         prevStep,
         validateCurrentSection,
+        revealSectionErrors,
         validationErrors,
         data,
         setFullData,
@@ -824,8 +825,11 @@ function ReportFormContent() {
 
     const goFixIncomplete = React.useCallback((dataSection: number) => {
         setBlockedSubmitOpen(false);
+        // Mark the missing fields inline before the step opens, so the student sees exactly
+        // which inputs block the submit instead of a bare "section incomplete".
+        revealSectionErrors(dataSection);
         setStep(dataSectionToWizardStep(dataSection));
-    }, [setStep]);
+    }, [setStep, revealSectionErrors]);
 
     const handleSubmit = async (e?: React.MouseEvent) => {
         if (e) {

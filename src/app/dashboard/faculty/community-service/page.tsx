@@ -253,7 +253,7 @@ function mineBucket(row: MineRow): "drafts" | "review" | "action" | "published" 
     const rec = row as unknown as Record<string, unknown>;
     if (normalizeReviewStatus(row.status) === "draft") return "drafts";
     if (canEditReturnedOpportunity(rec)) return "action";
-    if (isOpportunityPermanentlyRejected(rec) || normalizeReviewStatus(row.status) === "rejected") return "closed";
+    if (isOpportunityPermanentlyRejected(rec) || ["rejected", "closed"].includes(normalizeReviewStatus(row.status))) return "closed";
     if (isOpportunityPubliclyLive(rec) || normalizeReviewStatus(row.status) === "live") return "published";
     return "review";
 }

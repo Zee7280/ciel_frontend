@@ -9,6 +9,10 @@ export async function GET(request: Request) {
         if (facultyEmail.trim()) {
             backendUrl.searchParams.set("faculty_email", facultyEmail.trim().toLowerCase());
         }
+        // `scope=authored` keeps the faculty's own Create Opportunity tabs to listings they created;
+        // without it the backend returns every listing that merely names them as supervisor.
+        const scope = searchParams.get("scope");
+        if (scope) backendUrl.searchParams.set("scope", scope);
 
         const response = await fetch(
             backendUrl.toString(),
@@ -21,7 +25,7 @@ export async function GET(request: Request) {
             },
         );
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
             return NextResponse.json(

@@ -150,6 +150,7 @@ function mapMineRow(r: Record<string, unknown>): MineRow {
 
 export function createTabOf(op: MineRow): StatusTab {
     if (op.status === "draft") return "drafts";
+    if (op.status === "closed") return "closed";
     if (canEditReturnedOpportunity(op as unknown as Record<string, unknown>)) return "action";
     if (isOpportunityPermanentlyRejected(op as unknown as Record<string, unknown>)) return "closed";
     if (opportunityFullyApproved(op)) return "history";

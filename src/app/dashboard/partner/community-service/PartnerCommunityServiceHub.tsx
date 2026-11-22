@@ -176,7 +176,7 @@ function hasPartnerSignal(record: Record<string, unknown>) {
 function mineBucket(row: OppRow): "drafts" | "review" | "action" | "published" | "closed" {
     if (normalizeReviewStatus(row.status) === "draft") return "drafts";
     if (canEditReturnedOpportunity(row)) return "action";
-    if (isOpportunityPermanentlyRejected(row) || normalizeReviewStatus(row.status) === "rejected") return "closed";
+    if (isOpportunityPermanentlyRejected(row) || ["rejected", "closed"].includes(normalizeReviewStatus(row.status))) return "closed";
     if (isOpportunityPubliclyLive(row) || normalizeReviewStatus(row.status) === "live") return "published";
     return "review";
 }
@@ -678,7 +678,10 @@ export default function PartnerCommunityServiceHub() {
                                         <OpportunityListFlashHead title={row.title} />
                                         <div className="px-4 py-3">
                                             <small className="block text-[11.5px] text-[#6b7c86]">
-                                                {formatOpportunityCode(row)} · {String(row.status || "in review")}
+                                                {formatOpportunityCode(row)} ·{" "}
+                                                {String(row.status || "").toLowerCase() === "pending_execution"
+                                                    ? "Confirm execution details — open this opportunity to confirm"
+                                                    : String(row.status || "in review")}
                                                 {pickNum(row, "applicants_count", "applicantsCount") > 0
                                                     ? ` · ${pickNum(row, "applicants_count", "applicantsCount")} applications`
                                                     : ""}

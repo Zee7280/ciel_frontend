@@ -465,6 +465,9 @@ export function validateSection5(data: any): ValidationResult {
 /**
  * Section 6: Resources
  */
+/** Section 5 (Resources) 6.2 — "What did it make possible?" must be a line, not a word. */
+export const RESOURCE_PURPOSE_MIN_WORDS = 3;
+
 export function validateSection6(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     data = asObj(data);
@@ -499,6 +502,9 @@ export function validateSection6(data: any): ValidationResult {
                 }
                 if (!String(row.purpose || '').trim()) {
                     errors.push({ field: `resources.${index}.purpose`, message: 'Say what this resource made possible' });
+                } else if (countWords(String(row.purpose)) < RESOURCE_PURPOSE_MIN_WORDS) {
+                    // One clear line, not a single word — same rule as the backend submit gate.
+                    errors.push({ field: `resources.${index}.purpose`, message: `What did it make possible? — write one clear line (at least ${RESOURCE_PURPOSE_MIN_WORDS} words)` });
                 }
 
                 if (['Other (Specify)', 'Other / Custom'].includes(row.type) && !String(row.type_other || '').trim()) {

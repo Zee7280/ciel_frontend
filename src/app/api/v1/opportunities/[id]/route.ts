@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             }
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
             return NextResponse.json(
@@ -45,7 +45,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
         let data: Record<string, unknown> = {};
         try {
-            data = await response.json();
+            data = await response.json().catch(() => ({}));
         } catch {
             data = {};
         }

@@ -189,12 +189,20 @@ async function uploadViaMultipartDirect(
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("project_id", projectId);
     formData.append("section", section);
-    formData.append("field", field);
+    // Only Section 8 has the per-project evidence endpoint (it also validates `field`); every
+    // other section's files go through the generic report upload route, which only takes
+    // `file` + `section`. Posting section1/6/7 to the evidence route is always a 400.
+    const isSection8 = section === "section8";
+    if (isSection8) {
+        formData.append("project_id", projectId);
+        formData.append("field", field);
+    }
 
     const url = apiV1PathToNestUrl(
-        `/api/v1/student/reports/${encodeURIComponent(projectId)}/evidence`,
+        isSection8
+            ? `/api/v1/student/reports/${encodeURIComponent(projectId)}/evidence`
+            : "/api/v1/student/reports/upload",
         nestBase,
     );
     const res = await authenticatedFetch(url, { method: "POST", body: formData }, { timeoutMs: S3_PUT_TIMEOUT_MS });

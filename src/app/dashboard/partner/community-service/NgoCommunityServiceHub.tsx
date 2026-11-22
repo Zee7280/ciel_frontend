@@ -214,6 +214,11 @@ function resolveNgoCoHostContactName(row: OppRow): string | null {
 }
 
 function ngoPendingStageLabel(row: OppRow): string {
+    // Executing-organization confirmation runs before any co-host / CIEL PK step; it is the
+    // creator's own action, so say so instead of "waiting for someone else".
+    if (String(row.status || "").toLowerCase() === "pending_execution") {
+        return "Confirm execution details — open this opportunity to confirm";
+    }
     const requiresPartner = Boolean(row.requires_partner_approval);
     const partnerStatus = (row.partner_approval_status ?? row.partner_status) as ApprovalLineStatus;
     if (requiresPartner && !isApprovalLineDone(partnerStatus)) {

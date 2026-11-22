@@ -1682,6 +1682,9 @@ function StudentOpportunityCreationPageInner() {
                 });
                 // Drafts reopen on the step the student left (Next / Back / rail / Save draft all move
                 // the marker). Submitted records being edited always open on the first step.
+                // A draft opened without `&draft=1` must still behave as a draft: Submit promotes it
+                // into a fresh submission instead of silently re-saving the draft row.
+                if (String(d.status || "").toLowerCase() === "draft") setIsDraftMode(true);
                 if (String(d.status || "").toLowerCase() === "draft" && !userNavigatedRef.current) {
                     const resumeStep = resolveDraftResumeStep(d, editingOpportunityId);
                     if (resumeStep && resumeStep !== "A") goToStepRef.current(resumeStep);

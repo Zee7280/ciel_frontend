@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
 import { hydrateSection8Visibility } from "../utils/mediaVisibility";
-import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, normalizeAcademicIntegration, type SectionIncompleteInfo } from '../utils/validation';
+import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, normalizeAcademicIntegration, type SectionIncompleteInfo, ValidationResult } from '../utils/validation';
 import { canonicalReportStep, isMergedActivitiesStep, nextReportStep, prevReportStep, wizardStepToDataSections, FLASH_CARD_STEP } from '../utils/reportWizardNav';
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1, loggedHoursClearSubmitBar, resolveRequiredHoursPerStudent } from '../utils/engagementMetrics';
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
@@ -740,6 +740,9 @@ interface ReportContextType {
     setStep: (step: number) => void;
     validationErrors: Record<string, ValidationError[]>;
     validateCurrentSection: () => boolean;
+    /** Runs the validator for one data section and shows its field errors inline (used when the
+     * "Cannot submit yet" dialog opens that section, so the student lands on the marked fields). */
+    revealSectionErrors: (dataSection: number) => void;
     clearValidationErrors: (section: string) => void;
     getFieldError: (fieldPath: string) => string | undefined;
     setFullData: (data: ReportData) => void;
@@ -1172,6 +1175,19 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         return true;
     }, [isReadOnly, isTeamMemberAttendanceOnly, activeStep, data, clearValidationErrors]);
 
+    const revealSectionErrors = useCallback((dataSection: number) => {
+        const validators: Record<number, (d: any) => ValidationResult> = {
+            1: validateSection1, 2: validateSection2, 3: validateSection3, 4: validateSection4,
+            5: validateSection5, 6: validateSection6, 7: validateSection7, 8: validateSection8,
+            9: validateSection9, 10: validateSection10,
+        };
+        const run = validators[dataSection];
+        if (!run) return;
+        const key = `section${dataSection}` as keyof ReportData;
+        const result = run((data as any)[key]);
+        setValidationErrors((prev) => ({ ...prev, [key]: result.errors }));
+    }, [data]);
+
     const getFieldError = useCallback((fieldPath: string): string | undefined => {
         const keys = wizardStepToDataSections(activeStep).map((n) => `section${n}`);
         for (const sectionKey of keys) {
@@ -1265,6 +1281,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         setStep,
         validationErrors,
         validateCurrentSection,
+        revealSectionErrors,
         clearValidationErrors,
         getFieldError,
         setFullData,
@@ -1296,6 +1313,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         setStep,
         validationErrors,
         validateCurrentSection,
+        revealSectionErrors,
         clearValidationErrors,
         getFieldError,
         setFullData,
