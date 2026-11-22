@@ -546,7 +546,7 @@ export default function Sidebar() {
 
     // Faculty approval queues (join applications this faculty member can decide; report supervision
     // requests): one count per page load, so a waiting student is visible from any page.
-    const [facultyQueueCounts, setFacultyQueueCounts] = useState({ joinApplications: 0, reportSupervision: 0 });
+    const [facultyQueueCounts, setFacultyQueueCounts] = useState({ joinApplications: 0 });
     useEffect(() => {
         if (!isFaculty) return;
         let cancelled = false;
@@ -564,12 +564,8 @@ export default function Sidebar() {
             count("/api/v1/faculty/applications?status=pending", (d) =>
                 Array.isArray(d) ? d.filter((r) => (r as { can_decide?: boolean } | null)?.can_decide !== false).length : 0,
             ),
-            count("/api/v1/faculty/report-supervision", (d) => {
-                const pending = (d as { pending?: unknown } | null)?.pending;
-                return Array.isArray(pending) ? pending.length : 0;
-            }),
-        ]).then(([joinApplications, reportSupervision]) => {
-            if (!cancelled) setFacultyQueueCounts({ joinApplications, reportSupervision });
+        ]).then(([joinApplications]) => {
+            if (!cancelled) setFacultyQueueCounts({ joinApplications });
         });
         return () => {
             cancelled = true;
@@ -788,7 +784,6 @@ export default function Sidebar() {
             if (path.endsWith("/notifications")) return notificationUnreadCount || undefined;
             if (isFaculty) {
                 if (href === `${FACULTY_CS_HUB}?view=review&tab=apps`) return facultyQueueCounts.joinApplications || undefined;
-                if (href === "/dashboard/faculty/report-supervision") return facultyQueueCounts.reportSupervision || undefined;
                 if (href === "/dashboard/faculty/quick-work") return facultyQuickWorkPending || undefined;
             }
             if (isAdmin && adminCounts) {
