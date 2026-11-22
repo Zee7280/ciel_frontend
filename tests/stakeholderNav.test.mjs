@@ -89,8 +89,13 @@ test("sidebar, mobile menu and every home page render from the shared model", ()
     assert.match(sidebar, /<NavGroup[\s\S]*?items=\{items\}/, "main buttons expand into their sub-buttons");
     assert.match(sidebar, /mainGroups\.map\(\(g\) => \(\{ heading: `\$\{g\.main\.emoji\} \$\{g\.main\.label\}`, items: g\.items \}\)\)/, "mobile sheet uses the same groups");
     assert.doesNotMatch(sidebar, /PathsBottomSheet/, "student mobile menu is the shared sheet");
+    // The student home and sidebar keep their original layout (impact-area cards, flat menu).
+    const studentHome = read("src/app/dashboard/student/page.tsx");
+    assert.doesNotMatch(studentHome, /StakeholderHomeCards/);
+    assert.match(studentHome, /alertCount=\{card\.key === "communityService" \? csRevisionCount : undefined\}/);
+    assert.match(sidebar, /<NavSectionLabel collapsed=\{collapsed\}>My Impact Areas<\/NavSectionLabel>/);
+    assert.match(sidebar, /\{ heading: "My Impact Areas", items: studentAreaLinks \}/);
     const homes = {
-        "src/app/dashboard/student/page.tsx": 'role="student"',
         "src/app/dashboard/faculty/page.tsx": 'role="faculty"',
         "src/app/dashboard/partner/UniversityDashboardHome.tsx": 'role="university"',
         "src/app/dashboard/partner/NgoDashboardHome.tsx": "role={role}",

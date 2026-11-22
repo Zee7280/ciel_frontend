@@ -56,6 +56,7 @@ import {
     type CielImpactSummary,
 } from "@/utils/cielImpactSummary";
 import { CIEL_PATHS } from "@/utils/cielPaths";
+import { QUICK_WORK_HREF } from "@/utils/quickWorkApi";
 import {
     CIEL_ADMIN_MUTATED_EVENT,
     CIEL_ADMIN_PENDING_COUNTS_EVENT,
@@ -1011,6 +1012,42 @@ export default function Sidebar() {
         return items;
     }, [isStudent, isFaculty, isInvestor, isAdmin, settingsHref, helpHref, countForHref]);
 
+    /**
+     * Student sidebar keeps its original layout (My Dashboard → My Impact Areas → Quick Community
+     * Impact → My Portfolio → More). The shared stakeholder groups drive every other role.
+     */
+    const studentAreaLinks = useMemo<NavItem[]>(
+        () =>
+            isStudent
+                ? CIEL_PATHS.map((path) => ({
+                      label: path.label,
+                      href: path.href,
+                      emoji: path.emoji,
+                      needsAction: impactSummary?.pathsStatus?.[path.key]?.needsAction,
+                      countPill: path.key === "communityService" ? impactSummary?.activeEngagements || undefined : undefined,
+                      onPrefetch: () => prefetchStudentPathData(path.key),
+                  }))
+                : [],
+        [isStudent, impactSummary],
+    );
+    const studentQuickWork = useMemo<NavItem>(() => ({ label: "Quick Impact Log", href: QUICK_WORK_HREF, emoji: "⚡" }), []);
+    const studentPortfolio = useMemo<NavItem>(
+        () => ({ label: "My Impact Portfolio", href: "/dashboard/student/impact", emoji: "🏆", countPill: impactHistoryBadge || undefined, onPrefetch: () => prefetchStudentImpactPortfolio() }),
+        [impactHistoryBadge],
+    );
+    const studentMoreLinks = useMemo<NavItem[]>(
+        () =>
+            isStudent
+                ? withCounts([
+                      { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
+                      { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
+                      { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell },
+                      { label: "Platform tutorial", href: "/dashboard/student/tutorials", icon: PlayCircle },
+                  ])
+                : [],
+        [isStudent, withCounts],
+    );
+
     const conditionalDashboardRows = useMemo<NavItem[]>(() => {
         const rows: NavItem[] = [];
         if (isStudent && studentSubscriptionNav) rows.push({ label: "Subscription fee", href: STUDENT_SUBSCRIPTION_PATH, emoji: "💳" });
@@ -1021,13 +1058,14 @@ export default function Sidebar() {
         () => [
             dashboardHref,
             ...conditionalDashboardRows.map((l) => l.href),
+            ...(isStudent ? [...studentAreaLinks.map((l) => l.href), studentQuickWork.href, studentPortfolio.href, ...studentMoreLinks.map((l) => l.href)] : []),
             ...mainGroups.flatMap((g) => [g.main.href, ...g.items.map((l) => l.href)]),
             ...otherAreas.map((l) => l.href),
             ...extraSections.flatMap((s) => s.items.map((l) => l.href)),
             ...footerLinks.map((l) => l.href),
             ...(isInvestor ? investorPaths.map((l) => l.href) : []),
         ],
-        [dashboardHref, conditionalDashboardRows, mainGroups, otherAreas, extraSections, footerLinks, isInvestor, investorPaths],
+        [dashboardHref, conditionalDashboardRows, isStudent, studentAreaLinks, studentQuickWork, studentPortfolio, studentMoreLinks, mainGroups, otherAreas, extraSections, footerLinks, isInvestor, investorPaths],
     );
 
     const paramCount = (href: string) => Array.from(splitHref(href).params.keys()).length;
@@ -1049,6 +1087,12 @@ export default function Sidebar() {
             };
             const list = aliases[hrefView];
             if (list) return pathname === hrefPath && list.includes(v);
+        }
+        if (isStudent) {
+            if (hrefPath === "/dashboard/student/payments" && pathname === "/dashboard/student/payment") return true;
+            if (hrefPath === "/dashboard/student/impact" && pathname.startsWith("/dashboard/student/analytics")) return true;
+            if (hrefPath === STUDENT_CS_HUB && (pathname.startsWith("/dashboard/student/create-opportunity") || pathname.startsWith("/dashboard/student/browse"))) return true;
+            if (hrefPath === STUDENT_CS_HUB && pathname.startsWith(QUICK_WORK_HREF)) return false;
         }
         if (hrefPath === dashboardHref) return pathname === hrefPath && paramCount(href) === 0;
         if (pathname === hrefPath) {
@@ -1103,7 +1147,16 @@ export default function Sidebar() {
               { heading: "CIEL & You", items: investorCielYou },
               { heading: "Account", items: footerLinks },
           ]
-        : [
+        : isStudent
+          ? [
+                { heading: "My Dashboard", items: [{ label: "Dashboard", href: dashboardHref, icon: LayoutDashboard }, ...conditionalDashboardRows] },
+                { heading: "My Impact Areas", items: studentAreaLinks },
+                { heading: "Quick Community Impact", items: [studentQuickWork] },
+                { heading: "My Portfolio", items: [studentPortfolio] },
+                { heading: "More", items: studentMoreLinks },
+                { heading: "Account", items: footerLinks },
+            ]
+          : [
               { heading: "My Dashboard", items: [{ label: "Dashboard", href: dashboardHref, icon: LayoutDashboard }, ...conditionalDashboardRows] },
               ...mainGroups.map((g) => ({ heading: `${g.main.emoji} ${g.main.label}`, items: g.items })),
               { heading: "Other impact areas", items: otherAreas },
@@ -1226,6 +1279,63 @@ export default function Sidebar() {
                             <NavRow key={row.href} href={row.href} label={row.label} emoji={row.emoji} active={isNavActive(row.href)} collapsed={collapsed} />
                         ))}
 
+                        {isStudent ? (
+                            <>
+                                <NavSectionLabel collapsed={collapsed}>My Impact Areas</NavSectionLabel>
+                                {studentAreaLinks.map((link) => (
+                                    <NavRow
+                                        key={link.href}
+                                        href={link.href}
+                                        label={link.label}
+                                        emoji={link.emoji}
+                                        active={isNavActive(link.href)}
+                                        needsAction={link.needsAction}
+                                        countPill={link.countPill}
+                                        collapsed={collapsed}
+                                        onPrefetch={link.onPrefetch}
+                                    />
+                                ))}
+                                <NavSectionLabel collapsed={collapsed}>Quick Community Impact</NavSectionLabel>
+                                <NavRow
+                                    href={studentQuickWork.href}
+                                    label={studentQuickWork.label}
+                                    emoji={studentQuickWork.emoji}
+                                    active={pathname.startsWith(QUICK_WORK_HREF)}
+                                    collapsed={collapsed}
+                                />
+                                {!collapsed && <div className="mx-0 my-4 border-t border-white/[0.09]" />}
+                                <NavSectionLabel collapsed={collapsed}>My Portfolio</NavSectionLabel>
+                                <NavRow
+                                    href={studentPortfolio.href}
+                                    label={studentPortfolio.label}
+                                    emoji={studentPortfolio.emoji}
+                                    active={isNavActive(studentPortfolio.href)}
+                                    countPill={studentPortfolio.countPill}
+                                    collapsed={collapsed}
+                                    onPrefetch={studentPortfolio.onPrefetch}
+                                />
+                                <NavSectionLabel collapsed={collapsed}>More</NavSectionLabel>
+                                {studentMoreLinks.map((link) => (
+                                    <NavRow
+                                        key={link.href}
+                                        href={link.href}
+                                        label={link.label}
+                                        icon={link.icon}
+                                        active={isNavActive(link.href)}
+                                        countPill={link.countPill}
+                                        collapsed={collapsed}
+                                    />
+                                ))}
+                                {!collapsed && (
+                                    <div className="mx-3.5 mt-[18px] rounded-[14px] bg-white/[0.055] p-3.5 text-[11px] leading-[1.55] text-[#a9c2cc]">
+                                        <b className="text-white">Tip</b>
+                                        <br />
+                                        Open the Guidance card in each area before starting. Your draft saves automatically as you work.
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <>
                         {stakeholderNav ? (
                             <>
                                 <NavSectionLabel collapsed={collapsed}>Community Service</NavSectionLabel>
@@ -1310,6 +1420,8 @@ export default function Sidebar() {
                                     ))}
                                 </div>
                             ))
+                        )}
+                            </>
                         )}
                     </>
                 )}

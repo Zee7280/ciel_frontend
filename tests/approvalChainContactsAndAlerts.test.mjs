@@ -67,7 +67,7 @@ test("WhatsApp links in the app are handed to the WhatsApp app / web client by t
 test("a revision blinks on the student's Community Service tile and on My Opportunities / My Reports", () => {
     const home = read("src/app/dashboard/student/page.tsx");
     assert.match(home, /canEditReturnedOpportunity\(row\)/, "counts opportunities a reviewer sent back");
-    assert.match(home, /opportunities: \{ count: csRevisionCount, countLabel: "revision" \}/, "Opportunities home card blinks with the returned count");
+    assert.match(home, /alertCount=\{card\.key === "communityService" \? csRevisionCount : undefined\}/, "Community Service home card blinks with the returned count");
     const hub = read("src/app/dashboard/student/paths/community-service/CommunityServiceHub.tsx");
     assert.match(hub, /title="My Opportunities"[\s\S]*?alertCount=\{oppActionCount\}/);
     assert.match(hub, /title="My Reports"[\s\S]*?alertCount=\{reportActionCount\}/);
