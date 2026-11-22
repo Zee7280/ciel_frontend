@@ -163,6 +163,7 @@ const FACULTY_NAV: StakeholderNav = {
             subButtons: [
                 { label: "Opportunity Reviews", href: `${FACULTY_CS_HUB}?view=review&tab=opps`, hint: "Student proposals waiting for you" },
                 { label: "Participation Requests", href: `${FACULTY_CS_HUB}?view=review&tab=apps`, hint: "Students applying to published opportunities" },
+                { label: "Supervision Requests", href: "/dashboard/faculty/report-supervision", hint: "Confirm the students you supervise" },
                 { label: "QCI Reviews", href: "/dashboard/faculty/quick-work", hint: "Quick Community Impact logs naming you" },
             ],
         },
