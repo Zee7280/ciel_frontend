@@ -235,7 +235,8 @@ export default function Section8Evidence() {
     const selectedVisibility = normalizeMediaVisibility(media_visible) || DEFAULT_MEDIA_VISIBILITY;
     const evidenceTypeOther = section8.evidence_type_other || "";
     const descriptionWords = countWords(description);
-    const captionInRange = descriptionWords >= 10 && descriptionWords <= 45;
+    // V19 8.2 "Optional evidence explanation" — no minimum, up to 45 words.
+    const captionInRange = descriptionWords > 0 && descriptionWords <= 45;
 
     const update = (field: string, val: unknown) => updateSection("section8", { [field]: val });
     const toggleEvidenceType = (type: string) => {
@@ -285,13 +286,15 @@ export default function Section8Evidence() {
         const onFile = collectedElsewhere.length;
         const added = evidence_files?.length || 0;
         const total = onFile + added;
+        const publicOk = !isPublicMediaVisibility(selectedVisibility) || hasPublicSharePermission(section8);
+        // One status, not two: a public choice without the share permission *is* restricted for now.
         const visibility =
-            selectedVisibility === "public" ? "Visibility: public."
+            selectedVisibility === "public"
+                ? (publicOk ? "Visibility: public." : "Visibility: public requested — treated as restricted until public-share permission is confirmed.")
             : selectedVisibility === "restricted" ? "Visibility: restricted."
             : "Visibility: private.";
-        const publicOk = !isPublicMediaVisibility(selectedVisibility) || hasPublicSharePermission(section8);
         const shareNote = selectedVisibility === "public"
-            ? (publicOk ? "Public share permission is confirmed." : "Public share permission is pending.")
+            ? (publicOk ? "Public share permission is confirmed." : "Tick the public-share permission below to publish it.")
             : "Not shown publicly.";
         if (!total) return `Evidence already on file will appear here as pictures. ${visibility} ${shareNote}`;
         return `${total} evidence file${total === 1 ? "" : "s"} sit on record — ${onFile} from earlier sections${added ? ` and ${added} added here` : ""}. ${visibility} ${shareNote}`;
@@ -481,7 +484,7 @@ export default function Section8Evidence() {
                         <div>
                             <div className="flex items-end justify-between gap-3">
                                 <Label className={fieldLabel}>What does your evidence show?</Label>
-                                <span className="cer-tag">Required · 10–45 words</span>
+                                <span className="cer-tag auto">Optional · up to 45 words</span>
                             </div>
                             <input
                                 className="cer-input mt-2"
@@ -490,7 +493,7 @@ export default function Section8Evidence() {
                                 onChange={(e) => update("description", e.target.value)}
                             />
                             <p className={clsx("cer-wc", captionInRange && "ok")}>
-                                {descriptionWords} WORDS · TARGET 10–45
+                                {descriptionWords} WORDS · MAX 45
                             </p>
                             <FieldError message={getFieldError("description")} />
                         </div>

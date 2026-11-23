@@ -23,6 +23,8 @@ export interface Section2SmartDraftInput {
     discipline?: string;
     /** Q5 how the discipline contributed. */
     contribution?: string;
+    /** 2.3 risk, safeguarding & consent, already phrased (see riskSafeguarding.safeguardingSummarySentence). */
+    safeguarding?: string;
 }
 
 function clean(text: unknown): string {
@@ -107,6 +109,9 @@ export function composeSection2SmartDraft(input: Section2SmartDraftInput): strin
     } else if (contribution) {
         parts.push(sentence(contribution.charAt(0).toUpperCase() + contribution.slice(1)));
     }
+
+    const safeguarding = clean(input.safeguarding);
+    if (safeguarding) parts.push(safeguarding);
 
     return parts.filter(Boolean).join(" ");
 }

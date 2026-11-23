@@ -414,7 +414,9 @@ export default function Section9Reflection() {
                 <div>
                     <div className="flex items-end justify-between gap-3">
                         <Label className={fieldLabel}>Personal learning reflection · auto-drafted, edit freely</Label>
-                        <span className="cer-wc">{plWords} words · recommended 40–100</span>
+                        <span className={clsx("cer-wc", plWords >= 40 && plWords <= 100 && "ok")}>
+                            {plWords} words · required 40–100{plWords < 40 ? ` · add ${40 - plWords}` : plWords > 100 ? ` · trim ${plWords - 100}` : " · ✓"}
+                        </span>
                     </div>
                     <textarea
                         className="cer-input mt-2 min-h-[96px]"
@@ -427,7 +429,9 @@ export default function Section9Reflection() {
                 <div>
                     <div className="flex items-end justify-between gap-3">
                         <Label className={fieldLabel}>Academic application · auto-drafted, edit freely</Label>
-                        <span className="cer-wc">{aaWords} words · recommended 25–70</span>
+                        <span className={clsx("cer-wc", aaWords >= 25 && aaWords <= 70 && "ok")}>
+                            {aaWords} words · required 25–70{aaWords < 25 ? ` · add ${25 - aaWords}` : aaWords > 70 ? ` · trim ${aaWords - 70}` : " · ✓"}
+                        </span>
                     </div>
                     <textarea
                         className="cer-input mt-2 min-h-[96px]"

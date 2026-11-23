@@ -182,12 +182,16 @@ test("the report wizard renders the streamlined Section 4 (activities, reach, re
         "How do you know?",
         "One optional measurable result (before / after)",
         "Challenges &amp; limitations",
-        "Auto-generated Section 4 summary",
-        "Refresh summary",
         "Finalise Section 4 →",
     ]) {
         assert.ok(ui.includes(marker), marker);
     }
+    // One summary per step: the live banner at the top is the only Section 4 summary; the old
+    // "Auto-generated Section 4 summary" card (a second, different paragraph) is gone.
+    assert.equal(ui.includes("Auto-generated Section 4 summary"), false);
+    assert.equal(ui.includes("Refresh summary"), false);
+    assert.equal(ui.includes("data-ciel-section4-summary"), false);
+    assert.match(ui, /updateSection\("section4", \{ finalized: true, summary_text: summary\.text \}\)/);
     // Existing keys only: activity_blocks / project_summary / section5.* (no new top-level sections).
     assert.match(ui, /updateSection\("section4", \{ activity_blocks: next \}\)/);
     assert.match(ui, /updateSection\("section5", \{ observed_change: e\.target\.value \}\)/);

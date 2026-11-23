@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { CheckCircle2, ChevronDown, Lock, Pencil, PlusCircle, RefreshCw, Trash2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, Lock, Pencil, PlusCircle, Trash2 } from "lucide-react";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import { ACTIVITY_FAMILY_OPTIONS, GLOBAL_ACTIVITY_TAXONOMY } from "../utils/globalActivityTaxonomy";
@@ -274,11 +274,6 @@ export default function Section4Streamlined() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [section4.activity_blocks, section4.project_summary, section5.observed_change, section5.story_because, section5.measurable_outcomes, section5.challenges, section5.challenge_tags],
     );
-    const [summaryStamp, setSummaryStamp] = useState<string>("");
-    const refreshSummary = () => {
-        updateSection("section4", { summary_text: summary.text });
-        setSummaryStamp(new Date().toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" }));
-    };
 
     const activityErrors = activities.flatMap((a, i) => activityIssues(a, i, subsFor));
     const tagErrors = challengeTagIssues(tags);
@@ -632,52 +627,9 @@ export default function Section4Streamlined() {
                 </div>
             </section>
 
-            {/* Summary */}
-            <section className="overflow-hidden rounded-[18px] border border-[#0b2a33] bg-white shadow-sm" data-ciel-section4-summary>
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0b2a33] px-5 py-3 text-white">
-                    <p className="text-[11px] font-black uppercase tracking-[0.14em]">✦ Auto-generated Section 4 summary</p>
-                    <p className="text-[10px] text-white/70">{summaryStamp ? `Updated ${summaryStamp}` : "Updated from form fields · AI-ready"}</p>
-                </div>
-                <div className="space-y-4 px-5 py-4">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        {[
-                            [String(summary.majorActivities), "Major activities"],
-                            [String(summary.outputRecords), "Output records"],
-                            [summary.uniqueLabel, "Unique beneficiaries"],
-                        ].map(([v, l]) => (
-                            <div key={l} className="rounded-xl border border-[#dcebee] bg-[#f8fcfd] px-4 py-3">
-                                <b className="block text-xl font-black text-[#0e7d74]">{v}</b>
-                                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{l}</span>
-                            </div>
-                        ))}
-                    </div>
-                    {[
-                        ["Activities and deliverables", summary.activitiesText],
-                        ["Community reach", summary.reachText],
-                        ["Results and evidence", summary.resultsText],
-                        ["Challenges and limitations", summary.challengesText],
-                    ].map(([h, t]) => (
-                        <div key={h}>
-                            <p className="text-[11.5px] font-bold text-slate-900">{h}</p>
-                            <p className="whitespace-pre-line text-[12px] leading-relaxed text-slate-700">{t}</p>
-                        </div>
-                    ))}
-                    <p className="text-[10.5px] text-slate-500">
-                        Generated from student-entered data; not independently verified. The detailed report and Impact Flash Card reuse the same stored activity and outcome records.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={refreshSummary}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--teal)] bg-[var(--teal-soft)] px-3.5 py-1.5 text-[11px] font-bold text-[var(--teal)]"
-                        >
-                            <RefreshCw className="h-3.5 w-3.5" /> Refresh summary
-                        </button>
-                        <span className="text-[11px] text-slate-500">No student-written analytical summary required.</span>
-                    </div>
-                </div>
-            </section>
-
+            {/* The one Section 4 summary is the live banner at the top of this step ("what the rubric
+                will read"); Finalise stores the field-generated text with the report and Next lets the
+                AI rewrite it, so no second summary card is shown here. */}
             {/* Finalise */}
             <section className="space-y-2">
                 {!finalized ? (
@@ -691,7 +643,7 @@ export default function Section4Streamlined() {
                             Finalise Section 4 →
                         </button>
                         {!canFinalize ? (
-                            <p className="text-center text-xs text-slate-500">Complete the required fields listed in the section summary before finalising.</p>
+                            <p className="text-center text-xs text-slate-500">Complete the required fields above before finalising; the summary banner at the top of this step updates as you go.</p>
                         ) : (
                             <p className="text-center text-xs text-emerald-600">Ready ✨</p>
                         )}
@@ -699,7 +651,7 @@ export default function Section4Streamlined() {
                 ) : (
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
                         <span className="inline-flex items-center gap-1.5 font-semibold">
-                            <CheckCircle2 className="h-4 w-4" /> Section 4 finalised — the summary above travels with your report.
+                            <CheckCircle2 className="h-4 w-4" /> Section 4 finalised — its summary travels with your report.
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                             <Lock className="h-3.5 w-3.5" /> Editing any field above re-opens it.

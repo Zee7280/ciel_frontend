@@ -355,7 +355,13 @@ async function uploadEvidenceList(
     return mapWithConcurrency(files, UPLOAD_CONCURRENCY, async (item) => {
         const pendingFile = getPendingFile(item);
         if (pendingFile) {
-            return (await uploadEvidenceFile(projectId, section, field, pendingFile)) as EvidenceItem;
+            const uploaded = (await uploadEvidenceFile(projectId, section, field, pendingFile)) as EvidenceItem;
+            // Section 5 proofs are linked to the resource entry they support (`resource_index`); the
+            // link lives on the wrapper record, so it must survive the upload round-trip.
+            if (isRecord(item) && isRecord(uploaded) && typeof item.resource_index === "number") {
+                return { ...uploaded, resource_index: item.resource_index };
+            }
+            return uploaded;
         }
         return stripRuntimeFile(item);
     });

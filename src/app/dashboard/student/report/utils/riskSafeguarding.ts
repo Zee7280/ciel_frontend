@@ -104,6 +104,61 @@ export function hasRiskBlockContent(block: RiskBlockShape | null | undefined): b
     );
 }
 
+function firstSentence(value: unknown, maxLen = 220): string {
+    const t = text(value);
+    if (!t) return "";
+    const match = t.match(/^[^.!?]*[.!?]/);
+    const candidate = (match ? match[0] : t).trim().replace(/[.!?]+$/, "");
+    return candidate.length <= maxLen ? candidate : `${candidate.slice(0, maxLen).trim()}…`;
+}
+
+function listJoin(items: string[]): string {
+    if (items.length < 2) return items.join("");
+    return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/**
+ * 2.3 as one or two plain sentences for the Section 2 baseline statement and summaries. Empty when
+ * the block was not answered (older reports), so nothing is invented.
+ */
+export function safeguardingSummarySentence(block: RiskBlockShape | null | undefined): string {
+    if (!hasRiskBlockContent(block)) return "";
+    const risks = realRiskIds(block?.risk_factors).map((id) => riskFactorLabel(id).toLowerCase());
+    const parts: string[] = [];
+    if (!risks.length && riskFactorIds(block?.risk_factors).includes(RISK_NONE_ID)) {
+        parts.push("Safeguarding: no risk factors were identified for this project.");
+    } else if (risks.length) {
+        const precaution = firstSentence(block?.risk_mitigation);
+        parts.push(
+            `Safeguarding: ${listJoin(risks)} ${risks.length === 1 ? "was" : "were"} identified as risk factors${precaution ? `; ${precaution.charAt(0).toLowerCase()}${precaution.slice(1)}` : ""}.`,
+        );
+    } else if (text(block?.risk_mitigation)) {
+        parts.push(`Safeguarding: ${firstSentence(block?.risk_mitigation)}.`);
+    }
+    const consent = consentLabel(block?.risk_consent);
+    if (consent) parts.push(`Consent for photographs and personal data: ${consent.toLowerCase()} (${CONSENT_REPORTED_QUALIFIER}).`);
+    const lead = text(block?.risk_safeguarding_lead);
+    if (lead) parts.push(`Responsible for safeguarding on site: ${lead.replace(/[.!?]+$/, "")}.`);
+    const unresolved = firstSentence(block?.risk_unresolved);
+    if (unresolved) parts.push(`Unresolved: ${unresolved}.`);
+    return parts.join(" ");
+}
+
+/** Short banner line: "Safeguarding: 2 risk factors · written consent obtained (student-reported)". */
+export function safeguardingBannerLine(block: RiskBlockShape | null | undefined): string {
+    if (!hasRiskBlockContent(block)) return "Safeguarding block not answered yet.";
+    const risks = realRiskIds(block?.risk_factors);
+    const none = !risks.length && riskFactorIds(block?.risk_factors).includes(RISK_NONE_ID);
+    const consent = consentLabel(block?.risk_consent);
+    const bits = [
+        none ? "no risk factors identified" : risks.length ? `${risks.length} risk factor${risks.length === 1 ? "" : "s"}` : "",
+        consent ? `${consent.toLowerCase()} (student-reported)` : "",
+        text(block?.risk_safeguarding_lead) ? "on-site lead named" : "",
+        text(block?.risk_unresolved) ? "unresolved item noted" : "",
+    ].filter(Boolean);
+    return `Safeguarding: ${bits.join(" · ")}.`;
+}
+
 /**
  * Conditional rules, deliberately backward compatible:
  *  - nothing selected (an older report / not touched yet) → no errors, the block is optional;

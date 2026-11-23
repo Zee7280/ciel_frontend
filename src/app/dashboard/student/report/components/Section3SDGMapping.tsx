@@ -19,6 +19,7 @@ import {
 } from "@/utils/sdgData";
 import clsx from "clsx";
 import { listOpportunityReportSdgs, registeredSecondaryContribution } from "../utils/reportSdgMerge";
+import { MAX_ADDITIONAL_SDGS } from "../utils/sdgAdditionalCap";
 import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_MAX_WORDS, FIELD_WORD_POLICY, reportTextWordMeter } from "../utils/validation";
 
 const PRIMARY_SDG_WORD_RANGE = FIELD_WORD_POLICY.contribution_intent_statement;
@@ -214,11 +215,15 @@ function registeredSdgMeta(goalNumber: number, targetId: string, indicatorId: st
 /** Clickable colored SDG tile grid — replaces a plain goal dropdown with the same visual picker used across the app's redesigned SDG UI. */
 function SDGTileGrid({
     selectedId,
-    disabledIds = [],
+    registeredIds = [],
+    takenIds = [],
     onSelect,
 }: {
     selectedId: string;
-    disabledIds?: string[];
+    /** Goals registered on the opportunity (3.1) — locked, shown with the padlock. */
+    registeredIds?: string[];
+    /** Goals the student already mapped elsewhere in 3.2 — not registered, just taken. */
+    takenIds?: string[];
     onSelect: (id: string) => void;
 }) {
     return (
@@ -226,21 +231,33 @@ function SDGTileGrid({
             {ALL_SDGS.map((sdg) => {
                 const id = String(sdg.num);
                 const isSelected = id === selectedId;
-                const isDisabled = !isSelected && disabledIds.includes(id);
+                const isRegistered = !isSelected && registeredIds.includes(id);
+                const isTaken = !isSelected && !isRegistered && takenIds.includes(id);
+                const isDisabled = isRegistered || isTaken;
                 return (
                     <button
                         key={id}
                         type="button"
                         disabled={isDisabled}
+                        title={
+                            isRegistered
+                                ? `SDG ${id} is registered on the opportunity (see 3.1)`
+                                : isTaken
+                                  ? `SDG ${id} is already mapped in 3.2 — student-added, not registered`
+                                  : undefined
+                        }
+                        data-ciel-sdg-tile-state={isSelected ? "selected" : isRegistered ? "registered" : isTaken ? "taken" : "free"}
                         onClick={() => onSelect(isSelected ? "" : id)}
                         style={{ backgroundColor: sdg.color }}
                         className={clsx(
                             "cer-sdg-tile relative flex min-h-[66px] flex-col gap-0.5 rounded-lg border-2 p-2 text-left text-[11px] font-bold leading-tight text-white transition-all",
                             isSelected
                                 ? "on border-transparent"
-                                : isDisabled
+                                : isRegistered
                                   ? "prim cursor-not-allowed border-transparent"
-                                  : "border-transparent opacity-70 hover:-translate-y-0.5 hover:opacity-100",
+                                  : isTaken
+                                    ? "taken cursor-not-allowed border-transparent"
+                                    : "border-transparent opacity-70 hover:-translate-y-0.5 hover:opacity-100",
                         )}
                     >
                         <span className="text-base font-extrabold">{sdg.num}</span>
@@ -286,9 +303,18 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
         missing.forEach((row) => {
             next[String(row.goalNumber)] = "";
         });
-        updateSection("section3", { registered_secondary_contributions: next });
+        updateSection("section3", { registered_secondary_contributions: next }, { keepErrors: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [oppSecondaries, section3.registered_secondary_contributions]);
+
+    // V19 3.2 cap: record the opportunity's registered primary so the submit gates (frontend and
+    // backend) can tell whether the student's own primary mapping is an *additional* goal.
+    useEffect(() => {
+        const seeded = oppPrimaryNum > 0 ? oppPrimaryNum : null;
+        if ((section3.registered_primary_goal ?? null) === seeded) return;
+        updateSection("section3", { registered_primary_goal: seeded }, { keepErrors: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [oppPrimaryNum, section3.registered_primary_goal]);
 
     const setRegisteredContribution = (goalNumber: number, text: string) => {
         updateSection("section3", {
@@ -306,6 +332,12 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const studentSubIndicator = data.section3.primary_sdg.sub_indicator || "";
 
     const selectedSDGRecord = findSdgById(studentPrimaryId);
+    /** The student's primary mapping is an additional goal once the opportunity has its own registered primary. */
+    const primaryIsAdditional = Boolean(studentPrimaryId) && oppPrimaryNum > 0 && !registeredGoalIds.includes(studentPrimaryId);
+    /** "Up to two" additional goals in total (V19 3.2): secondary slots left after the primary mapping. */
+    const secondarySlots = Math.max(0, MAX_ADDITIONAL_SDGS - (primaryIsAdditional ? 1 : 0));
+    const additionalGoals = (secondary_sdgs || []).length + (primaryIsAdditional ? 1 : 0);
+    const overAdditionalCap = additionalGoals > MAX_ADDITIONAL_SDGS;
 
     const handleRemoveSecondary = (index: number) => {
         const updated = [...secondary_sdgs];
@@ -708,9 +740,10 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             </h3>
                         </div>
                         <p className="pl-9 text-sm leading-relaxed text-slate-500">
-                            If you wish to align your project with additional SDGs, you may select up to two.
-                            Please briefly explain how your activities contribute to achieving each selected
-                            SDG.
+                            If you wish to align your project with additional SDGs, you may select up to two in
+                            total — the primary mapping here plus one secondary alignment, or two secondary
+                            alignments. Please briefly explain how your activities contribute to achieving each
+                            selected SDG.
                         </p>
                     </div>
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
@@ -739,7 +772,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         </label>
                         <SDGTileGrid
                             selectedId={studentPrimaryId}
-                            disabledIds={registeredGoalIds}
+                            registeredIds={registeredGoalIds}
+                            takenIds={(secondary_sdgs || []).map((s) => s.goal_number?.toString() || "").filter(Boolean)}
                             onSelect={(id) =>
                                 updateSection("section3", {
                                     primary_sdg: {
@@ -839,13 +873,23 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                     3.2.2 Secondary SDG mapping (optional)
                                 </Label>
                                 <p className="mt-1 text-sm text-slate-500">
-                                    Map additional goals impacted by this project — up to two.
+                                    {primaryIsAdditional
+                                        ? "Map one more goal impacted by this project — your primary mapping above is the first of the two additional goals."
+                                        : "Map additional goals impacted by this project — up to two."}
                                 </p>
                             </div>
-                            <span className="cer-sdg-count shrink-0">
-                                {(secondary_sdgs || []).length} of 2 added
+                            <span className="cer-sdg-count shrink-0" data-ciel-secondary-count>
+                                {overAdditionalCap
+                                    ? `${(secondary_sdgs || []).length} added · ${secondarySlots} allowed`
+                                    : `${(secondary_sdgs || []).length} of ${secondarySlots} added`}
                             </span>
                         </div>
+                        {overAdditionalCap ? (
+                            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" data-ciel-sdg-cap-warning>
+                                Only {MAX_ADDITIONAL_SDGS} additional SDGs are allowed in total (your primary mapping counts as one). Remove {additionalGoals - MAX_ADDITIONAL_SDGS} secondary alignment{additionalGoals - MAX_ADDITIONAL_SDGS === 1 ? "" : "s"} or clear the primary mapping.
+                            </p>
+                        ) : null}
+                        <FieldError message={getFieldError("secondary_sdgs")} />
 
                         {(secondary_sdgs || []).map((sdg: {
                             goal_number?: string | number | null;
@@ -864,7 +908,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 .filter((_: unknown, i: number) => i !== index)
                                 .map((s: { goal_number?: string | number | null }) => s.goal_number?.toString())
                                 .filter((v: string | undefined): v is string => Boolean(v));
-                            const disabledIds = [studentPrimaryId, ...otherSelectedIds, ...registeredGoalIds].filter(Boolean);
+                            const takenIds = [studentPrimaryId, ...otherSelectedIds].filter(Boolean);
                             const duplicatesRegistered = Boolean(sdgId) && registeredGoalIds.includes(sdgId);
 
                             return (
@@ -893,7 +937,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                     ) : null}
                                     <SDGTileGrid
                                         selectedId={sdgId}
-                                        disabledIds={disabledIds}
+                                        registeredIds={registeredGoalIds}
+                                        takenIds={takenIds}
                                         onSelect={(id) =>
                                             updateSecondary(index, {
                                                 goal_number: id,
@@ -963,7 +1008,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             );
                         })}
 
-                        {secondary_sdgs.length < 2 ? (
+                        {secondary_sdgs.length < secondarySlots ? (
                             <button
                                 type="button"
                                 onClick={() => {

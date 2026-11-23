@@ -834,6 +834,25 @@
     font-weight: 800;
 }
 
+/* A goal the student already mapped elsewhere in 3.2: taken, not registered — no padlock. */
+.cer .cer-sdg-tile.taken {
+    outline: 2px dashed rgba(255, 255, 255, 0.85);
+    outline-offset: 2px;
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.cer .cer-sdg-tile.taken::after {
+    content: "mapped";
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 .cer .cer-s1sum {
     margin-top: 16px;
     border: 1px solid var(--line);
@@ -4840,3 +4859,203 @@
 .cer-s4 .ladStrip button.st{font-family:inherit}
 .cer-s4 .sureList button.su{font-family:inherit;width:100%;text-align:left}
 .cer-s4 .quickPicks button.qp{font-family:inherit}
+
+/* ── Section 5 · Resources (V19 streamlined flow) ─────────────────────────── */
+:is(.cer, .cer-scope) .cer-cr-intro {
+    border: 1px solid #cfe3ef;
+    background: #f3f9fc;
+    border-radius: 14px;
+    padding: 12px 15px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--ink);
+}
+:is(.cer, .cer-scope) .cer-cr-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+:is(.cer, .cer-scope) .cer-cr-steps span {
+    border: 1px solid #cfe3ef;
+    background: #fff;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #0d4b6b;
+}
+:is(.cer, .cer-scope) .cer-ex {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.5;
+}
+:is(.cer, .cer-scope) .cer-muted {
+    font-size: 11.5px;
+    color: var(--muted);
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 8px 11px;
+    background: #fafdfd;
+}
+:is(.cer, .cer-scope) .cer-ok {
+    font-size: 11.5px;
+    color: var(--teal);
+    border: 1px solid #cbe7e3;
+    border-radius: 10px;
+    padding: 8px 11px;
+    background: var(--teal-soft);
+    font-weight: 600;
+}
+:is(.cer, .cer-scope) .cer-who {
+    border: 1px solid #e8dcc3;
+    background: #fffaf0;
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+:is(.cer, .cer-scope) .cer-proof {
+    border: 1px solid #cbe7e3;
+    background: #f4fbf9;
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+:is(.cer, .cer-scope) .cer-pill {
+    display: inline-block;
+    border-radius: 999px;
+    background: var(--teal-soft);
+    color: var(--teal);
+    border: 1px solid #cbe7e3;
+    padding: 3px 10px;
+    font-size: 10.5px;
+    font-weight: 800;
+}
+:is(.cer, .cer-scope) .cer-cr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+}
+:is(.cer, .cer-scope) .cer-cr-table th,
+:is(.cer, .cer-scope) .cer-cr-table td {
+    text-align: left;
+    vertical-align: top;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+}
+:is(.cer, .cer-scope) .cer-cr-table th {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    background: #f8fcfd;
+}
+:is(.cer, .cer-scope) .cer-donut-wrap {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    border: 1px solid #f1e3b0;
+    background: #fffbea;
+    border-radius: 16px;
+    padding: 16px 18px;
+}
+:is(.cer, .cer-scope) .cer-donut-wrap > div:last-child b {
+    display: block;
+    font-size: 13px;
+    color: var(--ink);
+    margin-bottom: 4px;
+}
+:is(.cer, .cer-scope) .cer-donut-wrap p {
+    font-size: 11.5px;
+    color: #5c6672;
+    line-height: 1.5;
+    margin: 2px 0 0;
+}
+:is(.cer, .cer-scope) .cer-donut {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+:is(.cer, .cer-scope) .cer-donut-hole {
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    background: #fffbea;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    line-height: 1.05;
+}
+:is(.cer, .cer-scope) .cer-donut-hole b {
+    font-size: 18px;
+    color: var(--ink);
+}
+:is(.cer, .cer-scope) .cer-donut-hole span {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+:is(.cer, .cer-scope) .cer-donut-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin: 4px 0 6px;
+}
+:is(.cer, .cer-scope) .cer-donut-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink);
+}
+:is(.cer, .cer-scope) .cer-donut-legend i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+:is(.cer, .cer-scope) .cer-v17 {
+    border: 1px solid #0b3a40;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fff;
+}
+:is(.cer, .cer-scope) .cer-v17 header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #0b3a40;
+    color: #fff;
+    padding: 10px 16px;
+}
+:is(.cer, .cer-scope) .cer-v17 header b {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+}
+:is(.cer, .cer-scope) .cer-v17 header small {
+    font-size: 10px;
+    opacity: 0.75;
+}
+:is(.cer, .cer-scope) .cer-v17-body {
+    padding: 14px 16px;
+    display: grid;
+    gap: 10px;
+}
+:is(.cer, .cer-scope) .cer-v17-body h4 {
+    margin: 0 0 2px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--teal);
+}
+:is(.cer, .cer-scope) .cer-v17-body p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+    color: #1d3a3d;
+}

@@ -83,3 +83,45 @@ test("V19 item 13: reviewer attention notes flag blank, incomplete and inconsist
     assert.deepEqual(clean.map((n) => [n.level, n.code]), [["info", "consent_student_reported"]]);
     assert.match(clean[0].message, /student-reported, not independently verified/);
 });
+
+test("2.3 is written into the Section 2 statement and summaries: one plain sentence set, nothing invented", async () => {
+    const { safeguardingSummarySentence, safeguardingBannerLine } = await import("../src/app/dashboard/student/report/utils/riskSafeguarding.ts");
+    assert.equal(safeguardingSummarySentence({}), "");
+    assert.equal(safeguardingSummarySentence(null), "");
+    assert.equal(safeguardingBannerLine({}), "Safeguarding block not answered yet.");
+    const block = {
+        risk_factors: ["children_present", "physical_work"],
+        risk_mitigation: "All activities will be coordinated with SOS Children's Village management. Volunteers will use protective equipment.",
+        risk_consent: "written",
+        risk_safeguarding_lead: "Village Director",
+        risk_unresolved: "",
+    };
+    assert.equal(
+        safeguardingSummarySentence(block),
+        "Safeguarding: children present and physical work / tools / heights were identified as risk factors; all activities will be coordinated with SOS Children's Village management. " +
+            "Consent for photographs and personal data: written consent obtained (student-reported, not independently verified). " +
+            "Responsible for safeguarding on site: Village Director.",
+    );
+    assert.equal(safeguardingBannerLine(block), "Safeguarding: 2 risk factors · written consent obtained (student-reported) · on-site lead named.");
+    assert.equal(safeguardingSummarySentence({ risk_factors: ["none"] }), "Safeguarding: no risk factors were identified for this project.");
+    assert.equal(safeguardingBannerLine({ risk_factors: ["none"] }), "Safeguarding: no risk factors identified.");
+    assert.match(safeguardingSummarySentence({ risk_factors: ["travel_to_site"], risk_unresolved: "Transport for the last session is still unconfirmed." }), /Unresolved: Transport for the last session is still unconfirmed\.$/);
+});
+
+test("Section 2 wiring: the live statement, the AI-unavailable fallback and the banner all carry 2.3", async () => {
+    const { readFileSync } = await import("node:fs");
+    const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+    const s2 = read("src/app/dashboard/student/report/components/Section2ProjectContext.tsx");
+    assert.match(s2, /safeguardingSummarySentence\(sectionData\),\s*\);/);
+    assert.match(s2, /safeguarding: safeguardingSummarySentence\(sectionData\),/);
+    assert.match(s2, /if \(safeguarding\) parts\.push\(safeguarding\);/);
+    assert.match(s2, /hasRiskBlockContent\(sectionData\);/);
+    for (const key of ["risk_factors", "risk_mitigation", "risk_consent", "risk_safeguarding_lead", "risk_unresolved"]) {
+        assert.match(s2, new RegExp(`sectionData\\.${key},\\s*\\n`), `effect dep ${key}`);
+    }
+    const chrome = read("src/app/dashboard/student/report/ReportFormChrome.tsx");
+    assert.match(chrome, /safeguardingBannerLine\(data\.section2\),/);
+    assert.match(chrome, /🛡 \$\{riskFactorLabel\(id\)\}/);
+    const draft = read("src/app/dashboard/student/report/utils/section2SmartDraft.ts");
+    assert.match(draft, /const safeguarding = clean\(input\.safeguarding\);\s*if \(safeguarding\) parts\.push\(safeguarding\);/);
+});

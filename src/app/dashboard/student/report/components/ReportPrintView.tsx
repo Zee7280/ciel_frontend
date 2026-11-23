@@ -1534,6 +1534,17 @@ export default function ReportPrintView({ projectData, reportData, showCiiSectio
                             ) : null}
                         </div>
                     ) : null}
+                    {/* V19 item 17: every registered secondary SDG carries its own contribution statement. */}
+                    {Object.entries(data.section3.registered_secondary_contributions || {}).filter(([, text]) => String(text || "").trim()).length ? (
+                        <div className={dossierFieldGrid}>
+                            {Object.entries(data.section3.registered_secondary_contributions || {})
+                                .filter(([, text]) => String(text || "").trim())
+                                .sort(([a], [b]) => Number(a) - Number(b))
+                                .map(([goal, text]) => (
+                                    <QandA key={goal} q={`Contribution to registered SDG ${goal}`} a={String(text)} />
+                                ))}
+                        </div>
+                    ) : null}
 
                     <div className={dossierFieldGrid}>
                         <QandA q="Validation status" a={data.section3.validation_status} />

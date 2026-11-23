@@ -11,6 +11,30 @@ export function isExternalResourceSource(sources: unknown): boolean {
     return list.some((s) => !(INTERNAL_RESOURCE_SOURCES as readonly string[]).includes(s));
 }
 
+/** V19 5.2 "mixed" source — the student team AND an outside contributor funded the same entry. */
+export function isMixedResourceSource(sources: unknown): boolean {
+    const list = Array.isArray(sources) ? sources.map((s) => String(s || "").trim()).filter(Boolean) : [];
+    const internal = (s: string) => (INTERNAL_RESOURCE_SOURCES as readonly string[]).includes(s);
+    return list.some(internal) && list.some((s) => !internal(s));
+}
+
+/** "8,000" / 8000 → 8000; null when blank or not a number (older rows may hold free text). */
+export function resourceAmountNumber(value: unknown): number | null {
+    const text = String(value ?? "").replace(/,/g, "").trim();
+    if (!text) return null;
+    const n = Number(text);
+    return Number.isFinite(n) ? n : null;
+}
+
+/** The outside contributor's share of a mixed entry: total minus the student team's share (null until both parse). */
+export function contributorShareOf(row: { amount?: unknown; student_team_share?: unknown; sources?: unknown }): number | null {
+    if (!isMixedResourceSource(row.sources)) return resourceAmountNumber(row.amount);
+    const total = resourceAmountNumber(row.amount);
+    const share = resourceAmountNumber(row.student_team_share);
+    if (total === null || share === null || share < 0 || share > total) return null;
+    return Number((total - share).toFixed(6));
+}
+
 /** `+92 300 1234567` → `+923001234567`; "" when nothing usable. */
 export function normalizeContributorPhone(code: unknown, number: unknown): string {
     const digits = String(number ?? "").replace(/\D/g, "").replace(/^0+/, "");

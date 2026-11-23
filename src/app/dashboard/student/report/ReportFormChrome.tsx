@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { ReportData } from "./context/ReportContext";
-import { mergeReportSdgSnapshotRows } from "./utils/reportSdgMerge";
+import { isRegisteredReportSdg, mergeReportSdgSnapshotRows, reportSdgContributionText } from "./utils/reportSdgMerge";
 import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, tabIsComplete, wizardStepToDataSections } from "./utils/reportWizardNav";
@@ -14,6 +14,7 @@ import { reportRequiresReportingFee, communityReportReviewerName, communityRepor
 import { isReportReturnedForRevision } from "@/utils/reportRevisionState";
 import { hasPublicSharePermission, isPublicMediaVisibility, mediaVisibilityTitle } from "./utils/mediaVisibility";
 import { combinedSummarySync, sectionSummarySync, type SectionSummarySync } from "./utils/sectionSummarySync";
+import { consentLabel, realRiskIds, riskFactorIds, riskFactorLabel, RISK_NONE_ID, safeguardingBannerLine } from "./utils/riskSafeguarding";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 Participation" },
@@ -632,24 +633,8 @@ export function ReportSectionModel({ step, data }: { step: number; data: ReportD
             </div>
         );
     }
-    if (uiStep === 5 && data.section6?.use_resources === "yes") {
-        const resources = data.section6.resources || [];
-        const byType = new Map<string, number>();
-        resources.forEach((row) => {
-            const key = pickString(row.type, row.type_other) || "Other";
-            byType.set(key, (byType.get(key) || 0) + 1);
-        });
-        return (
-            <div className="cer-resource-model">
-                <b>What your project ran on</b>
-                <div>
-                    {byType.size
-                        ? [...byType.entries()].map(([label, count]) => <span key={label}>{label} · {count}</span>)
-                        : <span>Add resource entries and this fills itself.</span>}
-                </div>
-            </div>
-        );
-    }
+    // Step 5: the "What your project ran on" model is the donut inside Section 5, right after 5.1
+    // (one model per step — see Section6Resources).
     if (uiStep === 8) {
         const scores = Object.values(data.section9?.competency_scores || {}).filter((n) => typeof n === "number" && n > 0);
         const avg = scores.length ? (scores.reduce((sum, n) => sum + Number(n), 0) / scores.length).toFixed(1) : "—";
@@ -868,19 +853,21 @@ function SectionSummaryStats({
                     who ? `👥 ${count ? `≈${count} · ` : ""}${who}` : "",
                     ...gaps.map((gap) => `⛔ ${gapLabel(gap, data.section2)}`),
                     ...sources.map((source) => `🔎 ${baselineSourceLabel(source, data.section2)}`),
+                    ...realRiskIds(data.section2?.risk_factors).map((id) => `🛡 ${riskFactorLabel(id)}`),
+                    riskFactorIds(data.section2?.risk_factors).includes(RISK_NONE_ID) ? "🛡 No risk factors identified" : "",
+                    consentLabel(data.section2?.risk_consent) ? `📝 ${consentLabel(data.section2?.risk_consent)} · student-reported` : "",
                 ].filter(Boolean)}
             />
         );
     }
     if (uiStep === 3) {
-        const words = (data.section3?.contribution_intent_statement || "").trim().split(/\s+/).filter(Boolean).length;
-        const added = agg.sdgs.filter((row) => row.role !== "primary").length;
+        const wordsOf = (row: (typeof agg.sdgs)[number]) => reportSdgContributionText(row, data.section3).split(/\s+/).filter(Boolean).length;
+        const added = agg.sdgs.filter((row) => !isRegisteredReportSdg(row)).length;
         return (
             <StatChart
                 title="📊 SDG pathway coverage"
                 tiles={[
-                    ...agg.sdgs.map((row) => `SDG ${row.goalNumber}${row.targetId ? ` · ${row.targetId}` : ""}`),
-                    `✍️ ${words} words of contribution logic`,
+                    ...agg.sdgs.map((row) => `${isRegisteredReportSdg(row) ? "★ " : ""}SDG ${row.goalNumber}${row.targetId ? ` · ${row.targetId}` : ""} · ✍️ ${wordsOf(row)} words`),
                     `➕ ${added} student-added`,
                 ]}
             />
@@ -1291,19 +1278,22 @@ export function liveSectionSummary(uiStep: number, data: ReportData, a: ReturnTy
             who ? `Affected group: ${count ? `about ${count} ` : ""}${who}.` : "Affected group not named yet.",
             `${plural(gaps, "system gap")} and ${plural(sources, "baseline evidence source")} recorded.`,
             problem ? `Baseline: ${problem}` : "Baseline statement not written yet.",
+            safeguardingBannerLine(data.section2),
         ].join(" ");
     }
     if (uiStep === 3) {
-        const primary = a.sdgs.filter((s) => s.role === "primary");
-        const added = a.sdgs.filter((s) => s.role !== "primary");
-        const words = (data.section3?.contribution_intent_statement || "").trim().split(/\s+/).filter(Boolean).length;
+        const registered = a.sdgs.filter(isRegisteredReportSdg);
+        const added = a.sdgs.filter((s) => !isRegisteredReportSdg(s));
+        const written = a.sdgs.filter((row) => reportSdgContributionText(row, data.section3));
         const label = (rows: typeof a.sdgs) =>
             rows.map((row) => `SDG ${row.goalNumber}${row.targetId ? ` (${row.targetId})` : ""}`).join(", ");
-        if (!a.sdgs.length && !words) return "No SDG mapping saved yet.";
+        if (!a.sdgs.length) return "No SDG mapping saved yet.";
         return [
-            primary.length ? `Registered goal: ${label(primary)}.` : "No registered goal on the opportunity.",
+            registered.length ? `Registered goal${registered.length === 1 ? "" : "s"}: ${label(registered)}.` : "No registered goal on the opportunity.",
             added.length ? `Student-mapped: ${label(added)}.` : "No student-mapped goals added.",
-            words ? `Contribution logic: ${plural(words, "word")}.` : "Contribution logic not written yet.",
+            written.length
+                ? `Contribution logic written for ${written.length} of ${a.sdgs.length} goal${a.sdgs.length === 1 ? "" : "s"}${written.length < a.sdgs.length ? ` (missing: ${label(a.sdgs.filter((row) => !reportSdgContributionText(row, data.section3)))})` : ""}.`
+                : "Contribution logic not written yet.",
         ].join(" ");
     }
     if (uiStep === 4) {
@@ -1450,7 +1440,7 @@ export function ReportLiveBanner({
         return (
             <BannerShell
                 step={3}
-                title={`${a.sdgs.filter((s) => s.role === "primary").length} registered goal · ${a.sdgs.filter((s) => s.role !== "primary").length} student-mapped`}
+                title={`${plural(a.sdgs.filter(isRegisteredReportSdg).length, "registered goal")} · ${a.sdgs.filter((s) => !isRegisteredReportSdg(s)).length} student-mapped`}
                 ai={aiShown} aiSync={aiSync} live={live}
                 stats={<SectionSummaryStats uiStep={3} data={data} agg={a} />}
             >
@@ -1464,7 +1454,7 @@ export function ReportLiveBanner({
                                     className="cer-sdgc"
                                     style={{ background: sdg?.color || "#0e7d74" }}
                                 >
-                                    {row.role === "primary" ? "★ " : ""}
+                                    {isRegisteredReportSdg(row) ? "★ " : ""}
                                     SDG {row.goalNumber}
                                     {row.targetId ? ` · ${row.targetId}` : ""}
                                 </span>
@@ -1472,10 +1462,19 @@ export function ReportLiveBanner({
                         })}
                     </div>
                 ) : null}
-                {data.section3?.contribution_intent_statement ? (
+                {a.sdgs.length ? (
                     <>
-                        <div className="cer-bsec">PATHWAY</div>
-                        <div className="cer-quote">{data.section3.contribution_intent_statement}</div>
+                        {/* One pathway per goal: both registered SDGs (primary + secondary) and every student-mapped one. */}
+                        <div className="cer-bsec">PATHWAY · ONE PER GOAL</div>
+                        {a.sdgs.map((row) => {
+                            const text = reportSdgContributionText(row, data.section3);
+                            return (
+                                <div key={`pathway-${row.goalNumber}`} className="cer-quote" data-ciel-sdg-pathway={row.goalNumber}>
+                                    <b>SDG {row.goalNumber}{row.targetId ? ` · ${row.targetId}` : ""} · {isRegisteredReportSdg(row) ? "registered" : "student-mapped"}:</b>{" "}
+                                    {text || "contribution not written yet."}
+                                </div>
+                            );
+                        })}
                     </>
                 ) : null}
             </BannerShell>

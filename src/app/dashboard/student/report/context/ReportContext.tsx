@@ -14,6 +14,20 @@ import {
 } from '@/utils/teamReportSubmitAccess';
 import { isStudentReportAwaitingReview } from '@/utils/reviewQueue';
 
+/** Section 5 proof file wrapper (see section6.evidence_files). */
+export type ReportResourceProofFile = {
+    file?: File;
+    name?: string;
+    size?: number;
+    type?: string;
+    url?: string;
+    path?: string;
+    lastModified?: number;
+    /** Index of the 5.2 resource entry this proof supports; absent on files saved before entries were linked. */
+    resource_index?: number;
+    [key: string]: unknown;
+};
+
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
     project_id: string;
@@ -210,6 +224,12 @@ export interface ReportData {
          * secondary SDG, so validation can require each one. Older reports simply lack the map.
          */
         registered_secondary_contributions?: Record<string, string>;
+        /**
+         * The opportunity's registered primary goal, seeded by Section 3 so the submit gates can tell
+         * whether the student's own primary mapping is an *additional* goal (V19 3.2 cap of two).
+         * null = the opportunity has no registered primary.
+         */
+        registered_primary_goal?: number | null;
         secondary_sdgs: Array<{
             goal_number: number | string | null;
             target_id?: string;
@@ -349,6 +369,8 @@ export interface ReportData {
             purpose: string;
             verification: string[];  // 6.2.5 multi-select
             verification_other?: string;
+            /** V19 5.2 mixed source (student team + outside): the team's share, same unit as `amount`. */
+            student_team_share?: string;
             /** Who contributed it — required when the source is outside the student team. */
             contributor_name?: string;
             contributor_email?: string;
@@ -357,7 +379,12 @@ export interface ReportData {
             /** Where it came from, how it was used, who received it — the accountability trail. */
             evidence_trail?: string;
         }>;
-        evidence_files: File[];
+        /**
+         * Proof files. A native File before upload (legacy), or a wrapper record
+         * `{ file?, name, size, type, url?, resource_index? }` — `resource_index` links the proof
+         * to the 5.2 entry it supports (Section 5 "Upload proof of this contribution").
+         */
+        evidence_files: Array<File | ReportResourceProofFile>;
         summary_text?: string;
     };
     // Section 7: Partnerships (Structured Table)
@@ -732,7 +759,8 @@ function normalizeLoadedSection3(
 
 interface ReportContextType {
     data: ReportData;
-    updateSection: (section: Exclude<keyof ReportData, 'project_id'>, payload: any) => void;
+    /** `keepErrors`: a system seed (not a student edit) must not wipe the submit errors just revealed for the section. */
+    updateSection: (section: Exclude<keyof ReportData, 'project_id'>, payload: any, options?: { keepErrors?: boolean }) => void;
     setProjectId: (id: string) => void;
     activeStep: number;
     nextStep: () => void;
@@ -992,7 +1020,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         }));
     }, []);
 
-    const updateSection = useCallback((section: keyof Omit<ReportData, 'project_id'>, payload: any) => {
+    const updateSection = useCallback((section: keyof Omit<ReportData, 'project_id'>, payload: any, options?: { keepErrors?: boolean }) => {
         // Intelligence layer (Section 11) is allowed to be updated even in read-only mode
         // to show/persist AI summaries generated after submission.
         if (isReadOnly && section !== 'section11') return;
@@ -1008,8 +1036,9 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             return next;
         });
 
-        // Clear validation errors for this section when data changes
-        clearValidationErrors(section);
+        // Clear validation errors for this section when the student changes data — a system seed
+        // (e.g. Section 3 recording the opportunity's registered goals) keeps the errors on screen.
+        if (!options?.keepErrors) clearValidationErrors(section);
     }, [isReadOnly, isTeamMemberAttendanceOnly, clearValidationErrors]);
 
     const setFullData = useCallback((newData: Partial<ReportData>) => {

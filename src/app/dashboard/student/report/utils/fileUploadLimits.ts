@@ -2,6 +2,10 @@
 export const MAX_REPORT_UPLOAD_BYTES = 500 * 1024 * 1024;
 export const MAX_REPORT_UPLOAD_LABEL = "500 MB";
 
+/** Section 5 proof of a resource contribution (receipt, invoice, transfer record): 25 MB per file (V19). */
+export const MAX_RESOURCE_PROOF_BYTES = 25 * 1024 * 1024;
+export const MAX_RESOURCE_PROOF_LABEL = "25 MB";
+
 /** @deprecated Use {@link MAX_REPORT_UPLOAD_BYTES} */
 export const MAX_REPORT_IMAGE_UPLOAD_BYTES = MAX_REPORT_UPLOAD_BYTES;
 /** @deprecated Use {@link MAX_REPORT_UPLOAD_LABEL} */
@@ -28,5 +32,13 @@ export function splitReportFilesByImageSize(files: File[]): {
         accepted.push(file);
     });
 
+    return { accepted, rejected };
+}
+
+/** Same split against any per-file ceiling (Section 5 proofs use the 25 MB V19 limit). */
+export function splitReportFilesBySize(files: File[], maxBytes: number): { accepted: File[]; rejected: File[] } {
+    const accepted: File[] = [];
+    const rejected: File[] = [];
+    files.forEach((file) => (file.size > maxBytes ? rejected : accepted).push(file));
     return { accepted, rejected };
 }

@@ -15,7 +15,9 @@ import {
     CONSENT_OPTIONS,
     RISK_FACTOR_OPTIONS,
     RISK_TEXT_LIMITS,
+    hasRiskBlockContent,
     riskFactorIds,
+    safeguardingSummarySentence,
     toggleRiskFactor,
 } from "../utils/riskSafeguarding";
 
@@ -275,6 +277,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         evidenceList: string,
         discipline: string,
         disciplineContribution: string,
+        safeguarding = "",
     ) => {
         const parts: string[] = [];
 
@@ -307,6 +310,9 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             );
         }
 
+        // 2.3 risk, safeguarding & consent is part of the context the rubric reads.
+        if (safeguarding) parts.push(safeguarding);
+
         return parts.join(" ");
     };
 
@@ -327,7 +333,8 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             (sectionData.affected_count || "").trim() ||
             gaps.length > 0 ||
             evidenceArray.length > 0 ||
-            sectionData.discipline;
+            sectionData.discipline ||
+            hasRiskBlockContent(sectionData);
 
         if (hasAnyInput) {
             const composed = composeBaseline(
@@ -339,6 +346,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 evidenceSource,
                 sectionData.discipline,
                 sectionData.discipline_contribution,
+                safeguardingSummarySentence(sectionData),
             );
 
             // Only auto-update while the student hasn't hand-edited the draft away from our last output.
@@ -366,6 +374,11 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         sectionData.system_gaps,
         sectionData.system_gaps_other,
         sectionData.system_gaps_other_entries,
+        sectionData.risk_factors,
+        sectionData.risk_mitigation,
+        sectionData.risk_consent,
+        sectionData.risk_safeguarding_lead,
+        sectionData.risk_unresolved,
         updateSection,
     ]);
 
@@ -509,6 +522,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             ? (sectionData.discipline_other || "").trim()
                             : (sectionData.discipline || "").trim(),
                     contribution: sectionData.discipline_contribution,
+                    safeguarding: safeguardingSummarySentence(sectionData),
                 });
 
             const result = await generateAISummary("section2", sectionData);

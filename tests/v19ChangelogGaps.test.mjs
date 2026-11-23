@@ -55,8 +55,11 @@ test("items 17/20/21: opportunity SDG rows are de-duplicated per goal and carry 
 
 test("items 20/21/22: Section 3 greys out registered goals, counts registered secondaries in the footprint and labels the source", () => {
     const s3 = read("src/app/dashboard/student/report/components/Section3SDGMapping.tsx");
-    assert.match(s3, /disabledIds=\{registeredGoalIds\}/, "student primary picker blocks registered goals");
-    assert.match(s3, /\[studentPrimaryId, \.\.\.otherSelectedIds, \.\.\.registeredGoalIds\]/, "secondary pickers block registered goals");
+    // Registered goals are locked on every picker (padlock); goals taken elsewhere in 3.2 are
+    // merely "taken" — the QA sweep found student-added goals being presented as registered.
+    assert.match(s3, /<SDGTileGrid\s+selectedId=\{studentPrimaryId\}\s+registeredIds=\{registeredGoalIds\}/, "student primary picker blocks registered goals");
+    assert.match(s3, /const takenIds = \[studentPrimaryId, \.\.\.otherSelectedIds\]\.filter\(Boolean\);/, "secondary pickers take the other student picks");
+    assert.match(s3, /registeredIds=\{registeredGoalIds\}\s+takenIds=\{takenIds\}/, "secondary pickers block registered goals");
     assert.match(s3, /oppSecondaries\.forEach\(\(row\) => \{\s*push\(\{/, "registered secondaries enter finalizedGoals");
     assert.match(s3, /Registered on opportunity/);
     assert.match(s3, /Added by the team/);

@@ -4,6 +4,8 @@
  */
 
 import { SHORT_NOTE_MIN_WORDS, SHORT_NOTE_MAX_WORDS } from './section4Ladder';
+import { MAX_ADDITIONAL_SDGS, additionalStudentSdgCount } from './sdgAdditionalCap';
+import { isMixedResourceSource, resourceAmountNumber } from './resourceContributors';
 import { activityIssues, challengeTagIssues, legacyOutcomeIssues, reachIssues, simpleMeasureIssues, splitOutcomes } from './section4Streamlined';
 import { GLOBAL_ACTIVITY_TAXONOMY } from './globalActivityTaxonomy';
 import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
@@ -46,8 +48,11 @@ export const FIELD_WORD_POLICY: Record<string, { min: number; max: number }> = {
     measurement_explanation: { min: SHORT_NOTE_MIN_WORDS, max: SHORT_NOTE_MAX_WORDS },
     /** Overlap note when the same people appear in another activity. */
     overlap_note: { min: SHORT_NOTE_MIN_WORDS, max: SHORT_NOTE_MAX_WORDS },
-    /** Step 7 extra-evidence caption — UI meter is 10–45 words. */
-    evidence_caption: { min: 10, max: 45 },
+    /** Step 7 extra-evidence caption — V19 "Optional evidence explanation": no minimum, up to 45 words. */
+    evidence_caption: { min: 0, max: 45 },
+    /** V19 Section 8 — the two reflections are scored on these ranges (same as the on-screen meters). */
+    personal_learning: { min: 40, max: 100 },
+    academic_application: { min: 25, max: 70 },
 };
 
 /** Step 8 chip ids, plus participation-enum aliases carried from program setup. */
@@ -77,7 +82,7 @@ export function hasAcademicIntegration(value: unknown): boolean {
 }
 
 export function wordRangeLabel(min: number, max: number): string {
-    return `${min}–${max} words`;
+    return min === 0 ? `up to ${max} words` : `${min}–${max} words`;
 }
 
 export function countWords(str: string): number {
@@ -358,6 +363,16 @@ export function validateSection3(data: any): ValidationResult {
         pushWordRange(errors, `secondary_sdgs.${index}.justification_text`, sdg?.justification_text, 'Justification');
     });
 
+    // V19 3.2 — up to two additional goals in total; the student's own primary mapping counts as
+    // one when the opportunity already has a registered primary goal.
+    const extraGoals = additionalStudentSdgCount(data);
+    if (extraGoals > MAX_ADDITIONAL_SDGS) {
+        errors.push({
+            field: 'secondary_sdgs',
+            message: `Additional SDGs: at most ${MAX_ADDITIONAL_SDGS} in total (your own primary mapping counts as one) — remove ${extraGoals - MAX_ADDITIONAL_SDGS}`,
+        });
+    }
+
     // V19 item 17 — one contribution statement per SDG registered as secondary on the opportunity.
     // Section 3 seeds a key per registered secondary SDG; reports without the map are left alone.
     const registered = asObj(data.registered_secondary_contributions);
@@ -468,8 +483,12 @@ export function validateSection6(data: any): ValidationResult {
                 if (!String(row.type || '').trim()) {
                     errors.push({ field: `resources.${index}.type`, message: 'Choose the resource type' });
                 }
+                const amountNumber = resourceAmountNumber(row.amount);
                 if (!String(row.amount ?? '').trim()) {
                     errors.push({ field: `resources.${index}.amount`, message: 'Enter the amount or quantity' });
+                } else if (amountNumber !== null && amountNumber <= 0) {
+                    // A negative or zero quantity is not a resource (mirrors the backend submit gate).
+                    errors.push({ field: `resources.${index}.amount`, message: 'Enter an amount greater than 0' });
                 }
                 if (!String(row.unit || '').trim()) {
                     errors.push({ field: `resources.${index}.unit`, message: 'Choose the unit' });
@@ -503,6 +522,19 @@ export function validateSection6(data: any): ValidationResult {
                 // Accountability: a contribution from outside the team names its contributor and
                 // carries an evidence trail (mirrors the backend submit gate).
                 const external = isExternalResourceSource(sources);
+                // V19 5.2 mixed source: the student team's share is recorded in the same unit; the
+                // contributor's share is the remainder, so the two always reconcile to the total.
+                if (isMixedResourceSource(sources)) {
+                    const shareText = String(row.student_team_share ?? '').trim();
+                    const share = resourceAmountNumber(row.student_team_share);
+                    if (!shareText) {
+                        errors.push({ field: `resources.${index}.student_team_share`, message: "Record the student team's share in the same unit (enter 0 if none)" });
+                    } else if (share === null || share < 0) {
+                        errors.push({ field: `resources.${index}.student_team_share`, message: "The student team's share must be a number of 0 or more" });
+                    } else if (amountNumber !== null && share > amountNumber) {
+                        errors.push({ field: `resources.${index}.student_team_share`, message: `The student team's share (${share}) cannot exceed the resource total (${amountNumber})` });
+                    }
+                }
                 if (!contributorEmailLooksValid(row.contributor_email)) {
                     errors.push({ field: `resources.${index}.contributor_email`, message: 'Enter a valid email address' });
                 }
@@ -562,9 +594,8 @@ export function validateSection7(data: any): ValidationResult {
         if (!String(row.name || '').trim()) {
             errors.push({ field: `partners.${index}.name`, message: `Partner ${index + 1}: Organization name is required` });
         }
-        if (!row.type) {
-            errors.push({ field: `partners.${index}.type`, message: `Partner ${index + 1}: Partner type is required` });
-        }
+        // The partner type is "Recommended" on the card (V19 Section 6 asks for roles and the
+        // contribution line); only a chosen "Other" must be spelled out.
         // "Others (please specify)" reveals a required free-text field (Section7Partnerships.tsx)
         // that was never actually enforced here — selecting it and leaving it blank passed submit.
         if ((row.type === 'Others (please specify)' || row.type === '✏️ Other') && !String(row.type_other || '').trim()) {
@@ -575,7 +606,7 @@ export function validateSection7(data: any): ValidationResult {
             errors.push({ field: `partners.${index}.role`, message: `Partner ${index + 1}: At least one role in project is required` });
         }
         if (!asList(row.contribution).length && !String(row.contribution || '').trim()) {
-            errors.push({ field: `partners.${index}.contribution`, message: `Partner ${index + 1}: At least one contribution type is required` });
+            errors.push({ field: `partners.${index}.contribution`, message: `Partner ${index + 1}: say what this partner contributed, in one line` });
         }
     });
 
@@ -604,7 +635,8 @@ export function validateSection8(data: any): ValidationResult {
         if (types.some((type) => /other supporting document/i.test(String(type))) && !String(data.evidence_type_other || '').trim()) {
             errors.push({ field: 'evidence_type_other', message: 'Say what kind of document this is' });
         }
-        pushWordRange(errors, 'description', data.description, 'What does your evidence show?', true, 'evidence_caption');
+        // V19 8.2 — the caption is optional ("Optional evidence explanation"); a given one stays within 45 words.
+        pushWordRange(errors, 'description', data.description, 'What does your evidence show?', false, 'evidence_caption');
     }
 
     // V19 8.2 — the consolidated authenticity / consent / privacy confirmation is mandatory for every report.

@@ -50,7 +50,12 @@ function objectRecord(value: unknown): Record<string, unknown> | null {
 
 function firstArray(...values: unknown[]): unknown[] {
     for (const value of values) {
-        if (Array.isArray(value)) return value;
+        // An empty list (the API sends `secondary_sdgs: []` when the column is unset) is not an
+        // answer: keep looking in the nested shapes (`sdg_info.secondary_sdgs`, …).
+        if (Array.isArray(value)) {
+            if (value.length) return value;
+            continue;
+        }
         if (objectRecord(value)) return [value];
         if (typeof value === "string") {
             const trimmed = value.trim();
@@ -277,6 +282,31 @@ export function applyRegisteredSecondaryContributions(rows: ReportSdgRow[], sect
         const text = registeredSecondaryContribution(section3, row.goalNumber);
         return text ? { ...row, justification: text } : row;
     });
+}
+
+/** Registered on the opportunity (primary or secondary) — as opposed to mapped by the student. */
+export function isRegisteredReportSdg(row: Pick<ReportSdgRow, "source">): boolean {
+    return row.source === "opportunity";
+}
+
+/**
+ * The student's contribution text for one merged SDG row — every goal has its own:
+ *   registered primary   → section3.contribution_intent_statement (3.1.1)
+ *   registered secondary → section3.registered_secondary_contributions[goal] (3.1.2…)
+ *   student primary      → section3.student_contribution_intent_statement (3.2.1)
+ *   student secondary    → that entry's justification_text (3.2.2)
+ */
+export function reportSdgContributionText(
+    row: Pick<ReportSdgRow, "goalNumber" | "source" | "role" | "justification">,
+    section3: ReportData["section3"] | null | undefined,
+): string {
+    const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+    if (row.source === "opportunity") {
+        if (row.role === "primary") return text(section3?.contribution_intent_statement);
+        return registeredSecondaryContribution(section3, row.goalNumber) || text(row.justification);
+    }
+    if (row.role === "primary") return text(section3?.student_contribution_intent_statement);
+    return text(row.justification);
 }
 
 /** Student Section 3 mapping (primary + optional secondaries). */
