@@ -11,7 +11,6 @@ import {
 } from "@/utils/facultyScopeSession";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
 import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
-import StakeholderHomeCards from "@/components/ciel/dashboard/StakeholderHomeCards";
 import { FacultyCsInbox } from "@/components/ciel/community-service/FacultyCsInbox";
 import { useFacultyCommunityServiceData } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
 import { TimeGreeting } from "@/utils/timeGreeting";
@@ -229,21 +228,22 @@ export default function FacultyDashboard() {
                 <FacultyCsInbox items={cs.inboxItems} loading={cs.loading} hideEmpty />
             </div>
 
-            <StakeholderHomeCards
-                role="faculty"
-                subtitle="Create, approve and supervise, then see approved records and insights for the projects you supervise. Sub-buttons open inside each card."
-                states={{
-                    approvals: { count: communityActions, countLabel: "approval" },
-                    supervision: { badge: cs.loading ? undefined : `${cs.draftRows.length} IN PROGRESS`, hot: cs.hoursProjectCount > 0 },
-                    records: { badge: cs.loading ? undefined : `${cs.deckCards.length} VERIFIED` },
-                }}
-            />
-
             <MockupSectionHead
-                title="Other impact areas"
-                subtitle="Coursework, FYP / Thesis and Startup keep their own workspaces."
+                title="Impact Areas"
+                subtitle="Pick an impact area to see its work, approvals and verified impact."
             />
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                <MockupActionCard
+                    href="/dashboard/faculty/community-service"
+                    emoji="🌱"
+                    ghost="🌱"
+                    title="Community Service"
+                    subtitle="Create, review and supervise Community Service opportunities and reports."
+                    badge="OPEN AREA"
+                    background={MOCKUP_GRADIENTS.teal}
+                    hot={communityActions > 0}
+                    alertCount={communityActions}
+                />
                 <MockupActionCard
                     href="/dashboard/faculty/coursework-projects"
                     emoji="📚"

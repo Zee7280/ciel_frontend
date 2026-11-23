@@ -125,9 +125,9 @@ test("Browse Opportunities is offered to Faculty, Partner, NGO and University fr
     for (const p of ["src/app/dashboard/faculty/browse/page.tsx", "src/app/dashboard/partner/browse/page.tsx"]) {
         assert.match(read(p), /<ExploreOpportunitiesView variant="dashboard" \/>/, p);
     }
-    const nav = read("src/utils/stakeholderNav.ts");
-    assert.match(nav, /href: "\/dashboard\/partner\/browse"/);
-    assert.match(nav, /href: "\/dashboard\/faculty\/browse"/);
+    const sidebar = read("src/components/Sidebar.tsx");
+    assert.match(sidebar, /href: "\/dashboard\/partner\/browse"/);
+    assert.match(sidebar, /href: "\/dashboard\/faculty\/browse"/);
 });
 
 test("a phone number is never shown as the reviewer's name on the student card", () => {
@@ -206,5 +206,5 @@ test("dashboard tiles can blink a notification count, and faculty review tiles u
     assert.match(chrome, /motion-reduce:animate-none/);
     assert.match(chrome, /\$\{alerts\} \$\{alertNoun\}\$\{alerts === 1 \? "" : "s"\}/, "1 NOTIFICATION / 2 NOTIFICATIONS");
     assert.match(facultyCs, /title="Review Opportunities"[\s\S]*?alertCount=\{pendingApprovalsHero\}/);
-    assert.match(facultyHome, /approvals: \{ count: communityActions, countLabel: "approval" \}/, "Approvals home card blinks with the pending count");
+    assert.match(facultyHome, /title="Community Service"[\s\S]*?alertCount=\{communityActions\}/);
 });

@@ -31,14 +31,11 @@ test("the dashboard variant drops the site navbar, footers and hero, and opens d
     assert.match(card, /\.\.\.\(openInNewTab \? \{ target: "_blank", rel: "noopener noreferrer" \} : \{\}\)/);
 });
 
-test("the Opportunities button offers Browse Opportunities to faculty and every partner kind (NGO, university, partner)", async () => {
-    const { STAKEHOLDER_NAV } = await import("../src/utils/stakeholderNav.ts");
-    for (const role of ["faculty", "university", "ngo", "partner"]) {
-        const opportunities = STAKEHOLDER_NAV[role].mainButtons.find((m) => m.key === "opportunities");
-        const browse = opportunities.subButtons.find((s) => s.label === "Browse Opportunities");
-        assert.equal(browse?.href, role === "faculty" ? "/dashboard/faculty/browse" : "/dashboard/partner/browse", role);
-    }
-    // The sidebar renders every role from the shared model, so no role-specific list can drop it.
+test("sidebar offers Browse Opportunities to faculty and every partner kind (NGO, university, partner)", () => {
     const sidebar = read("src/components/Sidebar.tsx");
-    assert.match(sidebar, /STAKEHOLDER_NAV\[stakeholderRole\]/);
+    assert.match(sidebar, /\{ label: "Browse Opportunities", href: "\/dashboard\/partner\/browse", icon: Search \}/);
+    assert.match(sidebar, /\{ label: "Browse Opportunities", href: "\/dashboard\/faculty\/browse", icon: Search \}/);
+    // The partner entry sits outside the university-only / NGO-only conditionals.
+    const partnerBlock = sidebar.slice(sidebar.indexOf("const partnerWorkspace"), sidebar.indexOf("const partnerMore"));
+    assert.match(partnerBlock, /My Organization[^\n]*\n\s*\{ label: "Browse Opportunities"/);
 });
