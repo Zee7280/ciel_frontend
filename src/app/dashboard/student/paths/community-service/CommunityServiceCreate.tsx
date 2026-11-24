@@ -723,7 +723,7 @@ function ProposalCard({ op, tab, highlighted }: { op: MineRow; tab: StatusTab; h
                         <span>Approval chain</span>
                         <span className="rounded-lg bg-[#f1eef8] px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-[#6b2bd9]">{chain.versionLabel}</span>
                     </div>
-                    <ApprovalChain steps={chain.steps} badWord={tab === "closed" ? "Rejected" : "Revision"} />
+                    <ApprovalChain steps={chain.steps} badWord={tab === "closed" ? "Rejected" : "Revision"} contact={chain.chainContact} />
                 </div>
                 {(tab === "action" || tab === "closed") && op.rejection_reason ? (
                     <div className="mt-3 rounded-[13px] border border-[#f3d4d4] bg-[#fdeeee] p-3">

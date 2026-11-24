@@ -303,7 +303,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
 
     const saveNow = async (advanceTo?: number, sectionSummaries?: FypSectionSummaries, status?: "draft" | "submitted") => {
         if (entry.isOwner === false) {
-            setError("Only the lead author can edit this FYP record.");
+            blockStep("Only the lead author can edit this FYP record.");
             return false;
         }
         setSaving(true);
@@ -503,6 +503,14 @@ export default function FypV9Workspace({ id }: { id: string }) {
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+    // A step button that refuses must SAY so where the student is looking. The banner at the top of
+    // the form is off-screen once they have scrolled down to the button, so the reason also arrives as
+    // a toast and under the button itself (StepNav `error`); the page stays where they are.
+    const blockStep = (message: string) => {
+        setError(message);
+        toast.error(message);
+    };
+
     const completeSectionOne = async () => {
         const missing = [
             !entry.projectInfo?.title && "FYP title",
@@ -515,13 +523,13 @@ export default function FypV9Workspace({ id }: { id: string }) {
             routeKey === "other" && !v9.v9RouteOther.trim() && "Custom route description",
         ].filter(Boolean);
         if (missing.length) {
-            setError(`Please complete: ${missing.join(", ")}`);
+            blockStep(`Please complete: ${missing.join(", ")}`);
             return;
         }
         if (isTeam) {
             const members = team.length ? team : [];
             if (!members.length) {
-                setError("Please add the group members.");
+                blockStep("Please add the group members.");
                 return;
             }
             const incomplete = members.findIndex(
@@ -533,13 +541,13 @@ export default function FypV9Workspace({ id }: { id: string }) {
                     !normalizeLocalNumber(m.whatsappNumber),
             );
             if (incomplete >= 0) {
-                setError(`Please complete Name, Roll No., Email, Country Code and WhatsApp Number for Group Member ${incomplete + 1}.`);
+                blockStep(`Please complete Name, Roll No., Email, Country Code and WhatsApp Number for Group Member ${incomplete + 1}.`);
                 return;
             }
             const ownEmail = getStoredCurrentUserEmail();
             const ownIdx = ownEmail ? members.findIndex((m) => (m.email ?? "").trim().toLowerCase() === ownEmail) : -1;
             if (ownIdx >= 0) {
-                setError(`Group Member ${ownIdx + 1} uses your own email. Add your teammates' emails here — you are already on this record.`);
+                blockStep(`Group Member ${ownIdx + 1} uses your own email. Add your teammates' emails here — you are already on this record.`);
                 return;
             }
             const badPhone = members.findIndex(
@@ -548,7 +556,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                     normalizeLocalNumber(m.whatsappNumber).length < 6,
             );
             if (badPhone >= 0) {
-                setError(`Please enter a valid country code (e.g. +92) and WhatsApp number for Group Member ${badPhone + 1}.`);
+                blockStep(`Please enter a valid country code (e.g. +92) and WhatsApp number for Group Member ${badPhone + 1}.`);
                 return;
             }
         }
@@ -722,7 +730,11 @@ export default function FypV9Workspace({ id }: { id: string }) {
                 </div>
             </div>
 
-            {error ? <div className="mb-3 rounded-xl border border-ciel-amber/30 bg-ciel-amber-soft px-3.5 py-2.5 text-xs text-ciel-amber">{error}</div> : null}
+            {error ? (
+                <div role="alert" data-ciel-fyp-error className="mb-3 rounded-xl border border-ciel-amber/30 bg-ciel-amber-soft px-3.5 py-2.5 text-xs text-ciel-amber">
+                    {error}
+                </div>
+            ) : null}
 
             <div className="rounded-[18px] border border-ciel-border bg-white p-[22px] shadow-[0_4px_14px_rgba(14,42,58,.025)]">
                 {step === 0 && (
@@ -945,7 +957,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             {routeKey ? <div className="mt-3 rounded-xl border border-ciel-green/25 bg-ciel-green-soft px-3.5 py-2.5 text-[11.8px] text-ciel-green-deep"><b>{FYP_V9_ROUTES[routeKey].icon} Route selected:</b> {FYP_V9_ROUTES[routeKey].title}.</div> : null}
                         </Field>
                         <SummaryBox text={summaries[0]} />
-                        <StepNav hideBack onNext={completeSectionOne} nextLabel="Connect project & build roadmap →" saving={saving} />
+                        <StepNav hideBack onNext={completeSectionOne} nextLabel="Connect project & build roadmap →" saving={saving} error={error} />
                     </>
                 )}
 
@@ -992,7 +1004,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             </div>
                         </Field>
                         <SummaryBox text={summaries[1]} />
-                        <StepNav onBack={() => setStep(0)} onNext={() => goNext(2)} nextLabel="Next → pathway questions" saving={saving} />
+                        <StepNav onBack={() => setStep(0)} onNext={() => goNext(2)} nextLabel="Next → pathway questions" saving={saving} error={error} />
                     </>
                 )}
 
@@ -1042,7 +1054,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             </div>
                         )}
                         <SummaryBox text={summaries[2]} />
-                        <StepNav onBack={() => setStep(1)} onNext={() => goNext(3)} nextLabel="Next →" saving={saving} />
+                        <StepNav onBack={() => setStep(1)} onNext={() => goNext(3)} nextLabel="Next →" saving={saving} error={error} />
                     </>
                 )}
 
@@ -1185,7 +1197,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             <textarea rows={2} value={v9.validationSummary} onChange={(e) => patchV9({ validationSummary: e.target.value })} placeholder="In 1–3 lines, what evidence gave you confidence in the final work?" className={fieldClass} />
                         </Field>
                         <SummaryBox text={summaries[3]} />
-                        <StepNav onBack={() => setStep(2)} onNext={() => goNext(4)} nextLabel="Next →" saving={saving} />
+                        <StepNav onBack={() => setStep(2)} onNext={() => goNext(4)} nextLabel="Next →" saving={saving} error={error} />
                     </>
                 )}
 
@@ -1217,7 +1229,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             <Field label="Future potential / next step"><input value={v9.future} onChange={(e) => patchV9({ future: e.target.value })} className={fieldClass} /></Field>
                         </div>
                         <SummaryBox text={summaries[4]} />
-                        <StepNav onBack={() => setStep(3)} onNext={() => goNext(5)} nextLabel="Next →" saving={saving} />
+                        <StepNav onBack={() => setStep(3)} onNext={() => goNext(5)} nextLabel="Next →" saving={saving} error={error} />
                     </>
                 )}
 
@@ -1257,7 +1269,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             <div className="rounded-xl border border-ciel-amber/30 bg-ciel-amber-soft p-3 text-[11.8px] text-ciel-amber"><b>No defensible SDG link is acceptable.</b> Your project can still be academically excellent.</div>
                         ) : null}
                         <SummaryBox text={summaries[5]} />
-                        <StepNav onBack={() => setStep(4)} onNext={() => goNext(6)} nextLabel="Next →" saving={saving} />
+                        <StepNav onBack={() => setStep(4)} onNext={() => goNext(6)} nextLabel="Next →" saving={saving} error={error} />
                     </>
                 )}
 
@@ -1300,7 +1312,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             </div>
                         </div>
                         <SummaryBox text={summaries[6]} />
-                        <StepNav onBack={() => setStep(5)} onNext={() => goNext(7)} nextLabel="Review & submit →" saving={saving} />
+                        <StepNav onBack={() => setStep(5)} onNext={() => goNext(7)} nextLabel="Review & submit →" saving={saving} error={error} />
                     </>
                 )}
 

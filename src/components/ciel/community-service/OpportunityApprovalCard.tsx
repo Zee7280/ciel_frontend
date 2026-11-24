@@ -4,7 +4,7 @@ import {
     isFacultyApprovalCompleteForPartnerGate,
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
-import { formatSentWaiting } from "@/utils/reminderLinks";
+import { formatSentWaiting, mailtoHref, whatsappDigits } from "@/utils/reminderLinks";
 import { CIEL_SUPPORT_EMAIL, CIEL_SUPPORT_WHATSAPP_DISPLAY, formatPhoneDisplay } from "@/utils/cielContact";
 
 export type ApprovalCardStepState = "done" | "cur" | "bad" | "locked";
@@ -19,6 +19,35 @@ export type ApprovalCardStep = {
     email?: string;
     phone?: string;
 };
+
+/** What the chain's email / WhatsApp links open with: the opportunity they are about. */
+export type ApprovalChainContact = {
+    title: string;
+    /** Public code (CS-2026-316A); omitted when the row has none yet. */
+    code?: string;
+};
+
+/**
+ * The default message a chain box's email / WhatsApp link opens with. The box that is waiting
+ * ("cur") asks for the approval; every other box simply names the opportunity.
+ */
+export function approvalChainMessage(step: Pick<ApprovalCardStep, "role" | "who" | "state">, contact: ApprovalChainContact): string {
+    const greeting =
+        step.role === "Faculty"
+            ? `Dear ${(step.who || "").trim().split(/\s+/)[0] || "Faculty"}`
+            : step.role === "CIEL PK"
+              ? "Hi CIEL PK team"
+              : "Hi";
+    const about = `"${contact.title}"${contact.code ? ` (${contact.code})` : ""}`;
+    if (step.state === "cur") {
+        return `${greeting}, ${about} is awaiting your approval on CIEL PK. Please review it when convenient.`;
+    }
+    return `${greeting}, I am contacting you about ${about} on CIEL PK.`;
+}
+
+export function approvalChainSubject(contact: ApprovalChainContact): string {
+    return contact.code ? `CIEL PK Community Service Approval · ${contact.code}` : `CIEL PK · ${contact.title}`;
+}
 
 export type ApprovalCardPerson = {
     name: string;
@@ -102,10 +131,24 @@ function pillLabel(state: ApprovalCardStepState, badWord: string): string {
     return "Locked";
 }
 
-export function ApprovalChain({ steps, badWord = "Revision" }: { steps: ApprovalCardStep[]; badWord?: string }) {
+export function ApprovalChain({
+    steps,
+    badWord = "Revision",
+    contact,
+}: {
+    steps: ApprovalCardStep[];
+    badWord?: string;
+    /** When given, the email / phone lines open mail / WhatsApp with a message about this opportunity. */
+    contact?: ApprovalChainContact;
+}) {
     return (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-            {steps.map((step) => (
+            {steps.map((step) => {
+                const message = contact ? approvalChainMessage(step, contact) : "";
+                const mailHref = contact && step.email ? mailtoHref(step.email, approvalChainSubject(contact), `${message}\n\n`) : "";
+                const waDigits = step.phone ? whatsappDigits(step.phone) : "";
+                const waHref = contact && waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(message)}` : "";
+                return (
                 <div
                     key={step.role}
                     className={
@@ -127,12 +170,38 @@ export function ApprovalChain({ steps, badWord = "Revision" }: { steps: Approval
                             title={step.email}
                             className="mt-0.5 block break-all text-[10px] leading-snug text-[#4d6069]"
                         >
-                            ✉ {step.email}
+                            {mailHref ? (
+                                <a
+                                    href={mailHref}
+                                    data-ciel-step-email-link
+                                    aria-label={`Email ${step.who || step.role} about this opportunity`}
+                                    className="underline decoration-[#b9c9cf] underline-offset-2 hover:text-[#16313d]"
+                                >
+                                    ✉ {step.email}
+                                </a>
+                            ) : (
+                                <>✉ {step.email}</>
+                            )}
                         </small>
                     ) : null}
                     {step.phone ? (
                         <small data-ciel-step-phone className="mt-0.5 block text-[10px] leading-snug text-[#4d6069]">
-                            ☎ {step.phone}
+                            {waHref ? (
+                                <a
+                                    href={waHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    data-ciel-step-whatsapp
+                                    title="Open WhatsApp with a message about this opportunity"
+                                    aria-label={`WhatsApp ${step.who || step.role} about this opportunity`}
+                                    className="inline-flex items-center gap-1 font-bold text-[#1f7a46] hover:text-[#186238]"
+                                >
+                                    <span aria-hidden>💬</span> {step.phone}
+                                    <span className="rounded-[6px] bg-[#e8f8ee] px-1 py-px text-[8.5px] font-black uppercase tracking-[0.04em]">WhatsApp</span>
+                                </a>
+                            ) : (
+                                <>☎ {step.phone}</>
+                            )}
                         </small>
                     ) : null}
                     <span
@@ -150,7 +219,8 @@ export function ApprovalChain({ steps, badWord = "Revision" }: { steps: Approval
                         {step.pill || pillLabel(step.state, badWord)}
                     </span>
                 </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -398,6 +468,11 @@ export function buildOpportunityApprovalModel(
     return {
         title: pickStr(row, "title", "project_title", "projectTitle", "name") || "Opportunity",
         idLabel: formatOpportunityCode(row),
+        /** The opportunity the chain's email / WhatsApp links talk about. */
+        chainContact: {
+            title: pickStr(row, "title", "project_title", "projectTitle", "name") || "Opportunity",
+            code: formatOpportunityCode(row) || undefined,
+        } satisfies ApprovalChainContact,
         versionLabel: `Opp v${version}`,
         statusPill: statusTitle,
         lastActivity: waitingStamp
@@ -431,6 +506,7 @@ export default function OpportunityApprovalCard({
     lastActivity,
     people,
     steps,
+    chainContact,
     summary,
     facts,
     accent = "act",
@@ -445,6 +521,8 @@ export default function OpportunityApprovalCard({
     lastActivity?: string;
     people?: ApprovalCardPerson[];
     steps: ApprovalCardStep[];
+    /** Opens the chain's email / WhatsApp links with a message about this opportunity (defaults to title + ID). */
+    chainContact?: ApprovalChainContact;
     summary?: string;
     facts?: string;
     accent?: "act" | "rev" | "ok" | "";
@@ -494,7 +572,11 @@ export default function OpportunityApprovalCard({
                         <span>Approval chain</span>
                         {versionLabel ? <span className="rounded-lg bg-[#f1eef8] px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-[#6b2bd9]">{versionLabel}</span> : null}
                     </div>
-                    <ApprovalChain steps={steps} badWord={status.tone === "bad" && status.title.toLowerCase().includes("reject") ? "Rejected" : "Revision"} />
+                    <ApprovalChain
+                        steps={steps}
+                        badWord={status.tone === "bad" && status.title.toLowerCase().includes("reject") ? "Rejected" : "Revision"}
+                        contact={chainContact ?? { title, code: idLabel || undefined }}
+                    />
                 </div>
                 {summary ? (
                     <p className="mt-2 text-[12.5px] leading-relaxed text-[#3e515b]">

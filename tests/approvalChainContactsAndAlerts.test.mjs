@@ -25,6 +25,30 @@ test("approval chain boxes carry the reviewer's email and phone for Faculty, Par
     assert.match(card, /"partner_contact_phone"/);
 });
 
+test("approval chain email / phone lines open mail and WhatsApp with a default message about the opportunity", () => {
+    // The phone line is a wa.me link to that reviewer's number; the email line is a prefilled mailto.
+    assert.match(card, /import \{ formatSentWaiting, mailtoHref, whatsappDigits \} from "@\/utils\/reminderLinks";/);
+    assert.match(card, /const waDigits = step\.phone \? whatsappDigits\(step\.phone\) : "";/);
+    assert.match(card, /const waHref = contact && waDigits \? `https:\/\/wa\.me\/\$\{waDigits\}\?text=\$\{encodeURIComponent\(message\)\}` : "";/);
+    assert.match(card, /const mailHref = contact && step\.email \? mailtoHref\(step\.email, approvalChainSubject\(contact\), `\$\{message\}\\n\\n`\) : "";/);
+    assert.match(card, /data-ciel-step-whatsapp[\s\S]*?<span aria-hidden>💬<\/span> \{step\.phone\}/);
+    assert.match(card, /data-ciel-step-email-link/);
+    // Without a number / contact the plain text stays (nothing to open).
+    assert.match(card, /<>☎ \{step\.phone\}<\/>/);
+    // The default message: the waiting box asks for the approval, the others name the opportunity.
+    assert.match(card, /export function approvalChainMessage\(/);
+    assert.match(card, /if \(step\.state === "cur"\) \{\s*return `\$\{greeting\}, \$\{about\} is awaiting your approval on CIEL PK\. Please review it when convenient\.`;/);
+    assert.match(card, /return `\$\{greeting\}, I am contacting you about \$\{about\} on CIEL PK\.`;/);
+    assert.match(card, /const about = `"\$\{contact\.title\}"\$\{contact\.code \? ` \(\$\{contact\.code\}\)` : ""\}`;/);
+    assert.match(card, /contact\.code \? `CIEL PK Community Service Approval · \$\{contact\.code\}` : `CIEL PK · \$\{contact\.title\}`/);
+    // Every card gets the opportunity from the model (title + public code); the student list passes it too.
+    assert.match(card, /chainContact: \{\s*title: pickStr\(row, "title", "project_title", "projectTitle", "name"\) \|\| "Opportunity",\s*code: formatOpportunityCode\(row\) \|\| undefined,/);
+    assert.match(card, /contact=\{chainContact \?\? \{ title, code: idLabel \|\| undefined \}\}/);
+    assert.match(create, /<ApprovalChain steps=\{chain\.steps\} badWord=\{tab === "closed" \? "Rejected" : "Revision"\} contact=\{chain\.chainContact\} \/>/);
+    // The global bridge turns every wa.me link into the app on phones / desktop app or Web on computers.
+    assert.match(read("src/app/layout.tsx"), /<WhatsAppLinkBridge \/>/);
+});
+
 test("CIEL PK contact points match the footer / floating support button", () => {
     assert.match(contact, /CIEL_SUPPORT_EMAIL = "support@cielpk.com"/);
     assert.match(contact, /CIEL_SUPPORT_WHATSAPP_E164 = "923712243575"/);

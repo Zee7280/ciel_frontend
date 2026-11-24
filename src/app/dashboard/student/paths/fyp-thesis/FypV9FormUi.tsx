@@ -148,6 +148,7 @@ export function StepNav({
     saving,
     disabled,
     hideBack,
+    error,
 }: {
     onBack?: () => void;
     onNext: () => void;
@@ -155,9 +156,17 @@ export function StepNav({
     saving?: boolean;
     disabled?: boolean;
     hideBack?: boolean;
+    /** Why the last press refused — shown right here, where the student is looking. */
+    error?: string | null;
 }) {
     return (
-        <div className={clsx("mt-4 flex gap-[9px]", hideBack ? "justify-end" : "justify-between")}>
+        <div className="mt-4">
+        {error ? (
+            <p data-ciel-stepnav-error role="alert" className="mb-2 rounded-xl border border-ciel-amber/30 bg-ciel-amber-soft px-3.5 py-2.5 text-[12px] font-bold text-ciel-amber">
+                {error}
+            </p>
+        ) : null}
+        <div className={clsx("flex gap-[9px]", hideBack ? "justify-end" : "justify-between")}>
             {!hideBack ? (
                 <button
                     type="button"
@@ -175,6 +184,7 @@ export function StepNav({
             >
                 {saving ? "Saving…" : nextLabel}
             </button>
+        </div>
         </div>
     );
 }
