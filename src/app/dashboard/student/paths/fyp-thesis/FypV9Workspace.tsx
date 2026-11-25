@@ -115,7 +115,24 @@ function profileUniversity(): string {
     return canonicalPakistaniUniversity(stored) || stored;
 }
 
-export default function FypV9Workspace({ id }: { id: string }) {
+/** The supervisor rows of Section 1 — a faculty member's own FYP has no supervisor to connect. */
+const SUPERVISOR_FIELDS = new Set(["supervisor", "supervisorEmail"]);
+
+export default function FypV9Workspace({
+    id,
+    mode = "student",
+}: {
+    id: string;
+    /**
+     * "faculty": a faculty member's OWN FYP — same form, no supervisor loop. The supervisor is
+     * optional and the last step self-certifies and publishes (like a faculty venture).
+     */
+    mode?: "student" | "faculty";
+}) {
+    const facultyMode = mode === "faculty";
+    const hubHref = facultyMode ? "/dashboard/faculty/fyp-thesis?view=mine" : "/dashboard/student/paths/fyp-thesis";
+    const crumbRole = facultyMode ? "Faculty" : "Student";
+    const sectionOneRequired = facultyMode ? SECTION_ONE_REQUIRED.filter(([key]) => !SUPERVISOR_FIELDS.has(key)) : SECTION_ONE_REQUIRED;
     const cached = getPathSessionCache<FypEntry[]>("fyp-entries")?.find((row) => row.id === id);
     const [loading, setLoading] = useState(!cached);
     const [notFound, setNotFound] = useState(false);
@@ -499,7 +516,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
         return (
             <div className="mx-auto max-w-xl space-y-4 py-16 text-center">
                 <p className="text-lg font-black text-ciel-text">This FYP record doesn&apos;t exist, or isn&apos;t yours.</p>
-                <HubBackButton href="/dashboard/student/paths/fyp-thesis" label="← Back to my FYP records" />
+                <HubBackButton href={hubHref} label="← Back to my FYP records" />
             </div>
         );
     }
@@ -512,8 +529,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
     const acceptedCount = review.filter((r) => r.accepted).length;
     const connectionReady = !!(
         entry.projectInfo?.university &&
-        entry.projectInfo?.supervisorName &&
-        entry.projectInfo?.supervisorEmail &&
+        (facultyMode || (entry.projectInfo?.supervisorName && entry.projectInfo?.supervisorEmail)) &&
         (!isTeam ||
             (team.length > 0 &&
                 team.every(
@@ -579,7 +595,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
      * Section 1 in any order and come back — it is checked once, on "Submit FYP record".
      */
     const sectionOneBlocker = (): { message: string; focus: string; missing: string[] } | null => {
-        const missing = SECTION_ONE_REQUIRED.filter(([key]) => isSectionOneFieldEmpty(key));
+        const missing = sectionOneRequired.filter(([key]) => isSectionOneFieldEmpty(key));
         if (missing.length) {
             return {
                 message: `Before submitting, please complete in Section 1: ${missing.map(([, label]) => label).join(", ")}.`,
@@ -623,7 +639,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
     const completeSectionOne = async () => {
         setMissingFields([]);
         setError(null);
-        const open = SECTION_ONE_REQUIRED.filter(([key]) => isSectionOneFieldEmpty(key)).map(([, label]) => label);
+        const open = sectionOneRequired.filter(([key]) => isSectionOneFieldEmpty(key)).map(([, label]) => label);
         if (open.length) toast.message(`Saved. Still needed before final submission: ${open.join(", ")}.`);
         await goNext(1);
     };
@@ -654,6 +670,31 @@ export default function FypV9Workspace({ id }: { id: string }) {
             window.setTimeout(() => focusField(blocker.focus), 60);
             return;
         }
+        if (facultyMode) {
+            // A faculty FYP is never submitted into a review queue: save the draft, then certify.
+            const saved = await save(8, buildSectionSummaries());
+            if (!saved) return;
+            setSaving(true);
+            try {
+                const res = await authenticatedFetch(`/api/v1/paths/fyp-theses/${id}/self-certify`, { method: "POST", body: JSON.stringify({}) }, { redirectToLogin: true });
+                const body = (await res?.json().catch(() => null)) as { data?: FypEntry; message?: string | string[] } | null;
+                if (!res?.ok || !body?.data) {
+                    const raw = body?.message;
+                    const message = Array.isArray(raw) ? raw.join(" ") : raw || "Could not certify this FYP. Please try again.";
+                    setError(message);
+                    toast.error(message);
+                    return;
+                }
+                const certified = body.data;
+                setEntry((s) => mergeFypEntry(s, certified));
+                toast.success("Certified — your FYP is live on your impact wall, the university showcase and CIEL PK.");
+                setEditing(false);
+                setFlashOpen(false);
+            } finally {
+                setSaving(false);
+            }
+            return;
+        }
         const ok = await save(8, buildSectionSummaries(), "submitted");
         if (ok) {
             setEditing(false);
@@ -670,7 +711,9 @@ export default function FypV9Workspace({ id }: { id: string }) {
               : entry.supervisorApprovalStatus === "rejected"
                 ? "Your supervisor rejected this record — reopen it to fix and resubmit."
                 : entry.supervisorApprovalStatus === "approved"
-                  ? "Approved and live on your impact wall, university showcase, and CIEL PK."
+                  ? facultyMode
+                      ? "Self-certified and live on your impact wall, the university showcase and CIEL PK."
+                      : "Approved and live on your impact wall, university showcase, and CIEL PK."
                   : isOwner
                     ? "Submitted to your supervisor. You can reopen it if they ask for revision."
                     : "Shared team record — the lead author owns edits; you can track the same status and files.";
@@ -678,7 +721,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
     if (showCard) {
         return (
             <div className="mx-auto max-w-[1040px] pb-16">
-                <CourseworkCrumb role="Student" pathLabel="Final Year Project (FYP)" view="Record" />
+                <CourseworkCrumb role={crumbRole} pathLabel="Final Year Project (FYP)" view="Record" />
                 <CourseworkHero
                     kicker="CIEL PK · ACADEMIC PATH · FINAL YEAR PROJECTS"
                     title="Your FYP record"
@@ -687,7 +730,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                     stats={[...(entry.publicId ? [{ value: entry.publicId, label: "FYP ID" }] : []), { value: statusChip.label, label: "STATUS" }]}
                 />
                 <div className="mt-5">
-                    <HubBackButton href="/dashboard/student/paths/fyp-thesis" label="← FYP hub" />
+                    <HubBackButton href={hubHref} label="← FYP hub" />
                 </div>
                 {!isOwner && (
                     <div className="mb-3 rounded-xl border border-ciel-indigo/25 bg-ciel-indigo-soft px-4 py-2.5 text-xs font-semibold text-ciel-indigo">
@@ -702,13 +745,18 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             if (
                                 entry.supervisorApprovalStatus === "approved" &&
                                 !window.confirm(
-                                    "This FYP is already approved and ranked. Editing it will send it back for supervisor re-review and temporarily remove it from rankings and impact walls until it's approved again. Continue?",
+                                    facultyMode
+                                        ? "This FYP is certified and live. Editing it takes it off the impact walls until you certify it again. Continue?"
+                                        : "This FYP is already approved and ranked. Editing it will send it back for supervisor re-review and temporarily remove it from rankings and impact walls until it's approved again. Continue?",
                                 )
                             ) {
                                 return;
                             }
                             setReview(Array.from({ length: 7 }, () => ({ accepted: false, edited: false, text: "" })));
                             setDeclarationChecked(false);
+                            // A faculty FYP being edited goes back to draft (off the walls) until it is
+                            // certified again — it must never sit in anyone's review queue meanwhile.
+                            if (facultyMode) void save(undefined, undefined, "draft");
                             setEditing(true);
                             setStep(0);
                         }}
@@ -725,9 +773,9 @@ export default function FypV9Workspace({ id }: { id: string }) {
 
     return (
         <div className="mx-auto max-w-[1040px] pb-24">
-            <CourseworkCrumb role="Student" pathLabel="Final Year Project (FYP)" view="Build record" />
+            <CourseworkCrumb role={crumbRole} pathLabel="Final Year Project (FYP)" view="Build record" />
             <div className="mt-1">
-                <HubBackButton href="/dashboard/student/paths/fyp-thesis" label="← FYP hub" />
+                <HubBackButton href={hubHref} label="← FYP hub" />
             </div>
             <CourseworkHero
                 kicker="CIEL PK · ACADEMIC PATH · FINAL YEAR PROJECTS"
@@ -964,10 +1012,10 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             </div>
                         )}
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <Field label="Supervisor / faculty" required anchor="supervisor" invalid={fieldMissing("supervisor")}>
+                            <Field label={facultyMode ? "Co-supervisor (optional)" : "Supervisor / faculty"} required={!facultyMode} anchor="supervisor" invalid={fieldMissing("supervisor")}>
                                 <input value={entry.projectInfo?.supervisorName ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, supervisorName: e.target.value } }))} placeholder="Faculty supervisor name" className={fieldClass} />
                             </Field>
-                            <Field label="Supervisor email" required anchor="supervisorEmail" invalid={fieldMissing("supervisorEmail")}>
+                            <Field label={facultyMode ? "Co-supervisor email (optional)" : "Supervisor email"} required={!facultyMode} anchor="supervisorEmail" invalid={fieldMissing("supervisorEmail")}>
                                 <input type="email" value={entry.projectInfo?.supervisorEmail ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, supervisorEmail: e.target.value } }))} placeholder="name@university.edu.pk" className={fieldClass} />
                             </Field>
                         </div>
@@ -1526,7 +1574,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                     <input type="checkbox" checked={declarationChecked} onChange={(e) => setDeclarationChecked(e.target.checked)} className="mt-0.5 accent-ciel-purple" />
                                     <span className="text-[12px] leading-relaxed text-ciel-text">I confirm this record accurately represents the Final Year Project work completed, and that the evidence and findings described are genuine.</span>
                                 </label>
-                                <button type="button" disabled={saving || !declarationChecked} onClick={submitRecord} className="mt-3 w-full rounded-[11px] bg-ciel-purple py-3 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Submitting…" : "Submit FYP record + flashcard for verification →"}</button>
+                                <button type="button" disabled={saving || !declarationChecked} onClick={submitRecord} className="mt-3 w-full rounded-[11px] bg-ciel-purple py-3 text-[13px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? (facultyMode ? "Certifying…" : "Submitting…") : facultyMode ? "Certify & publish my FYP →" : "Submit FYP record + flashcard for verification →"}</button>
                             </div>
                         ) : null}
                         <div className="mt-4 flex justify-start">

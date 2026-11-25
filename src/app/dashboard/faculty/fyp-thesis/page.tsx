@@ -1,7 +1,10 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
+import type { FypEntry } from "@/utils/fypTypes";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
 import { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
@@ -17,7 +20,7 @@ import { CourseworkCrumb, HubBackButton, PathSectionHead, ActionKpiGrid, Workflo
 import { FACULTY_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero } from "@/components/ciel/dashboard/MockupChrome";
 import { isPathEntryApproved, isPathEntryWaiting, normalizeReviewStatus } from "@/utils/reviewQueue";
 
-const FYP_VIEWS = ["home", "progress", "pending", "approved", "rank"] as const;
+const FYP_VIEWS = ["home", "progress", "pending", "approved", "rank", "mine"] as const;
 type FacView = (typeof FYP_VIEWS)[number];
 const FYP_BASE = "/dashboard/faculty/fyp-thesis";
 const VIEW_CRUMB: Record<Exclude<FacView, "home">, string> = {
@@ -25,6 +28,7 @@ const VIEW_CRUMB: Record<Exclude<FacView, "home">, string> = {
     pending: "FYP Review",
     approved: "Approved FYP Impact",
     rank: "Approved FYP + AI Ranking",
+    mine: "My Faculty FYPs",
 };
 type ReviewTab = "pending" | "revision" | "rejected" | "all";
 
@@ -59,10 +63,16 @@ function FacultyFypThesisHub() {
     const [openFlashcardId, setOpenFlashcardId] = useState<string | null>(null);
     const [openReviewId, setOpenReviewId] = useState<string | null>(null);
     const [graderRuns, setGraderRuns] = useState<{ unlimited: boolean; used: number; limit: number } | null>(null);
+    const router = useRouter();
+    /** The faculty member's OWN FYP records (self-certified — no student review loop). */
+    const [myFyps, setMyFyps] = useState<FypEntry[]>([]);
+    const [creatingFyp, setCreatingFyp] = useState(false);
+    const [deletingFypId, setDeletingFypId] = useState<string | null>(null);
 
     useEffect(() => {
         void fetchEntries();
         void fetchInProgress();
+        void fetchMyFyps();
         authenticatedFetch("/api/v1/paths/fyp-thesis/merit-model")
             .then((res) => (res?.ok ? res.json() : null))
             .then((result) => {
@@ -87,6 +97,56 @@ function FacultyFypThesisHub() {
             setEntries([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchMyFyps = async () => {
+        try {
+            const response = await authenticatedFetch("/api/v1/paths/fyp-theses");
+            if (response?.ok) {
+                const data = await response.json();
+                const rows: FypEntry[] = Array.isArray(data.data) ? data.data : [];
+                setMyFyps(rows.filter((row) => row.isOwner !== false));
+            }
+        } catch {
+            // Non-fatal — the card just shows 0 until the next load.
+        }
+    };
+
+    const createFacultyFyp = async () => {
+        if (creatingFyp) return;
+        setCreatingFyp(true);
+        try {
+            const response = await authenticatedFetch("/api/v1/paths/fyp-theses", { method: "POST", body: JSON.stringify({}) }, { redirectToLogin: true });
+            const data = response?.ok ? await response.json().catch(() => null) : null;
+            const id = data?.data?.id;
+            if (!id) {
+                toast.error("Could not start a new FYP. Please try again.");
+                return;
+            }
+            router.push(`${FYP_BASE}/${id}`);
+        } catch {
+            toast.error("Could not start a new FYP. Please try again.");
+        } finally {
+            setCreatingFyp(false);
+        }
+    };
+
+    const deleteFacultyFyp = async (id: string) => {
+        if (deletingFypId || !window.confirm("Delete this FYP draft? This cannot be undone.")) return;
+        setDeletingFypId(id);
+        try {
+            const response = await authenticatedFetch(`/api/v1/paths/fyp-theses/${id}`, { method: "DELETE" }, { redirectToLogin: true });
+            if (response?.ok) {
+                setMyFyps((prev) => prev.filter((row) => row.id !== id));
+                toast.success("Draft deleted");
+            } else {
+                toast.error("Could not delete this draft");
+            }
+        } catch {
+            toast.error("Could not delete this draft");
+        } finally {
+            setDeletingFypId(null);
         }
     };
 
@@ -199,7 +259,7 @@ function FacultyFypThesisHub() {
                             subtitle="Your supervisees' Final Year Projects flow in as flashcards. The FYP AI Analyser has already scored each one against excellent work in the student's discipline (level-aware) — edit anything you disagree with, then approve to release the score and comments to the student."
                             pill="FACULTY VIEW"
                         />
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <MockupActionCard
                                 href={`${FYP_BASE}?view=progress`}
                                 emoji="🔬"
@@ -226,6 +286,15 @@ function FacultyFypThesisHub() {
                                 subtitle="Run the AI Analyser across all your approved projects anytime (unofficial preview). Publish up to 3× per academic year — each student gets a locked, dated “Faculty AI Analyser” badge on their flashcard, synced to the university and CIEL PK."
                                 badge={`${approved.length} APPROVED`}
                                 background={MOCKUP_GRADIENTS.purple}
+                            />
+                            <MockupActionCard
+                                href={`${FYP_BASE}?view=mine`}
+                                emoji="🎓"
+                                ghost="🎓"
+                                title="Create Faculty FYP"
+                                subtitle="Your own final-year project, thesis or research record on the same FYP form. Self-certified — no student review loop — and published to your impact wall, the university showcase and CIEL PK."
+                                badge={`${myFyps.length} MINE`}
+                                background={MOCKUP_GRADIENTS.teal}
                             />
                         </div>
                         <ActionKpiGrid
@@ -264,6 +333,73 @@ function FacultyFypThesisHub() {
                             className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none focus:border-blue-400"
                         />
                     </div>
+                )}
+
+                {view === "mine" && (
+                    <section data-ciel-faculty-fyp-mine className="space-y-4">
+                        <PathSectionHead
+                            title="My Faculty FYPs"
+                            subtitle="FYP records you own. Build one on the same FYP form students use; when it is complete, Certify & publish puts it on your impact wall, the university showcase and CIEL PK. It never enters a student review queue and is not ranked against students."
+                            pill="SELF-CERTIFIED"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => void createFacultyFyp()}
+                            disabled={creatingFyp}
+                            className="rounded-xl bg-[#0e7d74] px-4 py-2.5 text-sm font-black text-white disabled:opacity-60"
+                        >
+                            {creatingFyp ? "Starting…" : "+ Create a new FYP"}
+                        </button>
+                        {myFyps.length === 0 ? (
+                            <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                                No faculty FYP yet. Create one to start.
+                            </p>
+                        ) : (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {myFyps.map((row) => {
+                                    const title = row.projectTitle || row.projectInfo?.title || "Untitled FYP";
+                                    const certified = row.status === "submitted" && row.supervisorApprovalStatus === "approved";
+                                    const statusLabel = certified ? "Certified · live" : row.status === "submitted" ? "Edited · certify again" : "Draft";
+                                    const steps = Math.min(8, row.stepCompleted ?? 0);
+                                    return (
+                                        <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <b className="text-sm text-[#16313d]">{title}</b>
+                                                <span
+                                                    className={
+                                                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black " +
+                                                        (certified ? "bg-[#e8f5ef] text-[#1d765d]" : "bg-[#fff3dc] text-[#9a6410]")
+                                                    }
+                                                >
+                                                    {statusLabel}
+                                                </span>
+                                            </div>
+                                            {row.publicId ? <small className="mt-0.5 block text-[11px] text-slate-500">{row.publicId}</small> : null}
+                                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                                <i className="block h-full rounded-full bg-[#0e7d74]" style={{ width: `${(steps / 8) * 100}%` }} />
+                                            </div>
+                                            <small className="mt-1 block text-[11px] text-slate-500">{steps}/8 steps</small>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                <Link href={`${FYP_BASE}/${row.id}`} className="rounded-lg bg-[#edf4fb] px-3 py-1.5 text-xs font-black text-[#376d9f]">
+                                                    {row.status === "draft" ? "Continue" : "Open"}
+                                                </Link>
+                                                {row.status === "draft" && row.id ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void deleteFacultyFyp(String(row.id))}
+                                                        disabled={deletingFypId === row.id}
+                                                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 disabled:opacity-60"
+                                                    >
+                                                        {deletingFypId === row.id ? "Deleting…" : "Delete draft"}
+                                                    </button>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </section>
                 )}
 
                 {view === "progress" && (
