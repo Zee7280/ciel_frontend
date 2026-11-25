@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
-import { whatsappShareHref } from "@/utils/reminderLinks";
+import { whatsappDigits, whatsappShareHref } from "@/utils/reminderLinks";
 
 export type FollowUpRole = "student" | "faculty" | "partner" | "admin" | "none" | string | null | undefined;
 
@@ -68,6 +68,7 @@ export function ApprovalFollowUpActions({
     publicCode,
     nextStep,
     openPath,
+    phone,
     className,
 }: {
     opportunityId: string;
@@ -77,6 +78,8 @@ export function ApprovalFollowUpActions({
     publicCode?: string | null;
     nextStep?: string | null;
     openPath?: string | null;
+    /** The pending reviewer's WhatsApp number: the button then opens that chat, not the share sheet. */
+    phone?: string | null;
     className?: string;
 }) {
     const [sending, setSending] = useState(false);
@@ -84,6 +87,7 @@ export function ApprovalFollowUpActions({
     if (!opportunityId || !["faculty", "partner", "admin"].includes(role)) return null;
     const who = roleLabel(role, currentlyWith || "");
     const copy = buildFollowUpCopy({ title, publicCode, currentlyWith, nextStep, openPath });
+    const waDigits = whatsappDigits(phone || "");
 
     const sendEmail = async () => {
         if (sending) return;
@@ -109,9 +113,11 @@ export function ApprovalFollowUpActions({
                 {sending ? "Sending…" : `Email ${who}`}
             </button>
             <a
-                href={whatsappShareHref(copy.whatsappText)}
+                href={waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(copy.whatsappText)}` : whatsappShareHref(copy.whatsappText)}
                 target="_blank"
                 rel="noopener noreferrer"
+                data-ciel-followup-whatsapp={waDigits ? "direct" : "share"}
+                title={waDigits ? `Open a WhatsApp chat with ${who} (${phone})` : `No WhatsApp number saved for ${who} — choose the chat in WhatsApp`}
                 className="block w-full rounded-[9px] bg-[#e8f8ee] px-2.5 py-2 text-center text-[10px] font-black text-[#1f7a46]"
             >
                 WhatsApp {who}

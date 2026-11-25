@@ -232,3 +232,15 @@ test("dashboard tiles can blink a notification count, and faculty review tiles u
     assert.match(facultyCs, /title="Review Opportunities"[\s\S]*?alertCount=\{pendingApprovalsHero\}/);
     assert.match(facultyHome, /title="Community Service"[\s\S]*?alertCount=\{communityActions\}/);
 });
+
+test("CIEL PK admin: 'WhatsApp <reviewer>' opens a chat with the waiting faculty / partner, not a blank share", () => {
+    const followUp = read("src/components/ciel/community-service/ApprovalFollowUpActions.tsx");
+    const admin = read("src/app/dashboard/admin/approvals/page.tsx");
+    assert.match(followUp, /phone\?: string \| null;/, "optional reviewer number");
+    assert.match(followUp, /const waDigits = whatsappDigits\(phone \|\| ""\);/);
+    assert.match(followUp, /waDigits \? `https:\/\/wa\.me\/\$\{waDigits\}\?text=\$\{encodeURIComponent\(copy\.whatsappText\)\}` : whatsappShareHref\(copy\.whatsappText\)/, "no number keeps the old share link");
+    assert.match(admin, /<ApprovalFollowUpActions[\s\S]*?phone=\{\(\(\) => \{\s*const v = projRow\[waiterRole === "faculty" \? "faculty_contact_phone" : "partner_contact_phone"\];/);
+    // The chain card already reads the same backend fields for its Faculty / Partner boxes.
+    assert.match(card, /pickStr\(row, "faculty_contact_phone", "faculty_phone"\)/);
+    assert.match(card, /pickStr\(row, "partner_contact_phone", "partner_phone"\)/);
+});

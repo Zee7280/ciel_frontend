@@ -1588,6 +1588,10 @@ export default function AdminApprovalsPage() {
                                                   ? projRow.nextStep
                                                   : ""
                                         }
+                                        phone={(() => {
+                                            const v = projRow[waiterRole === "faculty" ? "faculty_contact_phone" : "partner_contact_phone"];
+                                            return typeof v === "string" ? v : "";
+                                        })()}
                                         className="flex flex-wrap items-center gap-2"
                                     />
                                 ) : null}
