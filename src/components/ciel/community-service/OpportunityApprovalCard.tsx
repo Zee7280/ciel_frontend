@@ -334,7 +334,8 @@ export function buildOpportunityApprovalModel(
         who: facultyName || undefined,
         state: lineState(facultyLine, cursor, blocked),
         email: facultyEmail || undefined,
-        phone: facultyPhone || undefined,
+        // A faculty supervisor's number is shown to CIEL PK admin only.
+        phone: (viewer === "admin" && facultyPhone) || undefined,
     });
 
     if (requiresPartner) {

@@ -530,9 +530,10 @@ function ProposalCard({ op, tab, highlighted }: { op: MineRow; tab: StatusTab; h
               : reviewerRole === "admin"
                 ? CIEL_SUPPORT_EMAIL
                 : "";
+    // A faculty supervisor's number is CIEL PK admin only: the student reminds faculty by email.
     const reviewerPhoneRaw =
         reviewerRole === "faculty"
-            ? op.faculty_contact_phone
+            ? null
             : reviewerRole === "partner"
               ? op.partner_contact_phone
               : reviewerRole === "admin"

@@ -371,9 +371,12 @@ export function StudentOpportunityFlashcard({
     className = "",
     hideApplyCta = false,
     applyHref,
+    showFacultyPhone = false,
 }: {
     model: StudentFlashcardModel;
     className?: string;
+    /** The faculty supervisor's WhatsApp is shown to CIEL PK admin only; every other viewer gets email. */
+    showFacultyPhone?: boolean;
     /** Omit the bottom "Apply now" banner, for pages that render their own working Apply button. */
     hideApplyCta?: boolean;
     /**
@@ -465,7 +468,7 @@ export function StudentOpportunityFlashcard({
     const facultyFirstName = String(model.facultyName || "").trim().split(/\s+/)[0] || "";
     const facultyMessage = `Dear ${facultyFirstName ? `${facultyFirstName}` : "Faculty"}, I am contacting you about "${contactTitle}" on CIEL PK.`;
     const facultyMailHref = facultyEmail ? mailtoHref(facultyEmail, `CIEL PK · ${contactTitle}`, `${facultyMessage}\n\n`) : "";
-    const facultyWa = whatsappDigits(model.facultyWhatsapp);
+    const facultyWa = showFacultyPhone ? whatsappDigits(model.facultyWhatsapp) : "";
     const facultyWaHref = facultyWa ? `https://wa.me/${facultyWa}?text=${encodeURIComponent(facultyMessage)}` : "";
     const mapUrl = String(model.mapUrl || "").trim();
     const mapPlace = String(model.mapPlace || "").trim() || String(model.city || "").trim();

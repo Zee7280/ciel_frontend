@@ -15,7 +15,8 @@ test("approval chain boxes carry the reviewer's email and phone for Faculty, Par
     assert.match(card, /email\?: string;\s*phone\?: string;/, "step type has email/phone");
     assert.match(card, /data-ciel-step-email/, "email line rendered in the box");
     assert.match(card, /data-ciel-step-phone/, "phone line rendered in the box");
-    assert.match(card, /role: "Faculty",[\s\S]*?email: facultyEmail \|\| undefined,\s*phone: facultyPhone \|\| undefined/);
+    // The faculty supervisor's number is CIEL PK admin only.
+    assert.match(card, /role: "Faculty",[\s\S]*?email: facultyEmail \|\| undefined,[\s\S]*?phone: \(viewer === "admin" && facultyPhone\) \|\| undefined/);
     assert.match(card, /role: viewer === "ngo" \? "NGO" : "Partner",[\s\S]*?email: partnerEmail \|\| undefined,\s*phone: partnerPhone \|\| undefined/);
     assert.match(card, /role: "CIEL PK",[\s\S]*?email: CIEL_SUPPORT_EMAIL,\s*phone: CIEL_SUPPORT_WHATSAPP_DISPLAY/);
     // Reads the same fields the student "mine" list already returns.
@@ -243,4 +244,27 @@ test("CIEL PK admin: 'WhatsApp <reviewer>' opens a chat with the waiting faculty
     // The chain card already reads the same backend fields for its Faculty / Partner boxes.
     assert.match(card, /pickStr\(row, "faculty_contact_phone", "faculty_phone"\)/);
     assert.match(card, /pickStr\(row, "partner_contact_phone", "partner_phone"\)/);
+});
+
+test("a faculty supervisor's phone number is shown to CIEL PK admin only", () => {
+    const flash = read("src/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard.tsx");
+    const admin = read("src/app/dashboard/admin/approvals/page.tsx");
+    // Flashcard: hidden unless the page opts in; only the admin approvals page does.
+    assert.match(flash, /showFacultyPhone = false,/);
+    assert.match(flash, /const facultyWa = showFacultyPhone \? whatsappDigits\(model\.facultyWhatsapp\) : "";/);
+    assert.match(admin, /<StudentOpportunityFlashcard[\s\S]*?showFacultyPhone\s*\/>/);
+    const optedIn = [
+        "src/app/projects/[id]/page.tsx",
+        "src/app/verify/faculty/page.tsx",
+        "src/app/verify/partner/page.tsx",
+        "src/app/dashboard/student/browse/[id]/page.tsx",
+        "src/app/dashboard/student/create-opportunity/page.tsx",
+        "src/app/dashboard/partner/verify/page.tsx",
+        "src/components/faculty/FacultyOpportunityDetailBody.tsx",
+    ].filter((p) => /showFacultyPhone/.test(read(p)));
+    assert.deepEqual(optedIn, [], "no other page shows the faculty number");
+    // Approval chain: the Faculty box carries a phone for the admin viewer only.
+    assert.match(card, /phone: \(viewer === "admin" && facultyPhone\) \|\| undefined/);
+    // Student's own list: the faculty reminder has no WhatsApp number.
+    assert.match(create, /reviewerRole === "faculty"\s*\? null\s*: reviewerRole === "partner"/);
 });

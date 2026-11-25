@@ -2061,6 +2061,7 @@ export default function AdminApprovalsPage() {
                                                         ),
                                                     },
                                                 )}
+                                                showFacultyPhone
                                             />
                                         );
                                     } catch (err) {
