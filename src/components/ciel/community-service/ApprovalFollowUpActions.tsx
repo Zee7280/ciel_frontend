@@ -69,6 +69,7 @@ export function ApprovalFollowUpActions({
     nextStep,
     openPath,
     phone,
+    whatsappMessage,
     className,
 }: {
     opportunityId: string;
@@ -80,6 +81,8 @@ export function ApprovalFollowUpActions({
     openPath?: string | null;
     /** The pending reviewer's WhatsApp number: the button then opens that chat, not the share sheet. */
     phone?: string | null;
+    /** Replaces the default WhatsApp text (e.g. CIEL PK admin's partner approval request). */
+    whatsappMessage?: string;
     className?: string;
 }) {
     const [sending, setSending] = useState(false);
@@ -88,6 +91,7 @@ export function ApprovalFollowUpActions({
     const who = roleLabel(role, currentlyWith || "");
     const copy = buildFollowUpCopy({ title, publicCode, currentlyWith, nextStep, openPath });
     const waDigits = whatsappDigits(phone || "");
+    const waText = whatsappMessage?.trim() ? whatsappMessage : copy.whatsappText;
 
     const sendEmail = async () => {
         if (sending) return;
@@ -113,7 +117,7 @@ export function ApprovalFollowUpActions({
                 {sending ? "Sending…" : `Email ${who}`}
             </button>
             <a
-                href={waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(copy.whatsappText)}` : whatsappShareHref(copy.whatsappText)}
+                href={waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : whatsappShareHref(waText)}
                 target="_blank"
                 rel="noopener noreferrer"
                 data-ciel-followup-whatsapp={waDigits ? "direct" : "share"}

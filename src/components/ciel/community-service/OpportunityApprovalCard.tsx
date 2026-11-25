@@ -25,7 +25,30 @@ export type ApprovalChainContact = {
     title: string;
     /** Public code (CS-2026-316A); omitted when the row has none yet. */
     code?: string;
+    /**
+     * CIEL PK admin view only: who the partner request goes to and the student who chose them. The
+     * waiting Partner box then opens with the admin → partner approval request message.
+     */
+    partnerInvite?: { recipientName?: string; studentName?: string };
 };
+
+/** CIEL PK admin → partner organisation: the opportunity is waiting for the partner's approval. */
+export function partnerApprovalRequestMessage(input: { recipientName?: string; studentName?: string; title: string }): string {
+    const name = (input.recipientName || "").trim() || "there";
+    const student = (input.studentName || "").trim() || "A student";
+    const title = input.title.trim() || "this opportunity";
+    return [
+        `Hello ${name},`,
+        "",
+        `${student} has selected your organization as a partner for ${title}, and the opportunity is awaiting your approval.`,
+        "",
+        "Please check your email from CIEL PK and approve it there. If you don’t have an account yet, register at cielpk.com under Organization or NGO, whichever best fits your organization. Then review the opportunity in your dashboard.",
+        "",
+        "CIEL PK helps document and showcase community service projects, your organization’s contribution, and the impact created. Your approval will help the student move forward and ensure the project is recorded on the platform.",
+        "",
+        "If you have any questions, please visit cielpk.com or reply to this message. Thank you for supporting student and community impact.",
+    ].join("\n");
+}
 
 /**
  * The default message a chain box's email / WhatsApp link opens with. The box that is waiting
@@ -39,6 +62,9 @@ export function approvalChainMessage(step: Pick<ApprovalCardStep, "role" | "who"
               ? "Hi CIEL PK team"
               : "Hi";
     const about = `"${contact.title}"${contact.code ? ` (${contact.code})` : ""}`;
+    if (step.state === "cur" && contact.partnerInvite && (step.role === "Partner" || step.role === "NGO")) {
+        return partnerApprovalRequestMessage({ ...contact.partnerInvite, title: contact.title });
+    }
     if (step.state === "cur") {
         return `${greeting}, ${about} is awaiting your approval on CIEL PK. Please review it when convenient.`;
     }
@@ -267,6 +293,13 @@ export function buildOpportunityApprovalModel(
         isPlaceholderOpportunityOrgName(partnerNameRaw) || isPlaceholderOpportunityOrg(partnerOrg)
             ? ""
             : partnerNameRaw;
+    // The partner's contact person, for "Hello <name>" — a phone number typed into that field is not a name.
+    const partnerContactName = [
+        pickStr(row, "partner_contact_name"),
+        pickStr(supervision, "partner_contact_person"),
+        pickStr(collab, "contact_person", "contact_name"),
+        pickStr(partnerOrg, "contact_person", "contact_person_name"),
+    ].find((v) => v && !/^[+\d][\d\s().-]{6,}$/.test(v)) || "";
     const orgName = pickStr(organization, "name", "organization_name");
     const universityName =
         pickStr(row, "university", "institution", "creator_university") ||
@@ -473,6 +506,9 @@ export function buildOpportunityApprovalModel(
         chainContact: {
             title: pickStr(row, "title", "project_title", "projectTitle", "name") || "Opportunity",
             code: formatOpportunityCode(row) || undefined,
+            ...(viewer === "admin" && requiresPartner
+                ? { partnerInvite: { recipientName: partnerContactName || partnerName || undefined, studentName: studentName || undefined } }
+                : {}),
         } satisfies ApprovalChainContact,
         versionLabel: `Opp v${version}`,
         statusPill: statusTitle,

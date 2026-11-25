@@ -239,7 +239,7 @@ test("CIEL PK admin: 'WhatsApp <reviewer>' opens a chat with the waiting faculty
     const admin = read("src/app/dashboard/admin/approvals/page.tsx");
     assert.match(followUp, /phone\?: string \| null;/, "optional reviewer number");
     assert.match(followUp, /const waDigits = whatsappDigits\(phone \|\| ""\);/);
-    assert.match(followUp, /waDigits \? `https:\/\/wa\.me\/\$\{waDigits\}\?text=\$\{encodeURIComponent\(copy\.whatsappText\)\}` : whatsappShareHref\(copy\.whatsappText\)/, "no number keeps the old share link");
+    assert.match(followUp, /waDigits \? `https:\/\/wa\.me\/\$\{waDigits\}\?text=\$\{encodeURIComponent\(waText\)\}` : whatsappShareHref\(waText\)/, "no number keeps the old share link");
     assert.match(admin, /<ApprovalFollowUpActions[\s\S]*?phone=\{\(\(\) => \{\s*const v = projRow\[waiterRole === "faculty" \? "faculty_contact_phone" : "partner_contact_phone"\];/);
     // The chain card already reads the same backend fields for its Faculty / Partner boxes.
     assert.match(card, /pickStr\(row, "faculty_contact_phone", "faculty_phone"\)/);
@@ -267,4 +267,25 @@ test("a faculty supervisor's phone number is shown to CIEL PK admin only", () =>
     assert.match(card, /phone: \(viewer === "admin" && facultyPhone\) \|\| undefined/);
     // Student's own list: the faculty reminder has no WhatsApp number.
     assert.match(create, /reviewerRole === "faculty"\s*\? null\s*: reviewerRole === "partner"/);
+});
+
+test("CIEL PK admin → partner org: the approval request message (admin view only)", () => {
+    const admin = read("src/app/dashboard/admin/approvals/page.tsx");
+    const followUp = read("src/components/ciel/community-service/ApprovalFollowUpActions.tsx");
+    for (const line of [
+        "`Hello ${name},`",
+        "`${student} has selected your organization as a partner for ${title}, and the opportunity is awaiting your approval.`",
+        "Please check your email from CIEL PK and approve it there. If you don’t have an account yet, register at cielpk.com under Organization or NGO, whichever best fits your organization. Then review the opportunity in your dashboard.",
+        "CIEL PK helps document and showcase community service projects, your organization’s contribution, and the impact created. Your approval will help the student move forward and ensure the project is recorded on the platform.",
+        "If you have any questions, please visit cielpk.com or reply to this message. Thank you for supporting student and community impact.",
+    ]) {
+        assert.ok(card.includes(line), line);
+    }
+    assert.ok(!card.includes("￼"), "no stray object-replacement character from the pasted text");
+    // Only the admin view carries the partner invite; the waiting Partner / NGO box uses it.
+    assert.match(card, /\.\.\.\(viewer === "admin" && requiresPartner\s*\? \{ partnerInvite:/);
+    assert.match(card, /step\.state === "cur" && contact\.partnerInvite && \(step\.role === "Partner" \|\| step\.role === "NGO"\)/);
+    // The admin's "WhatsApp <partner>" button sends the same message to the partner's number.
+    assert.match(followUp, /const waText = whatsappMessage\?\.trim\(\) \? whatsappMessage : copy\.whatsappText;/);
+    assert.match(admin, /waiterRole === "partner" && partnerInvite\s*\? partnerApprovalRequestMessage\(\{ \.\.\.partnerInvite, title: approvalModel\.chainContact\.title \}\)/);
 });

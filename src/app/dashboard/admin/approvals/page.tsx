@@ -31,7 +31,7 @@ import {
     StudentOpportunityFlashcard,
 } from "@/app/dashboard/student/create-opportunity/StudentOpportunityFlashcard";
 import { OpportunityWhatsAppLinks } from "@/components/opportunities/OpportunityWhatsAppLinks";
-import OpportunityApprovalCard, { buildOpportunityApprovalModel } from "@/components/ciel/community-service/OpportunityApprovalCard";
+import OpportunityApprovalCard, { buildOpportunityApprovalModel, partnerApprovalRequestMessage } from "@/components/ciel/community-service/OpportunityApprovalCard";
 import { ApprovalFollowUpActions } from "@/components/ciel/community-service/ApprovalFollowUpActions";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import ApprovalInstructionsField from "@/app/dashboard/admin/_shared/ApprovalInstructionsField";
@@ -1471,12 +1471,14 @@ export default function AdminApprovalsPage() {
                         const waiterRole = String(projRow.currently_with_role ?? projRow.currentlyWithRole ?? "")
                             .trim()
                             .toLowerCase();
+                        const approvalModel = buildOpportunityApprovalModel(projRow, "admin", {
+                            mode: showApproveButton ? "pending" : "decided",
+                        });
+                        const partnerInvite = approvalModel.chainContact.partnerInvite;
                         return (
                         <OpportunityApprovalCard
                             key={proj.id}
-                            {...buildOpportunityApprovalModel(projRow, "admin", {
-                                mode: showApproveButton ? "pending" : "decided",
-                            })}
+                            {...approvalModel}
                             statusPill={flowLabel || undefined}
                             actions={
                             <div className="flex w-full flex-wrap items-center justify-start gap-2">
@@ -1592,6 +1594,11 @@ export default function AdminApprovalsPage() {
                                             const v = projRow[waiterRole === "faculty" ? "faculty_contact_phone" : "partner_contact_phone"];
                                             return typeof v === "string" ? v : "";
                                         })()}
+                                        whatsappMessage={
+                                            waiterRole === "partner" && partnerInvite
+                                                ? partnerApprovalRequestMessage({ ...partnerInvite, title: approvalModel.chainContact.title })
+                                                : undefined
+                                        }
                                         className="flex flex-wrap items-center gap-2"
                                     />
                                 ) : null}
