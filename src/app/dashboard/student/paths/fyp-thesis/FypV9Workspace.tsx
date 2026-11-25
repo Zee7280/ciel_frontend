@@ -8,7 +8,8 @@ import { authenticatedFetch } from "@/utils/api";
 import { loadStudentFyp } from "@/utils/fypStudentApi";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import { sdgData } from "@/utils/sdgData";
-import { pakistaniUniversities } from "@/utils/universityData";
+import { canonicalPakistaniUniversity, pakistaniUniversities } from "@/utils/universityData";
+import { readStudentInstitutionFromBrowserStorage } from "@/utils/studentOpportunityApplyEligibility";
 import { getPathSessionCache } from "@/utils/student-path-session-cache";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import ThesisCard from "@/components/ciel/ThesisCard";
@@ -95,6 +96,25 @@ const FYP_V9_JOURNEY = [
     "Review & submit",
 ];
 
+/** Section 1 required fields in page order: [anchor key, label in the "Please complete" message]. */
+const SECTION_ONE_REQUIRED: [string, string][] = [
+    ["title", "FYP title"],
+    ["university", "University"],
+    ["area", "Academic area"],
+    ["discipline", "Discipline"],
+    ["supervisor", "Supervisor"],
+    ["supervisorEmail", "Supervisor email"],
+    ["route", "Primary FYP route"],
+    ["routeOther", "Custom route description"],
+];
+
+/** The student's university as the profile stores it, spelled as the picker lists it ("BNU" → full name). */
+function profileUniversity(): string {
+    const stored = readStudentInstitutionFromBrowserStorage();
+    if (!stored || stored === "Other") return "";
+    return canonicalPakistaniUniversity(stored) || stored;
+}
+
 export default function FypV9Workspace({ id }: { id: string }) {
     const cached = getPathSessionCache<FypEntry[]>("fyp-entries")?.find((row) => row.id === id);
     const [loading, setLoading] = useState(!cached);
@@ -110,6 +130,8 @@ export default function FypV9Workspace({ id }: { id: string }) {
     const [uploading, setUploading] = useState(false);
     const [removingVersion, setRemovingVersion] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    /** Section 1 fields the last "Connect project" press found empty; each clears as soon as it is filled. */
+    const [missingFields, setMissingFields] = useState<string[]>([]);
     const [flashOpen, setFlashOpen] = useState(false);
     const [declarationChecked, setDeclarationChecked] = useState(false);
     const saveTailRef = useRef(Promise.resolve());
@@ -127,6 +149,12 @@ export default function FypV9Workspace({ id }: { id: string }) {
                 // field. Default it into state so what's visibly filled in is actually saved.
                 if (!data.projectInfo?.graduationYear) {
                     data.projectInfo = { ...data.projectInfo, graduationYear: "2026" };
+                }
+                // A new record arrives empty (POST {}); the university comes from the student's profile
+                // when it is set there, as the field's hint promises. Saved with the next step.
+                if (!data.projectInfo?.university?.trim() && data.isOwner !== false) {
+                    const fromProfile = profileUniversity();
+                    if (fromProfile) data.projectInfo = { ...data.projectInfo, university: fromProfile };
                 }
                 setEntry(data);
                 setV9(hydrateV9(data));
@@ -511,27 +539,57 @@ export default function FypV9Workspace({ id }: { id: string }) {
         toast.error(message);
     };
 
-    const completeSectionOne = async () => {
-        const missing = [
-            !entry.projectInfo?.title && "FYP title",
-            !entry.projectInfo?.university && "University",
-            !v9.academicAreaKey && "Academic area",
-            !effectiveSelect(v9.discipline, v9.disciplineOther) && "Discipline",
-            !entry.projectInfo?.supervisorName && "Supervisor",
-            !entry.projectInfo?.supervisorEmail && "Supervisor email",
-            !routeKey && "Primary FYP route",
-            routeKey === "other" && !v9.v9RouteOther.trim() && "Custom route description",
-        ].filter(Boolean);
+    /** Scrolls the first empty Section 1 field into view and puts the cursor in it. */
+    const focusField = (key: string) => {
+        if (typeof document === "undefined") return;
+        const box = document.querySelector<HTMLElement>(`[data-ciel-fyp-field="${key}"]`);
+        if (!box) return;
+        box.scrollIntoView({ behavior: "smooth", block: "center" });
+        const input = box.querySelector<HTMLElement>("input, select, textarea, button");
+        window.setTimeout(() => input?.focus({ preventScroll: true }), 350);
+    };
+
+    const isSectionOneFieldEmpty = (key: string): boolean => {
+        switch (key) {
+            case "title":
+                return !entry.projectInfo?.title;
+            case "university":
+                return !entry.projectInfo?.university;
+            case "area":
+                return !v9.academicAreaKey;
+            case "discipline":
+                return !effectiveSelect(v9.discipline, v9.disciplineOther);
+            case "supervisor":
+                return !entry.projectInfo?.supervisorName;
+            case "supervisorEmail":
+                return !entry.projectInfo?.supervisorEmail;
+            case "route":
+                return !routeKey;
+            case "routeOther":
+                return routeKey === "other" && !v9.v9RouteOther.trim();
+            default:
+                return false;
+        }
+    };
+    const fieldMissing = (key: string) => missingFields.includes(key) && isSectionOneFieldEmpty(key);
+
+    /**
+     * What still stops the FINAL submission from Section 1: the identity fields and, for a group
+     * project, complete member rows. Nothing here blocks moving between steps — a student may fill
+     * Section 1 in any order and come back — it is checked once, on "Submit FYP record".
+     */
+    const sectionOneBlocker = (): { message: string; focus: string; missing: string[] } | null => {
+        const missing = SECTION_ONE_REQUIRED.filter(([key]) => isSectionOneFieldEmpty(key));
         if (missing.length) {
-            blockStep(`Please complete: ${missing.join(", ")}`);
-            return;
+            return {
+                message: `Before submitting, please complete in Section 1: ${missing.map(([, label]) => label).join(", ")}.`,
+                focus: missing[0][0],
+                missing: missing.map(([key]) => key),
+            };
         }
         if (isTeam) {
             const members = team.length ? team : [];
-            if (!members.length) {
-                blockStep("Please add the group members.");
-                return;
-            }
+            if (!members.length) return { message: "Before submitting, please add the group members in Section 1.", focus: "team", missing: [] };
             const incomplete = members.findIndex(
                 (m) =>
                     !m.name?.trim() ||
@@ -541,14 +599,12 @@ export default function FypV9Workspace({ id }: { id: string }) {
                     !normalizeLocalNumber(m.whatsappNumber),
             );
             if (incomplete >= 0) {
-                blockStep(`Please complete Name, Roll No., Email, Country Code and WhatsApp Number for Group Member ${incomplete + 1}.`);
-                return;
+                return { message: `Before submitting, please complete Name, Roll No., Email, Country Code and WhatsApp Number for Group Member ${incomplete + 1} (Section 1).`, focus: "team", missing: [] };
             }
             const ownEmail = getStoredCurrentUserEmail();
             const ownIdx = ownEmail ? members.findIndex((m) => (m.email ?? "").trim().toLowerCase() === ownEmail) : -1;
             if (ownIdx >= 0) {
-                blockStep(`Group Member ${ownIdx + 1} uses your own email. Add your teammates' emails here — you are already on this record.`);
-                return;
+                return { message: `Group Member ${ownIdx + 1} uses your own email. Add your teammates' emails in Section 1 — you are already on this record.`, focus: "team", missing: [] };
             }
             const badPhone = members.findIndex(
                 (m) =>
@@ -556,11 +612,19 @@ export default function FypV9Workspace({ id }: { id: string }) {
                     normalizeLocalNumber(m.whatsappNumber).length < 6,
             );
             if (badPhone >= 0) {
-                blockStep(`Please enter a valid country code (e.g. +92) and WhatsApp number for Group Member ${badPhone + 1}.`);
-                return;
+                return { message: `Please enter a valid country code (e.g. +92) and WhatsApp number for Group Member ${badPhone + 1} (Section 1).`, focus: "team", missing: [] };
             }
         }
+        return null;
+    };
+
+    // "Connect project & build roadmap" never refuses: Section 1 can be completed later, and the
+    // final submission checks it (sectionOneBlocker). A short note says what is still open.
+    const completeSectionOne = async () => {
+        setMissingFields([]);
         setError(null);
+        const open = SECTION_ONE_REQUIRED.filter(([key]) => isSectionOneFieldEmpty(key)).map(([, label]) => label);
+        if (open.length) toast.message(`Saved. Still needed before final submission: ${open.join(", ")}.`);
         await goNext(1);
     };
 
@@ -582,6 +646,14 @@ export default function FypV9Workspace({ id }: { id: string }) {
     });
 
     const submitRecord = async () => {
+        const blocker = sectionOneBlocker();
+        if (blocker) {
+            setMissingFields(blocker.missing);
+            blockStep(`${blocker.message} Section 1 is open below.`);
+            setStep(0);
+            window.setTimeout(() => focusField(blocker.focus), 60);
+            return;
+        }
         const ok = await save(8, buildSectionSummaries(), "submitted");
         if (ok) {
             setEditing(false);
@@ -746,11 +818,11 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             <span>🎓</span>
                             <div><b className="text-ciel-text">Broad national coverage:</b> academic areas follow HEC classifications. If your programme uses a different title, choose Other and type it.</div>
                         </div>
-                        <Field label="Final Year Project title" required>
+                        <Field label="Final Year Project title" required anchor="title" invalid={fieldMissing("title")}>
                             <input value={entry.projectInfo?.title ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectTitle: e.target.value, projectInfo: { ...s.projectInfo, title: e.target.value } }))} placeholder="Working or final project title" className={fieldClass} />
                         </Field>
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <Field label="University / Institution" required hint="Auto-fills from your account when available — you can still edit it.">
+                            <Field label="University / Institution" required anchor="university" invalid={fieldMissing("university")} hint="Prefilled from your profile when it is set there — you can still edit it.">
                                 <SearchableSelect value={entry.projectInfo?.university ?? ""} onChange={(v) => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, university: v } }))} options={pakistaniUniversities} placeholder="Type your university" />
                             </Field>
                             <Field label="School / Faculty / Department (optional)">
@@ -758,7 +830,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             </Field>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-3">
-                            <Field label="Academic area" required>
+                            <Field label="Academic area" required anchor="area" invalid={fieldMissing("area")}>
                                 <select value={v9.academicAreaKey} onChange={(e) => patchV9({ academicAreaKey: e.target.value, discipline: "" })} className={fieldClass}>
                                     <option value="">Select broad academic area…</option>
                                     {Object.entries(FYP_V9_AREAS).map(([k, a]) => (
@@ -766,7 +838,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                     ))}
                                 </select>
                             </Field>
-                            <Field label="Specific discipline / programme field" required>
+                            <Field label="Specific discipline / programme field" required anchor="discipline" invalid={fieldMissing("discipline")}>
                                 <select value={v9.discipline} disabled={!area} onChange={(e) => patchV9({ discipline: e.target.value })} className={fieldClass}>
                                     <option value="">{area ? "Select discipline…" : "Choose academic area first…"}</option>
                                     {(area?.disciplines || []).map((d) => <option key={d}>{d}</option>)}
@@ -814,7 +886,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             </Field>
                         </div>
                         {isTeam && (
-                            <div className="mt-3 rounded-[14px] border border-ciel-purple/25 bg-gradient-to-br from-white to-ciel-purple-soft/40 p-3.5">
+                            <div data-ciel-fyp-field="team" className="mt-3 rounded-[14px] border border-ciel-purple/25 bg-gradient-to-br from-white to-ciel-purple-soft/40 p-3.5">
                                 <div className="mb-2 flex items-start justify-between gap-2">
                                     <div>
                                         <b className="text-xs">👥 Group members</b>
@@ -892,10 +964,10 @@ export default function FypV9Workspace({ id }: { id: string }) {
                             </div>
                         )}
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <Field label="Supervisor / faculty" required>
+                            <Field label="Supervisor / faculty" required anchor="supervisor" invalid={fieldMissing("supervisor")}>
                                 <input value={entry.projectInfo?.supervisorName ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, supervisorName: e.target.value } }))} placeholder="Faculty supervisor name" className={fieldClass} />
                             </Field>
-                            <Field label="Supervisor email" required>
+                            <Field label="Supervisor email" required anchor="supervisorEmail" invalid={fieldMissing("supervisorEmail")}>
                                 <input type="email" value={entry.projectInfo?.supervisorEmail ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, supervisorEmail: e.target.value } }))} placeholder="name@university.edu.pk" className={fieldClass} />
                             </Field>
                         </div>
@@ -921,7 +993,7 @@ export default function FypV9Workspace({ id }: { id: string }) {
                                 ))}
                             </div>
                         </div>
-                        <Field label="What is the PRIMARY form of your Final Year Project?" required hint="The route is based on what you finally produce — not simply your school name.">
+                        <Field anchor="route" invalid={fieldMissing("route") || fieldMissing("routeOther")} label="What is the PRIMARY form of your Final Year Project?" required hint="The route is based on what you finally produce — not simply your school name.">
                             {suggested.length ? (
                                 <div className="mb-2">
                                     <p className="text-[10.5px] text-ciel-text-soft"><b>Likely routes for this area:</b> suggestions only.</p>

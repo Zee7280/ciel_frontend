@@ -22,20 +22,31 @@ export function Field({
     hint,
     required,
     children,
+    anchor,
+    invalid,
 }: {
     label: string;
     hint?: string;
     required?: boolean;
     children: React.ReactNode;
+    /** Lets a refused step button scroll to and focus this field (`data-ciel-fyp-field`). */
+    anchor?: string;
+    /** The last step press named this field as missing and it is still empty. */
+    invalid?: boolean;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div
+            data-ciel-fyp-field={anchor}
+            data-ciel-fyp-invalid={invalid ? "1" : undefined}
+            className={clsx("space-y-1.5", invalid && "rounded-[12px] ring-2 ring-red-300 ring-offset-2 ring-offset-white")}
+        >
             <label className={labelClass}>
                 {label}
                 {required ? <span className="text-red-500"> *</span> : null}
             </label>
             {hint ? <p className="text-[11px] leading-relaxed text-ciel-text-soft">{hint}</p> : null}
             {children}
+            {invalid ? <p className="text-[11px] font-bold text-red-600">Required — please fill this in before continuing.</p> : null}
         </div>
     );
 }
