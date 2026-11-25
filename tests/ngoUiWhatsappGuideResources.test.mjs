@@ -45,7 +45,8 @@ test("the section guide opens by itself the first time a section is reached, and
 test("Section 5 resources: contributor and evidence trail on every entry (no duplicate PKR value field), mirrored in validation and the detailed report", () => {
     const form = read("src/app/dashboard/student/report/components/Section6Resources.tsx");
     for (const field of ["contributor_name", "contributor_email", "contributor_phone_code", "contributor_phone", "evidence_trail"]) {
-        assert.match(form, new RegExp(`onUpdate\\("${field}"`), field);
+        // V21 writes a field either on its own (onUpdate("x", …)) or together with others (onUpdateFields({ x: … })).
+        assert.match(form, new RegExp(`onUpdate\\("${field}"|\\b${field}: `), field);
     }
     assert.match(form, /50 notebooks \(or PKR 5,000 cash\)/);
     assert.doesNotMatch(form, /pkr_value|PKR value of this contribution/);

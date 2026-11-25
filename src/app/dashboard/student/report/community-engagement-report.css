@@ -5059,3 +5059,225 @@
     line-height: 1.55;
     color: #1d3a3d;
 }
+
+/* ── Section 5 · Resources V21: one box per resource, three steps in each (cer-rx-*) ─────── */
+:is(.cer, .cer-scope) .cer-rx-box {
+    border: 1px solid #cfe3df;
+    border-radius: 16px;
+    background: #fff;
+    overflow: hidden;
+}
+:is(.cer, .cer-scope) .cer-rx-box[open] { border-color: #a9d3cb; box-shadow: 0 1px 2px rgba(13, 43, 51, 0.05); }
+:is(.cer, .cer-scope) .cer-rx-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 13px;
+    cursor: pointer;
+    list-style: none;
+    background: #f5fbfa;
+    user-select: none;
+}
+:is(.cer, .cer-scope) .cer-rx-summary::-webkit-details-marker { display: none; }
+:is(.cer, .cer-scope) .cer-rx-box[open] .cer-rx-summary { border-bottom: 1px solid #dcebee; }
+:is(.cer, .cer-scope) .cer-rx-idx {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    background: var(--teal-soft);
+    color: var(--teal);
+    font-size: 10.5px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+:is(.cer, .cer-scope) .cer-rx-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+:is(.cer, .cer-scope) .cer-rx-title b { font-weight: 800; }
+:is(.cer, .cer-scope) .cer-rx-title small { display: block; font-size: 10.5px; color: var(--muted); font-weight: 600; }
+:is(.cer, .cer-scope) .cer-rx-badge { display: flex; align-items: center; gap: 7px; flex: none; }
+:is(.cer, .cer-scope) .cer-rx-dots { display: flex; gap: 3px; }
+:is(.cer, .cer-scope) .cer-rx-dots i {
+    width: 16px;
+    height: 16px;
+    border-radius: 99px;
+    border: 1px solid #d5e5e1;
+    background: #fff;
+    color: var(--muted);
+    font-size: 8.5px;
+    font-weight: 800;
+    font-style: normal;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+:is(.cer, .cer-scope) .cer-rx-dots i.ok { background: var(--teal); border-color: var(--teal); color: #fff; }
+:is(.cer, .cer-scope) .cer-rx-badge-text { font-size: 10px; font-weight: 800; color: var(--gold); white-space: nowrap; }
+:is(.cer, .cer-scope) .cer-rx-badge-text.ok { color: var(--teal); }
+:is(.cer, .cer-scope) .cer-rx-del {
+    border: 1px solid #f6cfd8;
+    background: #fdf1f4;
+    color: var(--red);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    flex: none;
+}
+:is(.cer, .cer-scope) .cer-rx-body { padding: 4px 14px 14px; }
+:is(.cer, .cer-scope) .cer-rx-step { padding: 13px 0; border-bottom: 1px dashed #d5e5e1; display: grid; gap: 12px; }
+:is(.cer, .cer-scope) .cer-rx-step:last-child { border-bottom: 0; padding-bottom: 4px; }
+:is(.cer, .cer-scope) .cer-rx-step-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+:is(.cer, .cer-scope) .cer-rx-step-head b { font-size: 13px; color: #0c6d62; }
+:is(.cer, .cer-scope) .cer-rx-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 99px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+:is(.cer, .cer-scope) .cer-rx-state { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--gold); }
+:is(.cer, .cer-scope) .cer-rx-state.ok { color: var(--teal); }
+:is(.cer, .cer-scope) .cer-rx-who { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+:is(.cer, .cer-scope) .cer-rx-choice {
+    display: grid;
+    gap: 3px;
+    justify-items: center;
+    text-align: center;
+    border: 2px solid var(--line);
+    border-radius: 13px;
+    background: #fff;
+    padding: 11px 9px;
+    cursor: pointer;
+    font-family: inherit;
+    color: #334155;
+    transition: 0.14s;
+}
+:is(.cer, .cer-scope) .cer-rx-choice span { font-size: 20px; }
+:is(.cer, .cer-scope) .cer-rx-choice b { font-size: 12px; color: var(--ink); }
+:is(.cer, .cer-scope) .cer-rx-choice small { font-size: 10px; color: var(--muted); line-height: 1.4; }
+:is(.cer, .cer-scope) .cer-rx-choice:hover:not(.on) { border-color: #b9dcd7; background: #f8fcfb; }
+:is(.cer, .cer-scope) .cer-rx-choice.on { border-color: var(--teal); background: var(--teal-soft); box-shadow: 0 0 0 3px rgba(14, 125, 116, 0.14); }
+:is(.cer, .cer-scope) .cer-rx-contributor { border: 1px solid #c8dfd9; background: #f9fdfb; border-radius: 14px; padding: 13px; }
+:is(.cer, .cer-scope) .cer-rx-share {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 8px 11px;
+    border: 1px dashed #c5dcd6;
+    border-radius: 9px;
+    background: #fff;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: #45666b;
+}
+:is(.cer, .cer-scope) .cer-rx-share.ok { color: #12645a; font-weight: 700; border-style: solid; }
+:is(.cer, .cer-scope) .cer-rx-wa-msg { font-size: 10px; line-height: 1.5; color: #6a8084; }
+:is(.cer, .cer-scope) .cer-rx-wa-msg.good { color: #16735a; font-weight: 800; }
+:is(.cer, .cer-scope) .cer-rx-wa-msg.bad { color: #b45309; font-weight: 700; }
+:is(.cer, .cer-scope) .cer-rx-check { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; font-weight: 500; line-height: 1.5; color: #345e61; }
+:is(.cer, .cer-scope) .cer-rx-check input { width: 16px; height: 16px; flex: none; margin-top: 1px; accent-color: #0c7b69; }
+:is(.cer, .cer-scope) .cer-rx-button {
+    border: 1px solid #c5dcd6;
+    border-radius: 9px;
+    background: #fff;
+    color: #15685d;
+    padding: 7px 11px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+}
+:is(.cer, .cer-scope) .cer-rx-button:hover:not(:disabled) { background: #edf8f4; }
+:is(.cer, .cer-scope) .cer-rx-button:disabled { opacity: 0.45; cursor: default; }
+:is(.cer, .cer-scope) .cer-pill-ok { background: #e9f7f0; border-color: #bfe3d0; color: #16735a; }
+:is(.cer, .cer-scope) .cer-pill-wait { background: #eef3fd; border-color: #cddaf5; color: #2f4f93; }
+:is(.cer, .cer-scope) .cer-pill-warn { background: #fff5e6; border-color: #f1d5a3; color: #8a5a06; }
+:is(.cer, .cer-scope) .cer-rx-why { margin-top: 4px; }
+:is(.cer, .cer-scope) .cer-rx-why summary { font-size: 12px; font-weight: 800; cursor: pointer; color: #1d574e; }
+:is(.cer, .cer-scope) .cer-rx-why p { margin-top: 8px; }
+:is(.cer, .cer-scope) .cer-rx-timeline {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+    padding: 0;
+    margin: 8px 0 4px;
+}
+:is(.cer, .cer-scope) .cer-rx-timeline li {
+    border: 1px solid #d5e5e1;
+    border-radius: 11px;
+    padding: 8px 9px;
+    background: #fff;
+    font-size: 10px;
+    line-height: 1.45;
+    color: #60787e;
+    overflow-wrap: anywhere;
+}
+:is(.cer, .cer-scope) .cer-rx-timeline li b { display: block; font-size: 10.5px; color: #345e61; margin-bottom: 2px; }
+:is(.cer, .cer-scope) .cer-rx-timeline li.done { background: #edf8f2; border-color: #c4e4d5; }
+:is(.cer, .cer-scope) .cer-rx-timeline li.done b { color: #16735a; }
+:is(.cer, .cer-scope) .cer-rx-timeline li.now { background: #fff8e8; border-color: #f0d49a; }
+:is(.cer, .cer-scope) .cer-rx-timeline li.now b { color: #8a5a06; }
+:is(.cer, .cer-scope) .cer-rx-profile { border: 1px solid #d8e6e2; border-radius: 13px; padding: 13px; background: #fff; display: grid; gap: 7px; }
+:is(.cer, .cer-scope) .cer-rx-profile h4 { font-size: 13px; color: #1d574e; margin: 0; }
+:is(.cer, .cer-scope) .cer-rx-profile p { font-size: 11px; line-height: 1.6; margin: 0; color: #506e72; overflow-wrap: anywhere; }
+:is(.cer, .cer-scope) .cer-rx-notice { background: #fff8e8; border: 1px solid #f0d49a; color: #6f4a07; border-radius: 10px; padding: 9px 12px; font-size: 11px; line-height: 1.6; }
+:is(.cer, .cer-scope) .cer-rx-sub { font-size: 12px; font-weight: 800; color: #0c6d62; margin: 14px 0 2px; }
+:is(.cer, .cer-scope) .cer-rx-mail { border: 1px solid #d7e6e1; border-radius: 13px; overflow: hidden; background: #fff; }
+:is(.cer, .cer-scope) .cer-rx-mail-meta { background: #f3f8f7; border-bottom: 1px solid #d7e6e1; padding: 10px 14px; font-size: 11px; line-height: 1.75; color: #305557; overflow-wrap: anywhere; }
+:is(.cer, .cer-scope) .cer-rx-mail-meta span { display: inline-block; width: 58px; color: #7c9195; font-weight: 700; }
+:is(.cer, .cer-scope) .cer-rx-mail-body { padding: 18px 18px 14px; font-size: 12.5px; line-height: 1.7; color: #27484b; overflow-wrap: anywhere; }
+:is(.cer, .cer-scope) .cer-rx-mail-body p { margin: 9px 0; }
+:is(.cer, .cer-scope) .cer-rx-mail-body h3 { font-size: 17px; margin: 6px 0 4px; color: #0b6057; font-weight: 800; }
+:is(.cer, .cer-scope) .cer-rx-mail-brand { letter-spacing: 0.2em; font-size: 13px; font-weight: 900; color: #0d7164; }
+:is(.cer, .cer-scope) .cer-rx-mail-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 11.5px; }
+:is(.cer, .cer-scope) .cer-rx-mail-table th, :is(.cer, .cer-scope) .cer-rx-mail-table td { border: 1px solid #d7e6e1; padding: 8px 9px; text-align: left; vertical-align: top; }
+:is(.cer, .cer-scope) .cer-rx-mail-table th { background: #eef7f4; color: #38675f; font-size: 10px; }
+:is(.cer, .cer-scope) .cer-rx-mail-cta { background: #eef7f4; border: 1px solid #cbe5dc; border-radius: 12px; padding: 12px 14px; margin: 14px 0; }
+:is(.cer, .cer-scope) .cer-rx-mail-cta p { margin: 5px 0 10px; font-size: 12px; }
+:is(.cer, .cer-scope) .cer-rx-mail-btn { display: inline-block; background: #0e7d74; color: #fff; border-radius: 9px; padding: 8px 13px; font-size: 11.5px; font-weight: 800; }
+:is(.cer, .cer-scope) .cer-rx-cert { border: 6px double #126d60; padding: 30px 24px; text-align: center; background: #fffdf6; color: #193c3f; margin-top: 12px; }
+:is(.cer, .cer-scope) .cer-rx-cert .brand { letter-spacing: 0.2em; font-size: 17px; font-weight: 900; color: #0d7164; }
+:is(.cer, .cer-scope) .cer-rx-cert .draft { display: inline-block; font-size: 10px; font-weight: 900; border: 1px dashed #b27418; color: #996117; padding: 6px 12px; margin: 16px auto 7px; }
+:is(.cer, .cer-scope) .cer-rx-cert h2 { font-size: 25px; font-family: Georgia, serif; margin: 12px 0; color: #0b6057; }
+:is(.cer, .cer-scope) .cer-rx-cert h3 { font-size: 23px; margin: 14px 0; font-family: Georgia, serif; }
+:is(.cer, .cer-scope) .cer-rx-cert p { font-size: 12px; line-height: 1.8; margin: 10px 0; overflow-wrap: anywhere; }
+:is(.cer, .cer-scope) .cer-rx-cert ul { text-align: left; font-size: 12px; line-height: 1.9; max-width: 550px; margin: 12px auto; padding-left: 22px; list-style: disc; }
+:is(.cer, .cer-scope) .cer-rx-cert footer { font-size: 10px; border-top: 1px solid #d2e2d9; margin-top: 22px; padding-top: 13px; line-height: 1.7; }
+:is(.cer, .cer-scope) .cer-rx-portal { border: 1px solid #d7e6e1; border-radius: 13px; overflow: hidden; background: #f7fbfa; }
+:is(.cer, .cer-scope) .cer-rx-portal-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #0c3d42; color: #fff; padding: 10px 14px; font-size: 11px; }
+:is(.cer, .cer-scope) .cer-rx-portal-bar b { letter-spacing: 0.16em; }
+:is(.cer, .cer-scope) .cer-rx-portal-bar i { margin-left: auto; font-style: normal; color: #bfe9e0; overflow-wrap: anywhere; }
+:is(.cer, .cer-scope) .cer-rx-portal-body { padding: 13px; }
+:is(.cer, .cer-scope) .cer-rx-portal-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+:is(.cer, .cer-scope) .cer-rx-portal-stats div { background: #fff; border: 1px solid #d7e6e1; border-radius: 11px; padding: 10px; text-align: center; }
+:is(.cer, .cer-scope) .cer-rx-portal-stats b { display: block; font-size: 15px; color: #0b6057; overflow-wrap: anywhere; }
+:is(.cer, .cer-scope) .cer-rx-portal-stats small { font-size: 9.5px; color: #60787e; }
+:is(.cer, .cer-scope) .cer-rx-portal-card { background: #fff; border: 1px solid #d7e6e1; border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; }
+:is(.cer, .cer-scope) .cer-rx-portal-card h4 { font-size: 13px; font-weight: 800; color: var(--ink); margin: 0; }
+:is(.cer, .cer-scope) .cer-rx-portal-card p { font-size: 11px; color: #506e72; margin: 0; }
+:is(.cer, .cer-scope) .cer-rx-portal-card ul { font-size: 11.5px; line-height: 1.7; padding-left: 18px; list-style: disc; margin: 0; }
+@media (max-width: 650px) {
+    :is(.cer, .cer-scope) .cer-rx-who { grid-template-columns: 1fr; }
+    :is(.cer, .cer-scope) .cer-rx-timeline { grid-template-columns: 1fr; }
+    :is(.cer, .cer-scope) .cer-rx-summary { flex-wrap: wrap; }
+    :is(.cer, .cer-scope) .cer-rx-badge { width: 100%; justify-content: flex-start; padding-left: 34px; }
+    :is(.cer, .cer-scope) .cer-rx-portal-stats { grid-template-columns: 1fr; }
+    :is(.cer, .cer-scope) .cer-rx-cert { padding: 22px 12px; }
+}

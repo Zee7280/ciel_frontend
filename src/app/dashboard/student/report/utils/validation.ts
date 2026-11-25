@@ -11,7 +11,7 @@ import { GLOBAL_ACTIVITY_TAXONOMY } from './globalActivityTaxonomy';
 import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibility } from './mediaVisibility';
 import { riskBlockErrors } from './riskSafeguarding';
 import { followupBlockErrors } from './sustainabilityFollowup';
-import { contributorEmailLooksValid, contributorPhoneLooksValid, isExternalResourceSource } from './resourceContributors';
+import { contributorEmailLooksValid, contributorOrgRequired, contributorPhoneLooksValid, isExternalResourceSource, resourceContributedBy } from './resourceContributors';
 
 export interface ValidationError {
     field: string;
@@ -473,6 +473,13 @@ export function validateSection6(data: any): ValidationResult {
     
     if (data.use_resources === 'yes') {
         const resources = asList(data.resources);
+        // V21 step 3: every box carries a proof file. Files saved before proofs were linked to boxes
+        // (no resource_index) still count until they are linked or removed.
+        const proofFiles = asList(data.evidence_files);
+        const linkedProofIndexes = new Set<number>(
+            proofFiles.map((file: any) => (typeof file?.resource_index === 'number' ? file.resource_index : -1)).filter((i: number) => i >= 0),
+        );
+        const hasUnlinkedProofs = proofFiles.some((file: any) => typeof file?.resource_index !== 'number');
         if (!resources.length) {
             errors.push({ field: 'resources', message: 'Please list the resources used' });
         } else {
@@ -494,10 +501,18 @@ export function validateSection6(data: any): ValidationResult {
                     errors.push({ field: `resources.${index}.unit`, message: 'Choose the unit' });
                 }
                 if (!asList(row.sources).length) {
-                    errors.push({ field: `resources.${index}.sources`, message: 'Choose at least one source for this resource' });
+                    // V21 asks "Who contributed it?" and then "Who are they?" — the sources follow those answers.
+                    const who = resourceContributedBy(row);
+                    errors.push({
+                        field: `resources.${index}.sources`,
+                        message: who === 'outside' || who === 'both' ? 'Choose what kind of contributor they are' : 'Choose who contributed this resource',
+                    });
                 }
                 if (!asList(row.verification).length) {
                     errors.push({ field: `resources.${index}.verification`, message: 'Choose at least one verification method' });
+                }
+                if (!hasUnlinkedProofs && !linkedProofIndexes.has(index)) {
+                    errors.push({ field: `resources.${index}.proof`, message: 'Upload a receipt, photo, letter or other proof' });
                 }
                 if (!String(row.purpose || '').trim()) {
                     errors.push({ field: `resources.${index}.purpose`, message: 'Say what this resource made possible' });
@@ -545,6 +560,9 @@ export function validateSection6(data: any): ValidationResult {
                 if (external) {
                     if (!String(row.contributor_name || '').trim()) {
                         errors.push({ field: `resources.${index}.contributor_name`, message: 'Name the contributor of this resource' });
+                    }
+                    if (contributorOrgRequired(row) && !String(row.contributor_org || '').trim()) {
+                        errors.push({ field: `resources.${index}.contributor_org`, message: 'Add the organization name' });
                     }
                     if (!String(row.contributor_email || '').trim()) {
                         errors.push({ field: `resources.${index}.contributor_email`, message: "Add the contributor's email" });

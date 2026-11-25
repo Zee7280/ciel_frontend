@@ -114,12 +114,13 @@ test("Section 5 · amounts must be > 0 and a mixed source splits into student-te
     assert.match(validation, /cannot exceed the resource total/);
     assert.match(backend, /cannot exceed the resource total/);
     // Form: the share block sits inside the outside-contributor state and the register uses the share.
-    const card = s6.slice(s6.indexOf("function ResourceCard"), s6.indexOf("export default function Section6Resources"));
+    const card = s6.slice(s6.indexOf("function ResourceBox"), s6.indexOf("export default function Section6Resources"));
     assert.match(card, /data-ciel-contributor-state="outside"/);
     assert.match(card, /data-ciel-resource-shares=\{idx\}/);
-    assert.match(card, /Student team’s share/);
+    assert.match(card, /Student team’s own share/);
     assert.match(card, /data-ciel-share-reconcile=/);
-    assert.match(s6, /const amt = contributorShareOf\(r\);/);
+    // The "Who gave what" roll-up credits each contributor with their share, never the whole total.
+    assert.match(read(`${dir}/utils/resourceContributorsView.ts`), /const share = contributorShareOf\(row\);/);
     assert.match(s6, /Student team share: /);
     // The backend contributor acknowledgement credits the share, not the total.
     const svc = read("../ciel_backend/src/resource-contributors/resource-contributors.service.ts");

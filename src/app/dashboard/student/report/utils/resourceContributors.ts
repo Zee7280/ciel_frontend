@@ -55,3 +55,127 @@ export function contributorEmailLooksValid(email: unknown): boolean {
     const e = String(email ?? "").trim();
     return !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * V21 Section 5 · one box per resource, three steps (the resource · who contributed it · proof).
+ * The stored row is unchanged: `sources` still carries the student team and/or the contributor's
+ * type, `verification` the kind of proof. `contributed_by` only remembers the answer to
+ * "Who contributed it?" — when it is missing (older drafts) it is derived from the sources.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+export type ResourceContributedBy = "team" | "outside" | "both" | "";
+
+/** "Who are they?" — the same values the shared source library already stores, in a friendlier order. */
+export const PERSON_CONTRIBUTOR_TYPES = ["Individual Donor", "Private Sponsor", "Pro-bono Contributor", "Community Members / Beneficiaries"] as const;
+export const ORG_CONTRIBUTOR_TYPES = [
+    "Partner Organization", "Corporate / CSR", "NGO / Nonprofit / Civil Society", "University / Institution",
+    "Faculty / Department / School", "Government / Public Agency", "Foundation / Philanthropy",
+    "International / Multilateral Organization", "Research / Academic Grant",
+] as const;
+export const GROUP_CONTRIBUTOR_TYPES = ["Fundraising Event / Campaign", "Crowdfunding"] as const;
+export const OTHER_CONTRIBUTOR_TYPE = "Other / Custom Source";
+export const OTHER_CONTRIBUTOR_TYPES = ["In-kind Donation", OTHER_CONTRIBUTOR_TYPE] as const;
+/** Always individuals; a sponsor, a collection or "something else" counts as an organisation once one is named. */
+export const STRICT_PERSON_CONTRIBUTOR_TYPES = ["Individual Donor", "Pro-bono Contributor", "Community Members / Beneficiaries"] as const;
+
+export const CONTRIBUTOR_TYPE_GROUPS: Array<[string, readonly string[]]> = [
+    ["A person", PERSON_CONTRIBUTOR_TYPES],
+    ["An organisation", ORG_CONTRIBUTOR_TYPES],
+    ["A collection from many people", GROUP_CONTRIBUTOR_TYPES],
+    ["Something else", OTHER_CONTRIBUTOR_TYPES],
+];
+
+const isInternalSource = (s: string) => (INTERNAL_RESOURCE_SOURCES as readonly string[]).includes(s);
+
+function sourceList(sources: unknown): string[] {
+    return Array.isArray(sources) ? sources.map((s) => String(s || "").trim()).filter(Boolean) : [];
+}
+
+/** The outside contributor's type = the first source that is not the student team ("" when none). */
+export function contributorTypeOf(row: { sources?: unknown }): string {
+    return sourceList(row.sources).find((s) => !isInternalSource(s)) || "";
+}
+
+/** Sources recorded earlier that are neither the team nor the contributor's type (older multi-chip rows). */
+export function extraContributorSources(row: { sources?: unknown }): string[] {
+    const type = contributorTypeOf(row);
+    return sourceList(row.sources).filter((s) => !isInternalSource(s) && s !== type);
+}
+
+/** What the sources say about who contributed — used when the answer was never stored. */
+export function contributedByFromSources(sources: unknown): ResourceContributedBy {
+    const list = sourceList(sources);
+    const self = list.some(isInternalSource);
+    const ext = list.some((s) => !isInternalSource(s));
+    return ext && self ? "both" : ext ? "outside" : self ? "team" : "";
+}
+
+/** The answer to "Who contributed it?" — the stored answer when it still fits the sources, else derived. */
+export function resourceContributedBy(row: { contributed_by?: unknown; sources?: unknown }): ResourceContributedBy {
+    const stored = String(row.contributed_by || "") as ResourceContributedBy;
+    const list = sourceList(row.sources);
+    const self = list.some(isInternalSource);
+    const ext = list.some((s) => !isInternalSource(s));
+    const fits =
+        stored === "team" ? self && !ext
+            : stored === "outside" ? !self
+                : stored === "both" ? self
+                    : stored === "" ? !self && !ext
+                        : false;
+    return fits ? stored : contributedByFromSources(list);
+}
+
+export function isOutsideContribution(row: { contributed_by?: unknown; sources?: unknown }): boolean {
+    const who = resourceContributedBy(row);
+    return who === "outside" || who === "both";
+}
+
+/** The stored sources follow the answers: the team (if it contributed) plus the contributor's type. */
+export function sourcesForContribution(who: ResourceContributedBy, type: string, extras: string[] = [], current: unknown = []): string[] {
+    const list = sourceList(current);
+    const self = list.filter(isInternalSource);
+    const team = who === "team" || who === "both" ? (self.length ? self : ["Student Team"]) : [];
+    const outside = who === "outside" || who === "both" ? [type, ...extras].map((s) => s.trim()).filter(Boolean) : [];
+    return [...new Set([...team, ...outside])];
+}
+
+export type ContributorKind = "individual" | "organization";
+
+/** An organisation type, or any typed contributor that named an organisation, is an organization record. */
+export function contributorKindOf(row: { sources?: unknown; contributor_org?: unknown }): ContributorKind {
+    const type = contributorTypeOf(row);
+    if ((ORG_CONTRIBUTOR_TYPES as readonly string[]).includes(type)) return "organization";
+    if ((STRICT_PERSON_CONTRIBUTOR_TYPES as readonly string[]).includes(type)) return "individual";
+    return type && String(row.contributor_org || "").trim() ? "organization" : "individual";
+}
+
+export function contributorOrgRequired(row: { sources?: unknown }): boolean {
+    return (ORG_CONTRIBUTOR_TYPES as readonly string[]).includes(contributorTypeOf(row));
+}
+
+/** The organisation field is shown unless the contributor is strictly a person. */
+export function contributorOrgShown(row: { sources?: unknown; contributor_org?: unknown }): boolean {
+    const type = contributorTypeOf(row);
+    if (contributorKindOf(row) === "organization" || String(row.contributor_org || "").trim()) return true;
+    return Boolean(type) && !(STRICT_PERSON_CONTRIBUTOR_TYPES as readonly string[]).includes(type);
+}
+
+/** Name shown for a contributor: the organisation when it is one, otherwise the person. */
+export function contributorDisplayName(row: { sources?: unknown; contributor_name?: unknown; contributor_org?: unknown }): string {
+    const name = String(row.contributor_name || "").trim();
+    const org = String(row.contributor_org || "").trim();
+    return contributorKindOf(row) === "organization" ? org || "Organization name pending" : name || "Contributor name pending";
+}
+
+/** Two rows describe the same contributor when the email matches, or (no email) the organisation / name does. */
+export function contributorIdentity(row: { sources?: unknown; contributor_name?: unknown; contributor_org?: unknown; contributor_email?: unknown }): string {
+    const email = String(row.contributor_email || "").trim().toLowerCase();
+    if (email) return `email|${email}`;
+    const kind = contributorKindOf(row);
+    const label = String(kind === "organization" ? row.contributor_org : row.contributor_name || "").trim().toLowerCase().replace(/\s+/g, " ");
+    return label ? `${kind}|${label}` : "";
+}
+
+export function contributorIsNamed(row: { contributor_name?: unknown; contributor_org?: unknown; contributor_email?: unknown; contributor_phone?: unknown }): boolean {
+    return ["contributor_name", "contributor_org", "contributor_email", "contributor_phone"].some((key) => String((row as Record<string, unknown>)[key] || "").trim());
+}

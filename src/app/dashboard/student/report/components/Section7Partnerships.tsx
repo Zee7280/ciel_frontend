@@ -15,6 +15,11 @@ import { evidenceItemKind } from "../utils/evidencePreviewKind";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+import {
+    contributorGaveText, contributorRoleText, contributorStage, groupContributors, linkedPartnerName, partnerCountWithContributors,
+    reportStage, type ContributorGroup, type ResourceRow, type ThankYouContext,
+} from "../utils/resourceContributorsView";
+import ContributorThankYouPreview, { ThankYouFlowStrip } from "./ContributorThankYouPreview";
 
 const partnerTypes = [
     "👤 Individual",
@@ -409,8 +414,37 @@ function PartnerCard({
 }
 
 export default function Section7Partnerships({ projectData }: { projectData?: any } = {}) {
-    const { data, updateSection, getFieldError } = useReportForm();
+    const { data, updateSection, getFieldError, setStep } = useReportForm();
     const { has_partners, partners, formalization_status } = data.section7;
+    const [previewGroup, setPreviewGroup] = React.useState<ContributorGroup | null>(null);
+
+    /* 6.3 · Everyone named in Resources is carried here automatically as a contributing partner. */
+    const section6Resources = useMemo<ResourceRow[]>(
+        () => (data.section6?.use_resources === "yes" && Array.isArray(data.section6.resources) ? (data.section6.resources as ResourceRow[]) : []),
+        [data.section6?.use_resources, data.section6?.resources],
+    );
+    const resourceProofs = Array.isArray(data.section6?.evidence_files) ? data.section6.evidence_files : [];
+    const contributorGroups = useMemo(() => {
+        const unlinked = resourceProofs.some((f: any) => typeof f?.resource_index !== "number");
+        return groupContributors(section6Resources, (index) =>
+            resourceProofs.filter((f: any) => f?.resource_index === index).length || (unlinked ? 1 : 0));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [section6Resources, data.section6?.evidence_files]);
+    const unnamedContributorRows = section6Resources.filter((row) => {
+        const who = String(row.contributed_by || "");
+        const outside = who === "outside" || who === "both" || (Array.isArray(row.sources) && row.sources.some((s) => !["Student Team", "Self-funded"].includes(String(s))));
+        return outside && !["contributor_name", "contributor_org", "contributor_email", "contributor_phone"].some((k) => String((row as any)[k] || "").trim());
+    }).length;
+    const stage = reportStage(data);
+    const namedPartners = (Array.isArray(partners) ? partners : []).filter((p: any) => String(p?.name || "").trim());
+    const thankYouCtx: ThankYouContext = {
+        projectTitle: String(projectData?.title || data.project_title || "Community Service project").trim(),
+        projectCode: String(data.project_id || data.public_id || projectData?.id || "").trim() || "pending",
+        partnerName: String(projectData?.organization_name || projectData?.partner_name || projectData?.organization || "").trim() || undefined,
+        university: String(data.section1?.team_lead?.university || "").trim() || undefined,
+        location: String(projectData?.location || projectData?.city || "").trim() || undefined,
+        teamNames: [String(data.section1?.team_lead?.name || "").trim(), ...(Array.isArray(data.section1?.team_members) ? data.section1.team_members : []).map((m: any) => String(m?.name || "").trim())].filter(Boolean),
+    };
 
     const update = (field: string, val: any) => updateSection("section7", { [field]: val });
 
@@ -503,12 +537,20 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
         || p.verification?.includes("Resource"),
     ).length;
 
+    const contributingNote = useMemo(() => {
+        if (!contributorGroups.length) return "";
+        const n = contributorGroups.length;
+        const counted = partnerCountWithContributors(has_partners === "yes" ? namedPartners : [], contributorGroups);
+        return ` ${n} outside contributor${n === 1 ? "" : "s"} recorded in Resources ${n === 1 ? "is" : "are"} carried here as contributing partner${n === 1 ? "" : "s"} (${counted} partner${counted === 1 ? "" : "s"} in all, each counted once); the thank-you email ${stage === "live" ? "was issued by CIEL PK after approval" : "follows Admin approval"}.`;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [contributorGroups, has_partners, partners, stage]);
+
     const autoNarrative = useMemo(() => {
-        if (has_partners === "no") return "No formal partnerships reported. Project was executed independently.";
-        if (!partners.length) return "Partnership summary will appear once partner details are entered.";
+        if (has_partners === "no") return `No formal partnerships reported. Project was executed independently.${contributingNote}`;
+        if (!partners.length) return `Partnership summary will appear once partner details are entered.${contributingNote}`;
         const types = [...new Set(partners.map(p => p.type).filter(Boolean))].slice(0, 2);
-        return `The project engaged ${partners.length} active ${partners.length === 1 ? "partner" : "partners"}${types.length ? ` including ${types.slice(0, 2).join(" and ").toLowerCase()} ${types.length === 1 ? "organization" : "organizations"}` : ""}. ${verifiedPartners.length > 0 ? `Partnerships were verified at the ${[...new Set(verifiedPartners.map(p => p.verification))].slice(0, 2).join(" and ").toLowerCase()} level.` : ""} ${formalCount > 0 ? `${formalCount} ${formalCount === 1 ? "collaboration was" : "collaborations were"} supported by formal documentation.` : ""}`;
-    }, [has_partners, partners, verifiedPartners, formalCount]);
+        return `The project engaged ${partners.length} active ${partners.length === 1 ? "partner" : "partners"}${types.length ? ` including ${types.slice(0, 2).join(" and ").toLowerCase()} ${types.length === 1 ? "organization" : "organizations"}` : ""}. ${verifiedPartners.length > 0 ? `Partnerships were verified at the ${[...new Set(verifiedPartners.map(p => p.verification))].slice(0, 2).join(" and ").toLowerCase()} level.` : ""} ${formalCount > 0 ? `${formalCount} ${formalCount === 1 ? "collaboration was" : "collaborations were"} supported by formal documentation.` : ""}${contributingNote}`;
+    }, [has_partners, partners, verifiedPartners, formalCount, contributingNote]);
 
     useEffect(() => {
         if (data.section7.summary_text !== autoNarrative) {
@@ -675,6 +717,59 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                     </section>
                 </div>
             ) : null}
+
+            {/* 6.3 Contributing partners · from Resources (automatic) */}
+            <section className="cer-card space-y-3" data-ciel-contributing-partners>
+                <div className="cer-secl">
+                    <span className="cer-secn">6.3</span>
+                    <h3>Contributing partners · from Resources</h3>
+                    <span className="cer-tag auto">Automatic</span>
+                </div>
+                <p className="cer-hint">
+                    Everyone you named in Resources is carried here automatically as a <b>contributing partner</b> — you never type them twice.
+                    They are shown separately from the partner(s) above, because giving a resource is a different role from helping to deliver the project.
+                </p>
+                {contributorGroups.length ? contributorGroups.map((g) => {
+                    const link = linkedPartnerName(g, has_partners === "yes" ? namedPartners : []);
+                    const [label, tone] = contributorStage(g, stage);
+                    return (
+                        <div key={g.key} className="cer-rx-profile" data-ciel-contributing-partner>
+                            <h4>🤝 {g.display}</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                                <span className="cer-pill">{link ? `Same as “${link}” above · counted once` : "Contributing partner"}</span>
+                                <span className={clsx("cer-pill", `cer-pill-${tone}`)}>{label}</span>
+                            </div>
+                            <p><b>Role:</b> {contributorRoleText(g) || "Contribution"}<br /><b>Contribution:</b> {contributorGaveText(g)}</p>
+                            <p>
+                                <b>{g.kind === "organization" ? "Contact person" : "Contact"} · private:</b> {g.name || "name pending"} · WhatsApp <span className="whitespace-nowrap">{g.phone || "pending"}</span> · {g.email || "email pending"}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" className="cer-rx-button" onClick={() => setStep(5)}>Edit in Resources</button>
+                                <button type="button" className="cer-rx-button" disabled={!g.previewReady} onClick={() => setPreviewGroup(g)}>Preview thank-you email</button>
+                            </div>
+                        </div>
+                    );
+                }) : (
+                    <div className="cer-muted">
+                        No outside contributor has been named in Resources yet. If the project ran only on the student team’s own time or money, this list stays empty — that is fine.
+                    </div>
+                )}
+                {unnamedContributorRows ? (
+                    <div className="cer-muted">
+                        {unnamedContributorRows} resource {unnamedContributorRows === 1 ? "entry" : "entries"} still {unnamedContributorRows === 1 ? "needs" : "need"} a contributor’s name in Resources.
+                    </div>
+                ) : null}
+                <details className="cer-rx-why">
+                    <summary>How a contributor becomes a partner — what, how and when</summary>
+                    <p className="cer-hint"><b>What:</b> each named contributor is recorded as a contributing partner of this project — their name or organization, their role (funding or in-kind support) and what they gave. WhatsApp number and email stay private.</p>
+                    <p className="cer-hint"><b>How:</b> automatically, from the contributor record in Resources. If the contributor is already your registered or additional partner (same organization name or email), the contribution is attached to that partner and counted once. Resources paid for by the student team never create a partner.</p>
+                    <p className="cer-hint"><b>When:</b></p>
+                    <ThankYouFlowStrip stage={stage} />
+                    <p className="cer-hint">A contributing partner is not automatically a delivery partner. To record a role such as host site or co-delivery, add them under “Any other partners?” above as well — their contribution is then shown under that partner and counted once.</p>
+                </details>
+            </section>
+
+            <ContributorThankYouPreview group={previewGroup} ctx={thankYouCtx} stage={stage} onClose={() => setPreviewGroup(null)} />
         </div>
     );
 }

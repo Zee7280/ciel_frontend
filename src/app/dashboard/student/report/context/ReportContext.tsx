@@ -371,11 +371,17 @@ export interface ReportData {
             verification_other?: string;
             /** V19 5.2 mixed source (student team + outside): the team's share, same unit as `amount`. */
             student_team_share?: string;
+            /** V21 "Who contributed it?" — team | outside | both; derived from `sources` when missing. */
+            contributed_by?: 'team' | 'outside' | 'both' | '';
             /** Who contributed it — required when the source is outside the student team. */
             contributor_name?: string;
+            /** Organisation the contributor gave on behalf of (required for organisation types). */
+            contributor_org?: string;
             contributor_email?: string;
             contributor_phone_code?: string;
             contributor_phone?: string;
+            /** They agreed to be named publicly; WhatsApp number and email always stay private. */
+            contributor_public_recognition?: boolean;
             /** Where it came from, how it was used, who received it — the accountability trail. */
             evidence_trail?: string;
         }>;
