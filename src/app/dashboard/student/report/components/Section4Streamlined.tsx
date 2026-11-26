@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { CheckCircle2, ChevronDown, Lock, Pencil, PlusCircle, Trash2 } from "lucide-react";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
+import { ExistingEvidencePicker, type ExistingEvidenceChoice } from "./ui/ExistingEvidencePicker";
 import { ACTIVITY_FAMILY_OPTIONS, GLOBAL_ACTIVITY_TAXONOMY } from "../utils/globalActivityTaxonomy";
 import { reportTextWordMeter } from "../utils/validation";
 import {
@@ -155,17 +156,29 @@ export default function Section4Streamlined() {
         updateSection("section4", { project_summary: { ...projectSummary, ...patch } });
 
     // ----- evidence already attached elsewhere in the report (reused, never re-uploaded) -----
-    const evidenceOptions = useMemo(() => {
-        const out: string[] = [];
+    // `value` is the label `evidence_ref` has always stored, so saved reports keep matching.
+    const evidenceChoices = useMemo(() => {
+        const out: ExistingEvidenceChoice[] = [];
         const logs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
         logs.forEach((log, i) => {
-            if (log?.evidence_file || (typeof log?.evidence_url === "string" && log.evidence_url.trim())) out.push(`Attendance evidence · ${log.date || `session ${i + 1}`}${log.location ? ` · ${log.location}` : ""}`);
+            const stored = typeof log?.evidence_url === "string" && log.evidence_url.trim() ? log.evidence_url.trim() : log?.evidence_file;
+            if (log?.evidence_file || (typeof log?.evidence_url === "string" && log.evidence_url.trim())) {
+                const caption = `${log.date || `session ${i + 1}`}${log.location ? ` · ${log.location}` : ""}`;
+                out.push({ value: `Attendance evidence · ${caption}`, source: "Attendance", caption, item: stored });
+            }
         });
         const files = (data.section8?.evidence_files || []) as Array<{ name?: string }>;
-        files.forEach((f, i) => out.push(`Evidence file · ${f?.name || `file ${i + 1}`}`));
+        files.forEach((f, i) => {
+            const caption = f?.name || `file ${i + 1}`;
+            out.push({ value: `Evidence file · ${caption}`, source: "Evidence", caption, item: f });
+        });
         const resourceFiles = ((data.section6 as { evidence_files?: Array<{ name?: string }> } | undefined)?.evidence_files || []) as Array<{ name?: string }>;
-        resourceFiles.forEach((f, i) => out.push(`Resource evidence · ${f?.name || `file ${i + 1}`}`));
-        return Array.from(new Set(out));
+        resourceFiles.forEach((f, i) => {
+            const caption = f?.name || `file ${i + 1}`;
+            out.push({ value: `Resource evidence · ${caption}`, source: "Resource", caption, item: f });
+        });
+        const seen = new Set<string>();
+        return out.filter((c) => (seen.has(c.value) ? false : (seen.add(c.value), true)));
     }, [data.section1?.attendance_logs, data.section8?.evidence_files, data.section6]);
 
     // ----- 4.2 reach -----
@@ -329,7 +342,7 @@ export default function Section4Streamlined() {
                                 key={a.id || index}
                                 activity={a}
                                 index={index}
-                                evidenceOptions={evidenceOptions}
+                                evidenceChoices={evidenceChoices}
                                 err={err}
                                 onChange={(patch) => updateActivity(index, patch)}
                                 onRemove={() => {
@@ -669,14 +682,14 @@ export default function Section4Streamlined() {
 function ActivityCard({
     activity: a,
     index,
-    evidenceOptions,
+    evidenceChoices,
     err,
     onChange,
     onRemove,
 }: {
     activity: V19Activity;
     index: number;
-    evidenceOptions: string[];
+    evidenceChoices: ExistingEvidenceChoice[];
     err: (field: string) => string | undefined;
     onChange: (patch: Partial<V19Activity>) => void;
     onRemove: () => void;
@@ -875,15 +888,7 @@ function ActivityCard({
 
                 <div>
                     <label className={labelCls}>Supporting evidence (optional here)</label>
-                    <Select value={String(a.evidence_ref || "")} onChange={(v) => onChange({ evidence_ref: v })}>
-                        <option value="">Choose existing evidence (optional)</option>
-                        {evidenceOptions.map((e) => (
-                            <option key={e} value={e}>
-                                {e}
-                            </option>
-                        ))}
-                        {a.evidence_ref && !evidenceOptions.includes(String(a.evidence_ref)) ? <option value={String(a.evidence_ref)}>Previously linked: {String(a.evidence_ref)}</option> : null}
-                    </Select>
+                    <ExistingEvidencePicker choices={evidenceChoices} value={String(a.evidence_ref || "")} onChange={(v) => onChange({ evidence_ref: v })} />
                     <p className="mt-1 text-[11px] text-slate-500">Evidence already attached in Participation or Evidence can be reused; no repeated uploads or activity location required.</p>
                 </div>
             </div>
