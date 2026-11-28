@@ -30,7 +30,40 @@ export type ApprovalChainContact = {
      * waiting Partner box then opens with the admin → partner approval request message.
      */
     partnerInvite?: { recipientName?: string; studentName?: string };
+    /**
+     * CIEL PK admin view only: the reviewer the opportunity is waiting on. The Student box then opens
+     * with a message asking the student to contact that reviewer for the approval.
+     */
+    studentNudge?: { studentName?: string; reviewer: "Faculty" | "Partner"; reviewerName?: string };
 };
+
+/** CIEL PK admin → student: please contact the reviewer the opportunity is waiting on. */
+export function studentReviewerNudgeMessage(input: {
+    studentName?: string;
+    reviewer: "Faculty" | "Partner";
+    reviewerName?: string;
+    title: string;
+    code?: string;
+}): string {
+    const first = (input.studentName || "").trim().split(/\s+/)[0] || "there";
+    const about = `"${input.title.trim() || "your opportunity"}"${input.code ? ` (${input.code})` : ""}`;
+    const reviewerName = (input.reviewerName || "").trim();
+    const partner = input.reviewer === "Partner";
+    const waitingOn = partner
+        ? reviewerName || "your partner organization"
+        : `your faculty supervisor${reviewerName ? ` (${reviewerName})` : ""}`;
+    return [
+        `Hello ${first},`,
+        "",
+        `This is CIEL PK. Your opportunity ${about} is still waiting for approval from ${waitingOn}.`,
+        "",
+        partner
+            ? "Please contact them and request them to approve it. They have received an email from CIEL PK with the approval link; if they don’t have an account yet, they can register at cielpk.com under Organization or NGO and approve it from their dashboard."
+            : "Please contact them and request them to approve it. They have received an email from CIEL PK with the approval link, and can also approve it from their CIEL PK faculty dashboard.",
+        "",
+        "Once they approve, CIEL PK completes the final verification. Thank you!",
+    ].join("\n");
+}
 
 /** CIEL PK admin → partner organisation: the opportunity is waiting for the partner's approval. */
 export function partnerApprovalRequestMessage(input: { recipientName?: string; studentName?: string; title: string }): string {
@@ -64,6 +97,9 @@ export function approvalChainMessage(step: Pick<ApprovalCardStep, "role" | "who"
     const about = `"${contact.title}"${contact.code ? ` (${contact.code})` : ""}`;
     if (step.state === "cur" && contact.partnerInvite && (step.role === "Partner" || step.role === "NGO")) {
         return partnerApprovalRequestMessage({ ...contact.partnerInvite, title: contact.title });
+    }
+    if (step.role === "Student" && contact.studentNudge) {
+        return studentReviewerNudgeMessage({ ...contact.studentNudge, title: contact.title, code: contact.code });
     }
     if (step.state === "cur") {
         return `${greeting}, ${about} is awaiting your approval on CIEL PK. Please review it when convenient.`;
@@ -330,10 +366,16 @@ export function buildOpportunityApprovalModel(
     const steps: ApprovalCardStep[] = [];
 
     if (studentCreated && !facultyCreated) {
+        // The student's own email / WhatsApp: CIEL PK admin only (asks them to chase a slow reviewer).
+        const studentEmail = viewer === "admin" ? pickStr(row, "student_contact_email") || pickStr(creator, "email") : "";
+        const studentPhone =
+            viewer === "admin" ? formatPhoneDisplay(pickStr(row, "student_contact_phone") || pickStr(creator, "phone")) : "";
         steps.push({
             role: "Student",
             who: studentName || undefined,
             state: lower(row.status) === "draft" ? "cur" : "done",
+            email: studentEmail.includes("@") ? studentEmail : undefined,
+            phone: studentPhone || undefined,
         });
         if (lower(row.status) !== "draft") cursor.value = false;
     }
@@ -508,6 +550,15 @@ export function buildOpportunityApprovalModel(
             code: formatOpportunityCode(row) || undefined,
             ...(viewer === "admin" && requiresPartner
                 ? { partnerInvite: { recipientName: partnerContactName || partnerName || undefined, studentName: studentName || undefined } }
+                : {}),
+            ...(viewer === "admin" && studentCreated && !facultyCreated && (workflow.stage === "pending_partner" || workflow.stage === "pending_faculty")
+                ? {
+                      studentNudge: {
+                          studentName: studentName || undefined,
+                          reviewer: workflow.stage === "pending_partner" ? ("Partner" as const) : ("Faculty" as const),
+                          reviewerName: (workflow.stage === "pending_partner" ? partnerName : facultyName) || undefined,
+                      },
+                  }
                 : {}),
         } satisfies ApprovalChainContact,
         versionLabel: `Opp v${version}`,
