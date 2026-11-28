@@ -667,7 +667,7 @@ export function validateSection8(data: any): ValidationResult {
 
     const visibility = resolveMediaVisibility(data.media_visible);
     if (isPublicMediaVisibility(visibility) && !hasPublicSharePermission(data)) {
-        errors.push({ field: 'public_share_permission', message: 'I have permission to publicly share this evidence.' });
+        errors.push({ field: 'public_share_permission', message: 'Confirm informed consent for public publication of this evidence (including identifiable individuals and minors), or choose Restricted.' });
     }
     return { isValid: errors.length === 0, errors };
 }

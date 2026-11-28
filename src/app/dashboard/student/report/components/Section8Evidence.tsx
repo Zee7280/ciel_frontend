@@ -41,20 +41,81 @@ const visibilityOptions: Array<{
     {
         id: "public",
         label: "Public",
-        desc: "Anyone viewing the published project can see this evidence. Original files can be downloaded.",
+        desc: "Student, assigned Faculty, authorized University and CIEL PK Super Admin can view this evidence. Associated Partners/NGOs and the public can view it once public-sharing consent is confirmed below. Original files can be downloaded.",
     },
     {
         id: "restricted",
         label: "Restricted",
         recommended: true,
-        desc: "Student and CIEL PK can view it now; Faculty and University unlock after super-admin approval. Partner / NGO never. Not shown publicly. Only CIEL PK Super Admin can download the originals.",
+        desc: "Student, assigned Faculty, authorized University and CIEL PK Super Admin can view this evidence. Associated Partners/NGOs and the public cannot. Only CIEL PK Super Admin can download the originals.",
     },
     {
         id: "private",
         label: "Private",
-        desc: "Internal verification only: Student and CIEL PK now, Faculty and University after super-admin approval. Partner / NGO never. Never published. Only CIEL PK Super Admin can download the originals.",
+        desc: "Student, assigned Faculty, authorized University and CIEL PK Super Admin can view this evidence, for internal verification only. Associated Partners/NGOs and the public cannot, and it is never published. Only CIEL PK Super Admin can download the originals.",
     },
 ];
+
+/** Who can see / download evidence at each privacy level — mirrors backend evidence-access.util. */
+const EVIDENCE_ACCESS_ROWS: Array<{ who: string; access: Record<MediaVisibility, boolean> }> = [
+    { who: "Submitting Student", access: { public: true, restricted: true, private: true } },
+    { who: "Assigned Faculty", access: { public: true, restricted: true, private: true } },
+    { who: "Authorized University", access: { public: true, restricted: true, private: true } },
+    { who: "CIEL PK Super Admin", access: { public: true, restricted: true, private: true } },
+    { who: "Associated Partner Organization / NGO", access: { public: true, restricted: false, private: false } },
+    { who: "General Public", access: { public: true, restricted: false, private: false } },
+    { who: "Original downloads — CIEL PK Super Admin", access: { public: true, restricted: true, private: true } },
+    { who: "Original downloads — everyone else", access: { public: true, restricted: false, private: false } },
+    { who: "Privacy status shown to associated stakeholders", access: { public: true, restricted: true, private: true } },
+];
+
+function EvidenceAccessMatrix({ selected }: { selected: MediaVisibility }) {
+    const levels: MediaVisibility[] = ["public", "restricted", "private"];
+    return (
+        <div data-ciel-evidence-access-matrix className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full min-w-[520px] border-collapse text-left text-[12.5px]">
+                <caption className="px-3.5 pb-1 pt-3 text-left">
+                    <span className="block text-[13px] font-bold text-slate-900">Stakeholder access matrix</span>
+                    <span className="block text-[11.5px] font-normal text-slate-500">Who can view each privacy level. Your choice is highlighted.</span>
+                </caption>
+                <thead>
+                    <tr className="bg-[#f7fafb] text-[11px] font-semibold text-slate-500">
+                        <th className="px-3.5 py-2">Stakeholder / permission</th>
+                        {levels.map((level) => (
+                            <th key={level} className={clsx("px-3 py-2 text-center", level === selected && "bg-[#eefbfe] text-[#0e7490]")}>
+                                {level === "public" ? "Public" : level === "restricted" ? "Restricted" : "Private"}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {EVIDENCE_ACCESS_ROWS.map((row) => (
+                        <tr key={row.who} className="border-t border-slate-100">
+                            <td className="px-3.5 py-2 text-slate-700">{row.who}</td>
+                            {levels.map((level) => (
+                                <td
+                                    key={level}
+                                    className={clsx(
+                                        "px-3 py-2 text-center",
+                                        level === selected && "bg-[#f3fcfe]",
+                                        row.access[level] ? "font-bold text-[#16734c]" : "text-slate-400",
+                                    )}
+                                >
+                                    {row.access[level] ? "✓ Yes" : "— No"}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            <p className="border-t border-slate-100 px-3.5 py-2 text-[11px] leading-relaxed text-slate-500">
+                Public needs the public-sharing consent above; until it is confirmed, evidence is treated as Restricted. Faculty and
+                University access is limited to the academic stakeholders associated with this project. Blocking downloads does not
+                prevent screenshots.
+            </p>
+        </div>
+    );
+}
 
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
@@ -523,9 +584,10 @@ export default function Section8Evidence() {
                             }
                         />
                         <span>
-                            I/we confirm that this evidence is authentic and relates to this project. I/we have reported consent and
-                            privacy details accurately, and understand that evidence without appropriate permission must not be shared
-                            publicly. False submissions may result in rejection and institutional action.
+                            I/We confirm that the submitted evidence is authentic, relates to this project and has been collected with
+                            appropriate consent. I/We understand that the evidence remains accessible to the assigned Faculty, authorized
+                            University representatives and CIEL PK Super Admin regardless of the selected privacy level. The selected
+                            privacy level determines access for Partner Organizations, NGOs and the general public.
                         </span>
                     </label>
                     <FieldError message={getFieldError("ethical_compliance")} />
@@ -593,11 +655,18 @@ export default function Section8Evidence() {
                                 className="mt-0.5 h-4 w-4 shrink-0 accent-[#0e7d74]"
                             />
                             <span className="text-[11px] leading-relaxed text-[var(--ink)]">
-                                <b>I have permission to publicly share this evidence.</b>
+                                <b>I/We confirm that appropriate informed consent has been obtained for public publication of this evidence,
+                                including applicable permissions for identifiable individuals and minors.</b>
                             </span>
                         </label>
                     ) : null}
                     <FieldError message={getFieldError("public_share_permission")} />
+                    <p className="mt-3 rounded-lg bg-[#f4f8fa] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#476277]">
+                        <b className="text-slate-900">Academic access stays the same at every level.</b> Every associated stakeholder can
+                        see this evidence&apos;s privacy status, even when they cannot open the file. Restricted and Private originals can
+                        be downloaded by CIEL PK Super Admin only.
+                    </p>
+                    <EvidenceAccessMatrix selected={selectedVisibility} />
                 </div>
             </section>
 

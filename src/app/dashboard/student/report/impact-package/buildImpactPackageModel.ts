@@ -622,7 +622,7 @@ export function buildImpactPackageModel(
                     : effectiveVisibility === "private"
                       ? { text: "Internal verification only" }
                       : effectiveVisibility === "restricted"
-                        ? { text: "Approval-gated internal view" }
+                        ? { text: "Internal view · not public" }
                         : { text: "Public permission confirmed" },
             ],
             hasContent: files.length > 0,

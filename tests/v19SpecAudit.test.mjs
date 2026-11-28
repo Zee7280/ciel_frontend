@@ -54,7 +54,7 @@ test("8.2 · one mandatory authenticity / consent / privacy confirmation; the ca
     assert.doesNotMatch(backend, /message: 'What does your evidence show\? is required'/);
     const s8 = read(`${R}components/Section8Evidence.tsx`);
     assert.match(s8, /data-testid="evidence-ethics-confirmation"/);
-    assert.match(s8, /I\/we confirm that this evidence is authentic and relates to this project/);
+    assert.match(s8, /I\/We confirm that the submitted evidence is authentic, relates to this project and has been collected with/);
     assert.match(s8, /EVIDENCE_ETHICS_FLAGS\.map\(\(flag\) => \[flag, e\.target\.checked\]\)/);
     assert.match(s8, /getFieldError\("ethical_compliance"\)/);
 });
