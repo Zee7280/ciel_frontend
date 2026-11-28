@@ -56,10 +56,6 @@ function otherSlotCount(evidence: string[] | undefined): number {
     return (evidence || []).filter((s) => isOtherSlotToken(s)).length;
 }
 
-interface Section2Props {
-    projectData?: any;
-}
-
 function formatBaselineEvidenceForDisplay(section: {
     baseline_evidence?: string[];
     baseline_other_entries?: string[];
@@ -83,35 +79,6 @@ function formatBaselineEvidenceForDisplay(section: {
             return t;
         })
         .join(", ");
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function cleanString(value: unknown): string {
-    return typeof value === "string" ? value.trim() : "";
-}
-
-function pickString(...values: unknown[]): string {
-    for (const value of values) {
-        const text = cleanString(value);
-        if (text) return text;
-    }
-    return "";
-}
-
-function joinLocationParts(parts: string[]): string {
-    const seen = new Set<string>();
-    const filtered = parts.filter((part) => {
-        const text = part.trim();
-        if (!text || text === "—") return false;
-        const key = text.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-    });
-    return filtered.length ? filtered.join(", ") : "—";
 }
 
 function listJoin(items: string[]): string {
@@ -195,7 +162,8 @@ const DISCIPLINES = [
     "Other…",
 ];
 
-export default function Section2ProjectContext({ projectData }: Section2Props) {
+// Partner, dates and location are shown once, in the mission header above every form step.
+export default function Section2ProjectContext() {
     const { data, updateSection, getFieldError, isReportSectionsReadOnly } = useReportForm();
     const isReadOnly = isReportSectionsReadOnly;
 
@@ -458,24 +426,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         });
     };
 
-    // Project identity fields
-    const project = asRecord(projectData);
-    const projectLocation = asRecord(project?.location);
-    const projectTimeline = asRecord(project?.timeline);
-    const partner = projectData?.organization_name || projectData?.partner_name || projectData?.organization || "Self-Initiated";
-    const venue = pickString(projectLocation?.venue, projectData?.venue);
-    const district = pickString(projectData?.city, projectData?.district, projectData?.location_district, projectLocation?.city, projectLocation?.district);
-    const province = pickString(projectData?.province, projectData?.location_province, projectLocation?.province);
-    const country = pickString(projectData?.country, projectData?.location_country, projectLocation?.country) || "Pakistan";
-    const locationDisplay = joinLocationParts([venue, district, province, country]);
-
-    // Format dates nicely if they exist
-    const formatDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString() : "—";
-    const startDate = formatDate(pickString(projectData?.start_date, projectData?.startDate, projectTimeline?.start_date, projectTimeline?.startDate));
-    const endDate = formatDate(pickString(projectData?.end_date, projectData?.endDate, projectTimeline?.end_date, projectTimeline?.endDate));
-
-
-
     const fieldClass = "min-h-[110px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-[var(--teal)] focus:bg-white focus:ring-2 focus:ring-[var(--aqua-soft)]";
     const chipClass = (isSel: boolean) =>
         clsx(
@@ -488,35 +438,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
 
     return (
         <div className="mx-auto max-w-5xl space-y-5">
-
-
-            {/* V19 item 04: partner, dates and location come from the approved opportunity — shown
-                read-only here so the student never re-types them in Section 2. */}
-            <div
-                className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-xs sm:grid-cols-3"
-                data-testid="section2-opportunity-identity"
-            >
-                <div className="min-w-0">
-                    <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Partner</p>
-                    <p className="mt-0.5 truncate font-medium text-slate-800" title={partner}>{partner}</p>
-                </div>
-                <div className="min-w-0">
-                    <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Dates</p>
-                    <p className="mt-0.5 font-medium text-slate-800">
-                        {startDate === "—" && endDate === "—" ? "—" : `${startDate} → ${endDate}`}
-                    </p>
-                </div>
-                <div className="min-w-0">
-                    <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Location</p>
-                    <p className="mt-0.5 truncate font-medium text-slate-800" title={locationDisplay || undefined}>
-                        {locationDisplay || "—"}
-                    </p>
-                </div>
-                <p className="text-[11px] text-slate-500 sm:col-span-3">
-                    From your approved opportunity · edit the opportunity if any of this is wrong.
-                </p>
-            </div>
-
             <div className="cer-note !mb-0">
                 <span aria-hidden>☝️</span>
                 <p>

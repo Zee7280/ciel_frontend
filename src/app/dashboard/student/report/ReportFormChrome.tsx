@@ -420,26 +420,7 @@ export function ReportSectionModel({ step, data }: { step: number; data: ReportD
             </div>
         );
     }
-    if (uiStep === 9) {
-        const status = String(data.section10?.continuation_status || "");
-        const rungs: Array<[string, string, string, boolean]> = [
-            ["⏸️", "Stops when we leave", "Honest and fine — say what would be needed.", status === "no"],
-            ["♻️", "Partly continues", "Some elements live on with support.", status === "partially" || status === "partial"],
-            ["🌿", "Continues on its own", "Named owner + handover mechanism.", status === "yes"],
-        ];
-        return (
-            <div className="cer-ladder">
-                {rungs.map(([icon, title, body, on]) => (
-                    <div key={title} className={on ? "on" : ""}>
-                        <span className="e">{icon}</span>
-                        <b>{title}</b>
-                        <br />
-                        {body}
-                    </div>
-                ))}
-            </div>
-        );
-    }
+    // Step 9: the continue / partly / stops choice lives once, as the clickable cards in 9.1.
     return null;
 }
 

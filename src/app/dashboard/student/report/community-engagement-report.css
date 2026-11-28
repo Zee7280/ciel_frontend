@@ -2051,40 +2051,6 @@
     margin-top: 3px;
 }
 
-:is(.cer, .cer-scope) .cer-ladder {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin: 0 0 14px;
-}
-
-:is(.cer, .cer-scope) .cer-ladder > div {
-    border-radius: 14px;
-    padding: 12px;
-    text-align: center;
-    border: 2px solid #e3eaee;
-    background: #fff;
-    font-size: 12.5px;
-    color: #58707a;
-}
-
-:is(.cer, .cer-scope) .cer-ladder > div.on {
-    border-color: #0f9d79;
-    background: #edfaf5;
-    color: #0b5d47;
-}
-
-:is(.cer, .cer-scope) .cer-ladder .e {
-    font-size: 24px;
-    display: block;
-}
-
-@media (max-width: 800px) {
-    :is(.cer, .cer-scope) .cer-ladder {
-        grid-template-columns: 1fr;
-    }
-}
-
 /* Impact flashcard — one card, same CII as the detailed report, print matches the screen */
 :is(.cer, .cer-scope) .cer-v17-flash {
     width: min(1160px, 100%);

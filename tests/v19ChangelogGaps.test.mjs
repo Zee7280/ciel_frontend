@@ -85,12 +85,17 @@ test("item 15: consent is labelled student-reported everywhere a reviewer sees i
     assert.match(read("src/app/dashboard/student/report/components/Section2ProjectContext.tsx"), /Reviewers see it as student-reported/);
 });
 
-test("item 04: Section 2 shows partner, dates and location from the opportunity instead of leaving them unused", () => {
+test("item 04: partner, dates and location show once in the mission header, not again inside Section 2", () => {
     const s2 = read("src/app/dashboard/student/report/components/Section2ProjectContext.tsx");
-    assert.match(s2, /section2-opportunity-identity/);
-    assert.match(s2, /\{partner\}/);
-    assert.match(s2, /\$\{startDate\} → \$\{endDate\}/);
-    assert.match(s2, /\{locationDisplay \|\| "—"\}/);
+    assert.doesNotMatch(s2, /section2-opportunity-identity/);
+    assert.doesNotMatch(s2, /edit the opportunity if any of this is wrong/);
+    const chrome = read("src/app/dashboard/student/report/ReportFormChrome.tsx");
+    assert.match(chrome, /YOUR COMMUNITY IMPACT MISSION/);
+    assert.match(chrome, /linkedPartnerName\(a\.context\)/);
+    assert.match(chrome, /a\.context\.projectLocation/);
+    assert.match(chrome, /a\.context\.timelineLabel/);
+    const page = read("src/app/dashboard/student/report/page.tsx");
+    assert.match(page, /\{!onFlash \? \(\s*<MissionHeroView/);
 });
 
 test("items 01/02: the flash card dialog is near full-screen and its card breakpoints follow the dialog width", () => {

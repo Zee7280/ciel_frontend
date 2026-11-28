@@ -15,12 +15,6 @@ const continuationOptions = [
     { id: "no", emoji: "⏸️", label: "No", desc: "Will not continue without further action." },
 ];
 
-const ladderOptions = [
-    { id: "no", emoji: "⏸️", title: "Stops when we leave", desc: "Honest and fine — say what would be needed." },
-    { id: "partially", emoji: "♻️", title: "Partly continues", desc: "Some elements live on with support." },
-    { id: "yes", emoji: "🌿", title: "Continues on its own", desc: "Named owner + handover mechanism." },
-];
-
 const mechanismOptions: { id: string; label: string; aliases?: string[] }[] = [
     { id: "Partner-led continuation", label: "🛡️ Partner-led continuation" },
     { id: "Community ownership", label: "🌐 Community ownership" },
@@ -151,23 +145,6 @@ export default function Section10Sustainability({ projectData }: { projectData?:
                                 <p className="mt-2 text-sm font-semibold text-slate-900">{opt.label}</p>
                                 <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{opt.desc}</p>
                             </button>
-                        );
-                    })}
-                </div>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                    {ladderOptions.map((step) => {
-                        const active = continuation_status === step.id;
-                        return (
-                            <div
-                                key={step.id}
-                                className={clsx(
-                                    "rounded-xl border px-3 py-3 text-sm",
-                                    active ? "border-[#0f9d79] bg-[#eefaf6]" : "border-slate-200 bg-white",
-                                )}
-                            >
-                                <p className="font-semibold text-slate-900">{step.emoji} {step.title}</p>
-                                <p className="mt-1 text-xs leading-relaxed text-slate-500">{step.desc}</p>
-                            </div>
                         );
                     })}
                 </div>

@@ -1194,7 +1194,7 @@ function ReportFormContent() {
 
                 <div ref={sectionContainerRef}>
                     {activeStep === 1 && <Section1Participation projectData={projectDetails} onWillAdvanceSection={requestAutoFocusOnNextStep} />}
-                    {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
+                    {activeStep === 2 && <Section2ProjectContext />}
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
                     {isMergedActivitiesStep(activeStep) && (
                         <div className="cer-s4">
