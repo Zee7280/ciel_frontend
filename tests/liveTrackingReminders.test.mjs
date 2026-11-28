@@ -37,22 +37,38 @@ test("the shared monitor card carries the communication bar and the Remind now b
     assert.match(faculty, /postRemindNow\("faculty", row\.project_id/);
 });
 
-test("every stakeholder hub has a Live progress tab on the same panel", () => {
-    const cases = [
-        ["src/app/dashboard/partner/community-service/PartnerCommunityServiceHub.tsx", 'role="partner"'],
-        ["src/app/dashboard/partner/community-service/NgoCommunityServiceHub.tsx", 'role="partner"'],
+test("every stakeholder hub shows live tracking from the same rows", () => {
+    // University and CIEL PK admin keep a separate Live progress tab on the shared panel (with a count).
+    for (const [file, role] of [
         ["src/app/dashboard/partner/community-service/UniversityCommunityServiceHub.tsx", 'role="partner"'],
         ["src/app/dashboard/admin/community-service/page.tsx", 'role="admin"'],
-    ];
-    for (const [file, role] of cases) {
+    ]) {
         const src = read(file);
-        assert.match(src, /\{ id: "tracking", label: "Live progress" \}/, file);
+        assert.match(src, /\{ id: "tracking", label: "Live progress"/, file);
         assert.match(src, /<ProjectTrackingPanel/, file);
         assert.ok(src.includes(role), `${file} ${role}`);
-        assert.match(src, /"tracking"/, file);
     }
+    assert.match(
+        read("src/app/dashboard/partner/community-service/UniversityCommunityServiceHub.tsx"),
+        /\{ id: "tracking", label: "Live progress", count: linkedProjects\.active\.length \}/,
+    );
+    // Partner and NGO show the faculty-style view: the Active tab IS the live view (old ?tab=tracking → Active).
+    for (const file of [
+        "src/app/dashboard/partner/community-service/PartnerCommunityServiceHub.tsx",
+        "src/app/dashboard/partner/community-service/NgoCommunityServiceHub.tsx",
+    ]) {
+        const src = read(file);
+        assert.match(src, /<LinkedProjectsView/, file);
+        assert.match(src, /const linkedProjects = useLinkedProjects\("partner", \{ enabled: view === "projects" \}\);/, file);
+        assert.match(src, /tab=\{linkedProjectsTab\(projectTab\)\}/, file);
+    }
+    const view = read("src/components/ciel/community-service/LinkedProjectsView.tsx");
+    assert.match(view, /return raw === "verified" \|\| raw === "all" \? raw : "active";/);
     const panel = read("src/components/ciel/community-service/ProjectTrackingPanel.tsx");
-    assert.match(panel, /useProjectTracking\(role\)/);
+    assert.match(panel, /const own = useLinkedProjects\(role, \{ enabled: !tracking \}\);/);
+    const hook = read("src/hooks/useLinkedProjects.ts");
+    assert.match(hook, /const tracking = useProjectTracking\(role, options\);/);
+    assert.match(hook, /groupTeamTrackingRows\(tracking\.rows\)/);
 });
 
 test("live sync: lists refresh on an interval while visible and when the tab comes back", () => {

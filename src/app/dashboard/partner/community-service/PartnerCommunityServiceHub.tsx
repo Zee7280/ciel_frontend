@@ -11,8 +11,8 @@ import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSec
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import QuickImpactPartnerWall from "@/components/ciel/community-service/quick-work/QuickImpactPartnerWall";
-import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
-import ProjectTrackingPanel from "@/components/ciel/community-service/ProjectTrackingPanel";
+import LinkedProjectsView, { linkedProjectsTab } from "@/components/ciel/community-service/LinkedProjectsView";
+import { useLinkedProjects } from "@/hooks/useLinkedProjects";
 import { projectReportHref } from "@/components/ciel/community-service/ProjectMonitorCard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import OpportunityApprovalCard, {
@@ -46,7 +46,6 @@ type CsView = (typeof CS_VIEWS)[number];
 const CS_BASE = "/dashboard/partner/community-service";
 const CREATE_FORM = "/dashboard/partner/requests/new";
 const MY_OPPS = "/dashboard/partner/requests";
-const APPROVALS = "/dashboard/partner/verify";
 const ANALYTICS = "/dashboard/partner/analytics";
 const HOME = "/dashboard/partner";
 
@@ -280,6 +279,8 @@ export default function PartnerCommunityServiceHub() {
     const [reloadKey, setReloadKey] = useState(0);
     /** Flashcard / revision / rejection open here, through the partner approval endpoints. */
     const partnerReview = usePartnerOpportunityReview(() => setReloadKey((k) => k + 1));
+    // Linked projects (live tracking, one card per team): loaded only while the Projects view is open.
+    const linkedProjects = useLinkedProjects("partner", { enabled: view === "projects" });
     // Live sync: linked opportunities and reports refresh while the hub is open.
     useLiveRefresh(() => setReloadKey((k) => k + 1));
     const [innerTab, setInnerTab] = useState("");
@@ -782,17 +783,6 @@ export default function PartnerCommunityServiceHub() {
                                                     ? "waiting"
                                                     : "pending";
                                         const model = buildOpportunityApprovalModel(row, "partner", { orgName, mode });
-                                        const verifyTab =
-                                            tab === "pending"
-                                                ? "pending"
-                                                : tab === "linked"
-                                                  ? "linked"
-                                                  : tab === "waiting"
-                                                    ? "waiting"
-                                                    : tab === "rev"
-                                                      ? "revision"
-                                                      : "history";
-                                        const href = `${APPROVALS}?tab=${verifyTab}&opportunity=${encodeURIComponent(row.id)}`;
                                         const acknowledge = lower(row.created_by_role ?? row.creator_role) === "faculty";
                                         return (
                                             <OpportunityApprovalCard
@@ -813,9 +803,18 @@ export default function PartnerCommunityServiceHub() {
                                                         />
                                                     ) : (
                                                         <>
-                                                            <Link href={href} className={approvalActionClass.soft}>
-                                                                {mode === "decided" ? "Open record" : "View same record"}
-                                                            </Link>
+                                                            <button
+                                                            type="button"
+                                                            className={approvalActionClass.soft}
+                                                            onClick={() =>
+                                                                void partnerReview.openOpportunityDetail(row.id, {
+                                                                    showActions: false,
+                                                                    approvalAction: "partner_ack",
+                                                                })
+                                                            }
+                                                        >
+                                                            View Flashcard
+                                                        </button>
                                                             <ApprovalFollowUpActions
                                                                 opportunityId={row.id}
                                                                 currentlyWithRole={pickStr(row, "currently_with_role", "currentlyWithRole")}
@@ -843,53 +842,21 @@ export default function PartnerCommunityServiceHub() {
                         title="Community Service Projects"
                         subtitle="Linked projects. You can monitor and remind; the academic report is approved by Faculty only."
                     />
-                    <HubTabs
-                        tabs={[
-                            { id: "active", label: "Active", count: waiting.length },
-                            { id: "tracking", label: "Live progress" },
-                            { id: "verified", label: "Verified", count: liveRows.length },
-                            { id: "all", label: "All", count: pipeline.length },
-                        ]}
-                        active={projectTab}
-                        onChange={setInnerTab}
+                    <LinkedProjectsView
+                        tracking={linkedProjects}
+                        reportRows={pipeline}
+                        reportsLoading={loading}
+                        tab={linkedProjectsTab(projectTab)}
+                        onTabChange={setInnerTab}
+                        roleLabel="your linked organization"
+                        reportHrefFor={(r) => {
+                            const base = projectReportHref(r, "/dashboard/partner/verify");
+                            return base ? `${base}?package=1` : undefined;
+                        }}
+                        onViewFlashcard={(projectId) =>
+                            void partnerReview.openOpportunityDetail(projectId, { showActions: false, approvalAction: "partner_ack" })
+                        }
                     />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading projects…</p>
-                    ) : projectTab === "tracking" ? (
-                        <ProjectTrackingPanel
-                            role="partner"
-                            roleLabel="your linked organization"
-                            reportHrefFor={(r) => {
-                                const base = projectReportHref(r, "/dashboard/partner/verify");
-                                return base ? `${base}?package=1` : undefined;
-                            }}
-                            hoursHrefFor={(projectId) => `/dashboard/partner/attendance-review?projectId=${encodeURIComponent(projectId)}`}
-                            emptyText="Assigned students on your linked projects appear here with live hours and report progress."
-                        />
-                    ) : (
-                        (() => {
-                            const list = projectTab === "verified" ? liveRows : projectTab === "all" ? pipeline : waiting;
-                            if (!list.length) {
-                                return <EmptyPanel title="No linked projects" text="Approved engagements linked to your organization appear here." />;
-                            }
-                            return (
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    {list.map((row) => (
-                                        <CommunityQueueCard
-                                            key={row.id}
-                                            href={reportHref(row.id)}
-                                            title={row.project_title || "Report"}
-                                            student={row.student_name || "Student"}
-                                            org={row.organization_name}
-                                            hours={row.hours}
-                                            tone={isFacultyCommunityLiveCard(row) ? "approved" : "waiting"}
-                                            cta="View progress →"
-                                        />
-                                    ))}
-                                </div>
-                            );
-                        })()
-                    )}
                 </div>
             )}
 

@@ -20,20 +20,17 @@ import { COMMAND_HERO, MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupSec
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import QuickImpactPartnerWall from "@/components/ciel/community-service/quick-work/QuickImpactPartnerWall";
-import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
-import ProjectTrackingPanel from "@/components/ciel/community-service/ProjectTrackingPanel";
+import LinkedProjectsView, { linkedProjectsTab } from "@/components/ciel/community-service/LinkedProjectsView";
+import { useLinkedProjects } from "@/hooks/useLinkedProjects";
 import { projectReportHref } from "@/components/ciel/community-service/ProjectMonitorCard";
 import OpportunityApprovalCard, {
     approvalActionClass,
     buildOpportunityApprovalModel,
 } from "@/components/ciel/community-service/OpportunityApprovalCard";
-import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
 import { formatOpportunityCode } from "@/utils/displayIds";
 import OpportunityListFlashHead from "@/components/opportunities/OpportunityListFlashHead";
-import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import {
     NGO_CS_ANALYTICS as ANALYTICS,
-    NGO_CS_APPROVALS as APPROVALS,
     NGO_CS_BASE as CS_BASE,
     NGO_CS_CREATE_FORM as CREATE_FORM,
     NGO_CS_MY_OPPS as MY_OPPS,
@@ -124,22 +121,6 @@ const GUIDES: Record<string, { title: string; desc: string; items?: [string, str
         rule: "Analytics respect record visibility and authorization.",
     },
 };
-
-function NgoRemindButtons({ email, title }: { email?: string | null; title: string }) {
-    const to = email && email.includes("@") ? email : "";
-    const subject = `Community Service reminder — ${title}`;
-    const body = `A reminder from your linked organization about “${title}”. Please continue the pending Community Service step in your signed-in CIEL PK dashboard.`;
-    return (
-        <div className="mt-1.5 flex flex-wrap gap-2">
-            <a href={mailtoHref(to, subject, body)} className="rounded-full bg-[#edf4fb] px-3 py-1.5 text-[11px] font-extrabold text-[#376d9f]">
-                ✉ Remind
-            </a>
-            <a href={whatsappShareHref(body)} className="rounded-full bg-[#e8f8ee] px-3 py-1.5 text-[11px] font-extrabold text-[#1f7a46]">
-                WhatsApp
-            </a>
-        </div>
-    );
-}
 
 function reportHref(id: string) {
     return `/dashboard/partner/verify/${encodeURIComponent(id)}?package=1`;
@@ -249,12 +230,13 @@ export default function NgoCommunityServiceHub() {
         applicationsOnMine,
         pipeline,
         waiting,
-        liveRows,
         deckCards,
         inboxItems,
     } = useNgoCommunityServiceData();
     /** Flashcard / revision / rejection open here, through the partner approval endpoints. */
     const partnerReview = usePartnerOpportunityReview(reload);
+    // Linked projects (live tracking, one card per team): loaded only while the Projects view is open.
+    const linkedProjects = useLinkedProjects("partner", { enabled: view === "projects" });
     const [innerTab, setInnerTab] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
 
@@ -566,17 +548,6 @@ export default function NgoCommunityServiceHub() {
                                                     ? "waiting"
                                                     : "pending";
                                         const model = buildOpportunityApprovalModel(row, "ngo", { orgName, mode });
-                                        const verifyTab =
-                                            tab === "pending"
-                                                ? "pending"
-                                                : tab === "linked"
-                                                  ? "linked"
-                                                  : tab === "waiting"
-                                                    ? "waiting"
-                                                    : tab === "rev"
-                                                      ? "revision"
-                                                      : "history";
-                                        const href = `${APPROVALS}?tab=${verifyTab}&opportunity=${encodeURIComponent(row.id)}`;
                                         return (
                                             <OpportunityApprovalCard
                                                 key={row.id}
@@ -597,9 +568,18 @@ export default function NgoCommunityServiceHub() {
                                                             onReject={(id) => partnerReview.review(id, "reject")}
                                                         />
                                                     ) : (
-                                                        <Link href={href} className={approvalActionClass.soft}>
-                                                            {mode === "decided" ? "Open record" : "View same record"}
-                                                        </Link>
+                                                        <button
+                                                            type="button"
+                                                            className={approvalActionClass.soft}
+                                                            onClick={() =>
+                                                                void partnerReview.openOpportunityDetail(row.id, {
+                                                                    showActions: false,
+                                                                    approvalAction: "partner_ack",
+                                                                })
+                                                            }
+                                                        >
+                                                            View Flashcard
+                                                        </button>
                                                     )
                                                 }
                                             />
@@ -618,57 +598,21 @@ export default function NgoCommunityServiceHub() {
                         title="Community Service Projects"
                         subtitle="Linked projects. You can monitor and remind; the academic report is approved by Faculty only."
                     />
-                    <HubTabs
-                        tabs={[
-                            { id: "active", label: "Active", count: waiting.length },
-                            { id: "tracking", label: "Live progress" },
-                            { id: "verified", label: "Verified", count: liveRows.length },
-                            { id: "all", label: "All", count: pipeline.length },
-                        ]}
-                        active={projectTab}
-                        onChange={setHubTab}
+                    <LinkedProjectsView
+                        tracking={linkedProjects}
+                        reportRows={pipeline}
+                        reportsLoading={loading}
+                        tab={linkedProjectsTab(projectTab)}
+                        onTabChange={setHubTab}
+                        roleLabel="your linked organization"
+                        reportHrefFor={(r) => {
+                            const base = projectReportHref(r, "/dashboard/partner/verify");
+                            return base ? `${base}?package=1` : undefined;
+                        }}
+                        onViewFlashcard={(projectId) =>
+                            void partnerReview.openOpportunityDetail(projectId, { showActions: false, approvalAction: "partner_ack" })
+                        }
                     />
-                    {loading ? (
-                        <p className="text-sm text-slate-500">Loading projects…</p>
-                    ) : projectTab === "tracking" ? (
-                        <ProjectTrackingPanel
-                            role="partner"
-                            roleLabel="your linked organization"
-                            reportHrefFor={(r) => {
-                                const base = projectReportHref(r, "/dashboard/partner/verify");
-                                return base ? `${base}?package=1` : undefined;
-                            }}
-                            hoursHrefFor={(projectId) => `/dashboard/partner/attendance-review?projectId=${encodeURIComponent(projectId)}`}
-                            emptyText="Assigned students on your linked projects appear here with live hours and report progress."
-                        />
-                    ) : (
-                        (() => {
-                            const list = projectTab === "verified" ? liveRows : projectTab === "all" ? pipeline : waiting;
-                            if (!list.length) {
-                                return <EmptyPanel title="No linked projects" text="Approved engagements linked to your organization appear here." />;
-                            }
-                            return (
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    {list.map((row) => (
-                                        <div key={row.id}>
-                                            <CommunityQueueCard
-                                                href={reportHref(row.id)}
-                                                title={row.project_title || "Report"}
-                                                student={row.student_name || "Student"}
-                                                org={row.organization_name}
-                                                hours={row.hours}
-                                                tone={isFacultyCommunityLiveCard(row) ? "approved" : "waiting"}
-                                                cta="View progress →"
-                                            />
-                                            {isFacultyCommunityLiveCard(row) ? null : (
-                                                <NgoRemindButtons email={row.student_email} title={row.project_title || "Report"} />
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            );
-                        })()
-                    )}
                 </div>
             )}
 

@@ -15,6 +15,7 @@ import QuickImpactPartnerWall from "@/components/ciel/community-service/quick-wo
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
 import ReportProgressCard from "@/components/ciel/community-service/ReportProgressCard";
 import ProjectTrackingPanel from "@/components/ciel/community-service/ProjectTrackingPanel";
+import { useLinkedProjects } from "@/hooks/useLinkedProjects";
 import { projectReportHref } from "@/components/ciel/community-service/ProjectMonitorCard";
 import OpportunityApprovalCard, {
     approvalActionClass,
@@ -356,6 +357,9 @@ export default function UniversityCommunityServiceHub() {
         ? innerTab
         : "active";
     const effectiveView: CsView = view === "reps" ? "allocation" : view;
+    // Live progress rows (one card per team): loaded only while the Projects view is open, so the
+    // tab count and the list come from the same request.
+    const linkedProjects = useLinkedProjects("partner", { enabled: effectiveView === "projects" });
     const guide = GUIDES[effectiveView] || GUIDES.home;
     const hours = deckCards.reduce((s, c) => s + (c.hours || 0), 0);
 
@@ -870,7 +874,7 @@ export default function UniversityCommunityServiceHub() {
                             { id: "faculty", label: "Pending Faculty", count: approvalOpps.filter(isPendingFacultyRow).filter(filterOpp).length },
                             { id: "approval", label: "In approval", count: approvalOpps.filter(filterOpp).length },
                             { id: "progress", label: "In progress", count: draftRows.filter(filterProject).length },
-                            { id: "tracking", label: "Live progress" },
+                            { id: "tracking", label: "Live progress", count: linkedProjects.active.length },
                             { id: "active", label: "Active reports", count: waiting.filter(filterProject).length },
                             { id: "verified", label: "Verified", count: liveRows.filter(filterProject).length },
                             { id: "closed", label: "Closed", count: closedReports.filter(filterProject).length },
@@ -884,6 +888,7 @@ export default function UniversityCommunityServiceHub() {
                         <ProjectTrackingPanel
                             role="partner"
                             roleLabel="your university"
+                            tracking={linkedProjects}
                             reportHrefFor={(r) => {
                                 const base = projectReportHref(r, "/dashboard/partner/verify");
                                 return base ? `${base}?package=1` : undefined;

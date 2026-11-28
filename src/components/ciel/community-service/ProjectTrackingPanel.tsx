@@ -1,32 +1,37 @@
 "use client";
 
-import { useProjectTracking } from "@/hooks/useProjectTracking";
+import { useLinkedProjects, type LinkedProjects } from "@/hooks/useLinkedProjects";
 import type { ProjectTrackingRole } from "@/utils/projectTracking";
 import type { FacultyCsReportRow } from "@/app/dashboard/faculty/community-service/useFacultyCommunityServiceData";
-import { isFacultyCommunityLiveCard } from "@/utils/reviewQueue";
 import { EmptyPanel } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import ProjectMonitorCard from "@/components/ciel/community-service/ProjectMonitorCard";
 
 /**
  * "Live progress" tab of a Community Service Projects view: every assigned student / team on the
  * projects this dashboard may see, with live hours, report progress, deadline and reminder state.
- * Refreshes itself every minute while open. Verified projects are left to the Verified tab.
+ * A team shows as one card (same grouping as the faculty hub). Refreshes itself every minute while
+ * open. Verified projects are left to the Verified tab.
  */
 export default function ProjectTrackingPanel({
     role,
     roleLabel,
     reportHrefFor,
     hoursHrefFor,
+    onViewFlashcard,
     emptyText,
+    tracking,
 }: {
     role: ProjectTrackingRole;
     roleLabel: string;
     reportHrefFor?: (row: FacultyCsReportRow) => string | undefined;
     hoursHrefFor?: (projectId: string) => string;
+    onViewFlashcard?: (projectId: string) => void;
     emptyText: string;
+    /** Rows already loaded by the hub (so the tab count and the list come from one request). */
+    tracking?: LinkedProjects;
 }) {
-    const { rows, loading, remindNow, remindingId } = useProjectTracking(role);
-    const active = rows.filter((row) => !isFacultyCommunityLiveCard(row));
+    const own = useLinkedProjects(role, { enabled: !tracking });
+    const { active, loading, remindNow, remindingId } = tracking ?? own;
     if (loading) return <p className="text-sm text-slate-500">Loading live progress…</p>;
     if (!active.length) return <EmptyPanel title="No project in progress" text={emptyText} />;
     return (
@@ -40,6 +45,7 @@ export default function ProjectTrackingPanel({
                     row={row}
                     reportHrefFor={reportHrefFor}
                     hoursHrefFor={hoursHrefFor}
+                    onViewFlashcard={onViewFlashcard}
                     remind={{ roleLabel, onRemindNow: remindNow, busy: remindingId === row.id }}
                 />
             ))}

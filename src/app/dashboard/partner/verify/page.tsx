@@ -52,7 +52,27 @@ type PartnerApprovalRow = FacultyApprovalRow & {
     partnerDecision: string;
     /** False until faculty step is done — backend returns 400 if partner acts earlier. */
     partnerDecisionActionsEnabled: boolean;
+    /** The backend row as received: supervision, partner and creator details for the approval chain. */
+    raw: Record<string, unknown>;
 };
+
+/** Drops undefined / null / blank-string values so they never overwrite a real field. */
+function definedOnly(record: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(
+        Object.entries(record).filter(([, value]) => value !== undefined && value !== null && !(typeof value === "string" && !value.trim())),
+    );
+}
+
+/** A display name, or "" for the "—" / "Student" placeholders the normalizer fills in. */
+function realName(value: unknown): string {
+    const text = typeof value === "string" ? value.trim() : "";
+    return text && text !== "—" && text !== "-" && text.toLowerCase() !== "student" ? text : "";
+}
+
+/** A phone number typed where a contact person's name was expected. */
+function looksLikePhone(value: string): boolean {
+    return /^[+\d][\d\s().-]{6,}$/.test(value.trim()) && value.replace(/\D/g, "").length >= 7;
+}
 
 function lower(value: unknown): string {
     if (value == null) return "";
@@ -150,6 +170,7 @@ function mapPartnerApprovalRows(payload: unknown, currentUserId: string): Partne
                 queueMessage: workflow.queueMessage,
                 partnerDecision: lower(raw.partner_approval_status ?? raw.partner_status),
                 partnerDecisionActionsEnabled: isFacultyApprovalCompleteForPartnerGate(raw),
+                raw,
             };
         })
         .filter((row) => {
@@ -186,6 +207,11 @@ function detailPartnerBlock(detail: Record<string, unknown>) {
             pickStr(ext, "official_email", "officialEmail", "email") ||
             pickStr(executingPartner, "official_email", "officialEmail", "email") ||
             pickStr(root, "official_email", "officialEmail", "email"),
+        phone:
+            pickStr(supervision, "partner_whatsapp_e164", "partner_phone", "external_partner_phone") ||
+            pickStr(ext, "contact_phone", "phone", "whatsapp") ||
+            pickStr(executingPartner, "contact_phone", "phone", "whatsapp") ||
+            pickStr(root, "whatsapp", "phone", "contact_phone"),
     };
 }
 
@@ -666,9 +692,12 @@ export default function VerifyWorkPage() {
                             <OpportunityApprovalCard
                                 {...buildOpportunityApprovalModel(
                                     {
+                                        // Full backend row first (faculty / partner / creator names for the chain),
+                                        // then the normalized fields that are actually present.
+                                        ...row.raw,
+                                        ...definedOnly({
                                         id: row.id,
                                         title: row.projectTitle,
-                                        student_name: row.studentName,
                                         version: row.version,
                                         faculty_approval_status: row.facultyApprovalStatus,
                                         partner_approval_status: row.partnerApprovalStatus,
@@ -685,6 +714,8 @@ export default function VerifyWorkPage() {
                                         currently_with_role: row.currentlyWithRole,
                                         next_step: row.nextStep,
                                         waiting_since: row.waitingSince,
+                                        }),
+                                        student_name: realName(row.studentName) || undefined,
                                         isStudentCreated: true,
                                     },
                                     "partner",
@@ -806,9 +837,7 @@ export default function VerifyWorkPage() {
                         <div className="space-y-6 text-sm">
                             <div>
                                 <h3 className="font-bold text-lg text-slate-900">{pickStr(detailRecord, "title") || "Student opportunity"}</h3>
-                                <p className="text-slate-500 mt-1">
-                                    {pickStr(detailRecord, "workflow_stage", "approval_stage").replace(/_/g, " ") || "Pending approval"}
-                                </p>
+                                <p className="text-slate-500 mt-1">{resolveStudentOpportunityWorkflow(detailRecord).badgeLabel}</p>
                             </div>
 
                             <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
@@ -835,21 +864,22 @@ export default function VerifyWorkPage() {
                                     <p className="text-xs font-bold text-amber-900 uppercase mb-2">Partner block</p>
                                     <ul className="space-y-1 text-slate-800">
                                         <li><span className="text-slate-500">Organization:</span> {partnerBlock.organization || "—"}</li>
-                                        <li><span className="text-slate-500">Contact person:</span> {partnerBlock.contact || "—"}</li>
+                                        <li>
+                                            <span className="text-slate-500">Contact person:</span>{" "}
+                                            {partnerBlock.contact && !looksLikePhone(partnerBlock.contact) ? partnerBlock.contact : "—"}
+                                        </li>
+                                        <li>
+                                            <span className="text-slate-500">WhatsApp:</span>{" "}
+                                            {partnerBlock.phone || (partnerBlock.contact && looksLikePhone(partnerBlock.contact) ? partnerBlock.contact : "") || "—"}
+                                        </li>
                                         <li><span className="text-slate-500">Email:</span> {partnerBlock.email || "—"}</li>
                                     </ul>
                                 </div>
                             ) : null}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="rounded-xl border border-slate-200 p-4">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Status</p>
-                                    <p className="text-slate-800">{pickStr(detailRecord, "status").replace(/_/g, " ") || "—"}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-200 p-4">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Workflow</p>
-                                    <p className="text-slate-800">{pickStr(detailRecord, "workflow_stage", "approval_stage").replace(/_/g, " ") || "—"}</p>
-                                </div>
+                            <div className="rounded-xl border border-slate-200 p-4" data-testid="partner-request-stage">
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Where it is now</p>
+                                <p className="text-slate-800">{resolveStudentOpportunityWorkflow(detailRecord).queueMessage}</p>
                             </div>
                             <StudentOpportunityFlashcard
                                 model={buildOpportunityRecordFlashcard(detailRecord, {

@@ -204,8 +204,9 @@ export function useFacultyOpportunityReviewActions(onChanged?: () => void) {
                     <DialogHeader>
                         <DialogTitle>{detailActionKind === "partner_ack" ? "Opportunity Flashcard" : "Student opportunity"}</DialogTitle>
                         <DialogDescription>
-                            Review the flashcard and full proposal here. Approve, request revision, or reject without leaving
-                            this page.
+                            {detailActionId
+                                ? "Review the flashcard and full proposal here. Approve, request revision, or reject without leaving this page."
+                                : "The flashcard and full proposal of this opportunity, as it stands now. View only."}
                         </DialogDescription>
                     </DialogHeader>
                     {detailLoading ? (

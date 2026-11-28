@@ -333,6 +333,14 @@ export default function ProjectMonitorCard({
                             {remind ? <RemindButtons email={remindTo} title={row.project_title} roleLabel={remind.roleLabel} /> : null}
                         </>
                     )}
+                    {!live && !reportHref && remind && remindTo ? (
+                        // Who the Email and WhatsApp reminders reach, shown separately (the phone number stays private).
+                        <p className="w-full text-[10.5px] leading-snug text-[#5b6d76]" data-testid="monitor-remind-recipients">
+                            <span className="font-bold">✉ Email:</span> <span className="break-all">{remindTo.split(",").join(", ")}</span>
+                            <br />
+                            <span className="font-bold">💬 WhatsApp:</span> opens your WhatsApp with the reminder ready; choose the student&apos;s chat.
+                        </p>
+                    ) : null}
                     {reportOpenHref ? (
                         <Link href={reportOpenHref} className="rounded-[10px] bg-[#0e7d74] px-3 py-2 text-[12px] font-black text-white">
                             Open report
