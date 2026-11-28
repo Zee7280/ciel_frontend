@@ -326,20 +326,6 @@ function ParticipationQuest({
 
     return (
         <div className="cer-quest-shell">
-            <div className="cer-quest-hero">
-                <div>
-                    <div className="k">SECTION 1 · PLAY IT AS FIVE SMALL MISSIONS</div>
-                    <h2>Participation Adventure 🎮</h2>
-                    <p>Same locked form. Same mandatory evidence. Complete one mission at a time and collect five progress stars.</p>
-                </div>
-                <div className="stars">
-                    <b>
-                        {"★".repeat(starsFilled)}
-                        {"☆".repeat(missionDone.length - starsFilled)}
-                    </b>
-                    <small>UI PROGRESS · NOT CII POINTS</small>
-                </div>
-            </div>
             <div className="cer-quest-bar">
                 <i style={{ width: `${(starsFilled / QUEST_MISSIONS.length) * 100}%` }} />
             </div>
@@ -1400,7 +1386,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
     return (
         <div className="flex min-h-0 w-full min-w-0 flex-col bg-slate-50/30">
             {isTeamMemberAttendanceOnly ? (
-                <div className="mx-3 mt-3 rounded-xl border border-[#bfe6e2] bg-[#e3f4fa] px-4 py-3 text-sm text-[#0f5e57] sm:mx-5 lg:mx-6">
+                <div className="mt-2 rounded-xl border border-[#bfe6e2] bg-[#e3f4fa] px-4 py-3 text-sm text-[#0f5e57]">
                     <p className="font-semibold">Team member — attendance only</p>
                     <p className="mt-1 text-xs text-[#0f5e57]/90">
                         Your team lead completes and submits this report. You may log and update your own attendance below.
@@ -1419,7 +1405,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
             ) : null}
 
             {/* Section 1 — compact 4-step progress */}
-            <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+            <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
                 <nav aria-label="Section 1 progress" className="mx-auto max-w-3xl">
                     <ol className="flex items-start">
                         {steps.map((s, idx) => {
@@ -1440,7 +1426,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                     {idx < steps.length - 1 ? (
                                         <div
                                             className={clsx(
-                                                "absolute left-[calc(50%+0.875rem)] right-0 top-3.5 hidden h-0.5 sm:block",
+                                                "absolute left-[calc(50%+0.75rem)] right-0 top-3 hidden h-0.5 sm:block",
                                                 isComplete ? "bg-[#0e7d74]" : "bg-[#dcebee]",
                                             )}
                                             aria-hidden
@@ -1455,7 +1441,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                             if (canNavigate) setInternalStep(s.id);
                                         }}
                                         className={clsx(
-                                            "relative z-10 flex flex-col items-center gap-1 transition-opacity",
+                                            "relative z-10 flex flex-col items-center gap-0.5 transition-opacity",
                                             isDisabled
                                                 ? "cursor-not-allowed opacity-40"
                                                 : canNavigate || isCurrent
@@ -1465,7 +1451,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                     >
                                         <span
                                             className={clsx(
-                                                "flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold transition-all",
+                                                "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition-all",
                                                 isCurrent && "bg-[#0e7d74] text-white shadow-sm",
                                                 isComplete && !isCurrent && "bg-[#0d2b33] text-white",
                                                 !isCurrent && !isComplete && "bg-[#dcebee] text-[#7a919a]",
@@ -1479,7 +1465,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                         </span>
                                         <span
                                             className={clsx(
-                                                "hidden max-w-[5.5rem] text-center text-[10px] font-medium leading-tight sm:block",
+                                                "hidden whitespace-nowrap text-center text-[10px] font-medium leading-tight sm:block",
                                                 isCurrent
                                                     ? "text-[#0e7d74]"
                                                     : isComplete
@@ -1506,8 +1492,8 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
             </div>
 
             {/* Scrollable Content Workspace */}
-            <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-5 lg:px-6">
-                <div className="mx-auto max-w-6xl min-w-0 space-y-4">
+            <main className="min-w-0 flex-1 overflow-x-hidden pt-3 pb-2">
+                <div className="mx-auto max-w-6xl min-w-0 space-y-3">
                     <ParticipationQuest
                         internalStep={internalStep}
                         setInternalStep={setInternalStep}

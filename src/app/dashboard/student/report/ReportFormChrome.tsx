@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import clsx from "clsx";
 import type { ReportData } from "./context/ReportContext";
 import { isRegisteredReportSdg, mergeReportSdgSnapshotRows, reportSdgContributionText } from "./utils/reportSdgMerge";
@@ -533,76 +533,6 @@ export function ReportSectionLeadNote({ step }: { step: number }) {
             <span>
                 <b>One section, two easy parts:</b> <b>Part A</b> — what you did (things you can count) · <b>Part B</b> — what changed because of it (before → after). Fill A, and B almost writes itself.
             </span>
-        </div>
-    );
-}
-
-const EXAMPLE_SPOTS: Record<number, [string, string, string]> = {
-    1: [
-        "Verified hours are the foundation of every claim in your report — effort, reach and value all start here.",
-        "20 May 2026 · 09:00–12:00 · SOS Children’s Village · Training Workshop — “Delivered a digital-safety workshop to 35 students, facilitated two group exercises and collected participant feedback.” + attendance sheet, activity photo, feedback form.",
-        "“Worked for 3 hours at NGO.” No time, no place, no proof — and remember: pooled team hours never satisfy your personal minimum.",
-    ],
-    2: [
-        "A specific, evidence-aware baseline is what makes your outcomes believable later.",
-        "“Classroom 4 had damaged lighting, limited learning displays and broken storage. Approximately 120 children used the space. We found this through a site visit, teacher interviews and direct observation.”",
-        "“The community had many problems and needed help.”",
-    ],
-    3: [
-        "CIEL maps your work to the UN framework without inflating claims: SDG → official target → indicator (optional) → your local metric → contribution logic.",
-        "SDG 4 · Target 4.a · Local metric: 1 classroom improved · “Our project improved classroom lighting, learning displays and physical usability, supporting a safer, more functional learning environment.”",
-        "Selecting five SDGs with no evidence. One well-argued SDG beats five decorative ones.",
-    ],
-    4: [
-        "Reviewers look for the difference between doing things and changing things. Activity = what you did · Output = what you can count · Outcome = what changed.",
-        "Activity: Repainted and reorganised Classroom 4. Outputs: 1 classroom improved, 14 displays installed, 6 storage units repaired. Reach: 120 students (class register, counted once). Outcome: usability up — baseline 2 of 6 storage units usable → endline 6 of 6, teacher-confirmed.",
-        "“Improved education.” “Helped 90 families and improved food security.” (an output and an outcome merged, with no baseline)",
-    ],
-    5: [
-        "Resources make your project’s real cost and mobilisation visible — including things you got for free.",
-        "Materials · 12 litres paint · from a local hardware store (discounted) · “made the wall painting possible” · verified by invoice. Cash · PKR 10,000 · student self-funded · receipts attached.",
-        "Typing “volunteer time” as a resource (your hours are already counted in Section 1) or listing money with no receipt and calling it verified.",
-    ],
-    6: [
-        "Partnerships of all sizes count — an NGO, a small store, a professional, a community elder — when the role and contribution are real and verifiable.",
-        "Imran Sheikh · Village Director · SOS Children’s Village · Role: community access + attendance verification · “Coordinated with teachers, gave classroom access and confirmed delivery of the upgraded space.”",
-        "“SOS — partner.” A name with no role, no contribution and no contact that can be verified.",
-    ],
-    7: [
-        "Your good work deserves to be seen. Five strong pieces of evidence beat twenty repetitive photographs — and visibility never changes your CII.",
-        "Attendance sheets (participation) · before/after photos with consent (outputs) · teacher feedback summary (outcomes) · receipts (resources) · partner sign-off (verification).",
-        "Twenty near-identical group photos; public images of children without consent; evidence that supports no specific claim.",
-    ],
-    8: [
-        "Reflection shows the learning behind the service — and separates a real experience from a template.",
-        "“I assumed the classroom needed more furniture, but teacher interviews showed lighting and storage were the urgent barriers. That changed our budget and taught me to validate assumptions before designing an intervention.”",
-        "“I learned teamwork and communication. It was a great experience.”",
-    ],
-    9: [
-        "Impact that outlives the project is the strongest signal — but only when it is credible. Small and true beats big and vague.",
-        "“SOS retains the display templates and storage labels. The house supervisor runs a monthly classroom check; we handed over a one-page maintenance guide and trained two staff. Weekly tutoring stops unless SOS assigns a volunteer.”",
-        "“The project will continue in the future.” or promising national scaling with nothing to back it.",
-    ],
-};
-
-/** V12 example spotlight — why / strong example / avoid — on every report section. */
-export function ReportExampleSpot({ step }: { step: number }) {
-    const uiStep = canonicalReportStep(step);
-    const spot = EXAMPLE_SPOTS[uiStep];
-    const [open, setOpen] = useState(false);
-    if (!spot) return null;
-    return (
-        <div className="cer-spot-wrap">
-            <button type="button" className="cer-spot-toggle" onClick={() => setOpen((v) => !v)}>
-                {open ? "Hide example ▴" : "Show me an example ▾"}
-            </button>
-            {open ? (
-                <div className="cer-spot">
-                    <div className="why"><b>Why this matters</b>{spot[0]}</div>
-                    <div className="ex"><b>Strong example</b>{spot[1]}</div>
-                    <div className="no"><b>Avoid this</b>{spot[2]}</div>
-                </div>
-            ) : null}
         </div>
     );
 }

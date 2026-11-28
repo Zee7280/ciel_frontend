@@ -63,7 +63,7 @@ import {
 import PreReportGuide from './components/PreReportGuide';
 import ResultPackageFeedbackGate from '@/components/feedback/ResultPackageFeedbackGate';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportLiveBanner, ReportCompiledSummary, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote, ReportRevisionNotice } from './ReportFormChrome';
+import { ReportLiveBanner, ReportCompiledSummary, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote, ReportRevisionNotice } from './ReportFormChrome';
 import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
 import "./community-engagement-report.css";
 
@@ -1085,6 +1085,25 @@ function ReportFormContent() {
                                 Opportunity flash card
                             </button>
                         )}
+                        {/* Team lead (and a solo student): the same shortcut team members get in their banner.
+                            Team members keep theirs in the banner; a summary-locked report cannot leave the flash card. */}
+                        {!isTeamMemberAttendanceOnly && !stepperLockedToSummaryOnly ? (
+                            onFlash ? (
+                                <button type="button" className="cer-ghost" onClick={() => goJourney(1)} data-testid="lead-back-to-sections">
+                                    ← Back to Section 1
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="cer-ghost"
+                                    onClick={() => goJourney(FLASH_CARD_STEP)}
+                                    data-testid="lead-view-flash-card"
+                                    style={{ borderColor: "#0e7d74", color: "#0e7d74", fontWeight: 800 }}
+                                >
+                                    View Flash Card →
+                                </button>
+                            )
+                        ) : null}
                     </div>
                     <div className="cer-actions">
                         {onFlash ? null : (
@@ -1170,7 +1189,6 @@ function ReportFormContent() {
                 {!onFlash ? (
                     <>
                         <ReportWritingGuide step={activeStep} />
-                        <ReportExampleSpot step={activeStep} />
                         <ReportGlobalCoverage step={activeStep} />
                         <ReportSectionLeadNote step={activeStep} />
                         <SectionModelView step={activeStep} data={deferredData} />
