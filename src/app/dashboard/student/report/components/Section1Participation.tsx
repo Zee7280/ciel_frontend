@@ -1760,6 +1760,11 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                 ? Math.min(100, Math.round((loggedEff / requiredHoursPerStudent) * 100))
                                 : 0;
                         const filteredLogCount = participantLogs.length;
+                        // The banner counts the sessions listed below (this member), not the whole team's;
+                        // sessions still missing evidence in other members' logs are named separately because
+                        // the report cannot be submitted until every counted session has evidence.
+                        const shownMissingEvidence = attendanceSessionsWithoutEvidence(participantLogs).length;
+                        const otherMissingEvidence = Math.max(0, sessionsMissingEvidence.length - shownMissingEvidence);
 
                         return (
                             <div className="space-y-4">
@@ -1907,7 +1912,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                                         : ""}
                                                 </p>
                                             </div>
-                                            {sessionsMissingEvidence.length ? (
+                                            {shownMissingEvidence ? (
                                                 <div
                                                     className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900"
                                                     data-testid="attendance-missing-evidence-banner"
@@ -1915,10 +1920,30 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                                                     <p className="leading-relaxed">
                                                         <span className="font-bold">
-                                                            {sessionsMissingEvidence.length} session{sessionsMissingEvidence.length === 1 ? " has" : "s have"} no supporting evidence.
+                                                            {shownMissingEvidence} session{shownMissingEvidence === 1 ? " below has" : "s below have"} no supporting evidence.
                                                         </span>{" "}
                                                         The report cannot be submitted until every counted session carries a photo or document.
                                                         Use <span className="font-semibold">Add evidence</span> on each card below, or remove the session.
+                                                        {otherMissingEvidence ? (
+                                                            <span className="font-semibold">
+                                                                {" "}
+                                                                {otherMissingEvidence} more {otherMissingEvidence === 1 ? "session" : "sessions"} in other members&apos; logs also need evidence.
+                                                            </span>
+                                                        ) : null}
+                                                    </p>
+                                                </div>
+                                            ) : otherMissingEvidence ? (
+                                                <div
+                                                    className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900"
+                                                    data-testid="attendance-missing-evidence-others"
+                                                >
+                                                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                                                    <p className="leading-relaxed">
+                                                        All sessions below have evidence.{" "}
+                                                        <span className="font-semibold">
+                                                            {otherMissingEvidence} {otherMissingEvidence === 1 ? "session" : "sessions"} in other members&apos; logs still {otherMissingEvidence === 1 ? "needs" : "need"} evidence
+                                                        </span>{" "}
+                                                        before the report can be submitted.
                                                     </p>
                                                 </div>
                                             ) : null}
