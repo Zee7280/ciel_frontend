@@ -65,7 +65,9 @@ test("items 20/21/22: Section 3 greys out registered goals, counts registered se
     assert.match(s3, /Added by the team/);
     assert.match(s3, /registered_secondary_contributions\.\$\{num\}/, "one contribution field per registered secondary SDG");
     assert.match(s3, /currentSummary\.startsWith\(SDG_AUTO_SUMMARY_LEAD\)/, "generated summary is regenerated, not frozen at 100 chars");
-    assert.match(s3, /Reported contributions — /);
+    assert.match(s3, /During implementation the team also mapped \$\{andList\(studentOnlyNums\.map\(sdgLabel\)\)\}/, "summary names team-added goals");
+    assert.match(s3, /also registered as secondary/, "summary names registered secondary goals");
+    assert.doesNotMatch(s3, /Reported contributions — /, "summary no longer quotes every contribution statement (cluttered)");
 });
 
 test("item 15: consent is labelled student-reported everywhere a reviewer sees it", () => {

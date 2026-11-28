@@ -1072,24 +1072,6 @@ export default function Section6Resources({ projectData }: { projectData?: any }
                 </>
             ) : null}
 
-            {/* AI-ready field summary */}
-            {use_resources ? (
-                <section className="cer-v17" data-ciel-section5-summary>
-                    <header>
-                        <b>SECTION 5 · RESOURCES &amp; CONTRIBUTIONS · AI-READY SUMMARY</b>
-                        <small>Student-reported · pending review</small>
-                    </header>
-                    <div className="cer-v17-body">
-                        {summaryLines.map(([h, t]) => (
-                            <div key={h}>
-                                <h4>{h}</h4>
-                                <p>{t}</p>
-                            </div>
-                        ))}
-                        <p className="cer-hint">Live field summary · updates from the boxes above · generated from student-entered data, not independently verified.</p>
-                    </div>
-                </section>
-            ) : null}
 
             <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
                 <DialogContent className="flex max-w-4xl flex-col items-center bg-white p-6">

@@ -126,22 +126,3 @@ export function dataSectionUiMark(dataSection: number): string {
     return String(dataSectionToWizardStep(dataSection));
 }
 
-/** Same auto-summary coverage as before: data sections 2, 3, 4, 5, 8, 9, 10. */
-export function dataSectionsToSummarize(wizardStep: number): number[] {
-    switch (canonicalReportStep(wizardStep)) {
-        case 2:
-            return [2];
-        case 3:
-            return [3];
-        case 4:
-            return [4, 5];
-        case 7:
-            return [8];
-        case 8:
-            return [9];
-        case 9:
-            return [10];
-        default:
-            return [];
-    }
-}

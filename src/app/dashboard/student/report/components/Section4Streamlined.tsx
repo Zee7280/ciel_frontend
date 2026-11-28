@@ -640,9 +640,8 @@ export default function Section4Streamlined() {
                 </div>
             </section>
 
-            {/* The one Section 4 summary is the live banner at the top of this step ("what the rubric
-                will read"); Finalise stores the field-generated text with the report and Next lets the
-                AI rewrite it, so no second summary card is shown here. */}
+            {/* No summary card on this step: Finalise stores the field-generated text with the report and the
+                one compiled summary is shown on the final step before submit. */}
             {/* Finalise */}
             <section className="space-y-2">
                 {!finalized ? (
@@ -656,7 +655,7 @@ export default function Section4Streamlined() {
                             Finalise Section 4 →
                         </button>
                         {!canFinalize ? (
-                            <p className="text-center text-xs text-slate-500">Complete the required fields above before finalising; the summary banner at the top of this step updates as you go.</p>
+                            <p className="text-center text-xs text-slate-500">Complete the required fields above before finalising.</p>
                         ) : (
                             <p className="text-center text-xs text-emerald-600">Ready ✨</p>
                         )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import clsx from "clsx";
 import type { ReportData } from "./context/ReportContext";
 import { isRegisteredReportSdg, mergeReportSdgSnapshotRows, reportSdgContributionText } from "./utils/reportSdgMerge";
 import { findSdgById } from "@/utils/sdgData";
@@ -1367,6 +1368,111 @@ export function liveSectionSummary(uiStep: number, data: ReportData, a: ReturnTy
             .join(" ");
     }
     return "";
+}
+
+const COMPILED_SUMMARY_TITLES: Record<number, string> = {
+    1: "Participation",
+    2: "Project context",
+    3: "SDG mapping",
+    4: "Activities & outcomes",
+    5: "Resources",
+    6: "Partnerships",
+    7: "Evidence",
+    8: "Reflection",
+    9: "Sustainability",
+};
+
+export type CompiledSummaryRow = { step: number; title: string; text: string };
+
+/**
+ * The one report summary shown before submit: a line per section, written from the current answers
+ * (no AI call). Sections no longer carry their own summary cards.
+ */
+export function compiledReportSummary(data: ReportData, projectData?: unknown): CompiledSummaryRow[] {
+    const a = chromeAgg(data, projectData);
+    const participation = a.hours > 0 || a.logs.length
+        ? `${plural(a.members, "participant")} · ${plural(a.hours, "verified hour")} across ${plural(a.logs.length, "logged session")}.`
+        : "No attendance logged yet.";
+    return Object.keys(COMPILED_SUMMARY_TITLES).map((key) => {
+        const step = Number(key);
+        return {
+            step,
+            title: COMPILED_SUMMARY_TITLES[step],
+            text: step === 1 ? participation : liveSectionSummary(step, data, a) || "Not answered yet.",
+        };
+    });
+}
+
+export function ReportCompiledSummary({
+    data,
+    projectData,
+    incompleteSections,
+    onEdit,
+}: {
+    data: ReportData;
+    projectData?: unknown;
+    /** Data-section numbers still incomplete (same set the stepper uses). */
+    incompleteSections?: Set<number>;
+    /** Jump to a wizard step to change its answers; omitted when the report is read-only. */
+    onEdit?: (step: number) => void;
+}) {
+    const rows = compiledReportSummary(data, projectData);
+    const needsWork = (step: number) => wizardStepToDataSections(step).some((n) => incompleteSections?.has(n));
+    const open = rows.filter((row) => needsWork(row.step)).length;
+    return (
+        <section data-ciel-compiled-summary className="mb-5 overflow-hidden rounded-2xl border border-[#d9e6e2] bg-white shadow-sm">
+            <header className="flex flex-wrap items-end justify-between gap-2 border-b border-[#e6efec] bg-gradient-to-r from-[#e9f7f4] to-white px-5 py-4">
+                <div>
+                    <p className="text-[10.5px] font-black uppercase tracking-[0.14em] text-[#0e7d74]">Before you submit</p>
+                    <h2 className="text-lg font-extrabold text-[#0f2f2c]">Report summary — compiled from all sections</h2>
+                    <p className="mt-0.5 text-xs text-slate-500">Written from your answers. Read it once; to change a line, edit that section.</p>
+                </div>
+                <span
+                    className={clsx(
+                        "rounded-full px-3 py-1 text-[11px] font-bold",
+                        open ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700",
+                    )}
+                >
+                    {open ? `${plural(open, "section")} need${open === 1 ? "s" : ""} attention` : "All sections complete"}
+                </span>
+            </header>
+            <ol className="divide-y divide-[#eef3f1]">
+                {rows.map((row) => {
+                    const pending = needsWork(row.step);
+                    return (
+                        <li key={row.step} className="grid grid-cols-[32px_1fr_auto] items-start gap-3 px-5 py-3">
+                            <span
+                                className={clsx(
+                                    "flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-extrabold",
+                                    pending ? "bg-amber-100 text-amber-800" : "bg-[#0e7d74] text-white",
+                                )}
+                            >
+                                {row.step}
+                            </span>
+                            <div className="min-w-0">
+                                <p className="text-[12.5px] font-bold text-[#0f2f2c]">
+                                    {row.title}
+                                    {pending ? <span className="ml-2 text-[10.5px] font-semibold text-amber-700">· needs attention</span> : null}
+                                </p>
+                                <p className="mt-0.5 break-words text-[12.5px] leading-relaxed text-slate-600">{row.text}</p>
+                            </div>
+                            {onEdit ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onEdit(row.step)}
+                                    className="rounded-lg px-2 py-1 text-[11px] font-bold text-[#0e7d74] hover:bg-[#e9f7f4]"
+                                >
+                                    Edit
+                                </button>
+                            ) : (
+                                <span />
+                            )}
+                        </li>
+                    );
+                })}
+            </ol>
+        </section>
+    );
 }
 
 /**

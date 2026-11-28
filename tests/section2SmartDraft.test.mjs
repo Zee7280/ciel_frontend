@@ -63,18 +63,14 @@ test("only what was entered appears: no group → no group sentence; count alone
     assert.match(composeSection2SmartDraft({ problem: "NGO staff had no transport." }), /began, NGO staff/);
 });
 
-test("2.2 button rewrites the rubric's AI summary now (summary_text + summary_source), not a separate blue draft", () => {
-    assert.match(section2, /generateAISummary\("section2", sectionData\)/);
-    assert.match(section2, /const summarySource = sectionSummarySource\(sectionData\)/);
-    assert.match(section2, /summary_text: result\.summary\.trim\(\),\s*summary_source: summarySource/);
-    // The old local template and its separate preview box are gone; the legacy field is only cleared.
-    assert.equal(section2.includes("generateSmartDraft"), false);
+test("Section 2 has no summary card or AI rewrite; the statement is composed from the current answers", () => {
+    assert.doesNotMatch(section2, /generateAISummary/);
+    assert.doesNotMatch(section2, /Rewrite with AI from my current answers/);
+    assert.doesNotMatch(section2, /<span className="cer-secn">2\.2<\/span>/);
+    assert.doesNotMatch(section2, /data-testid="section2-baseline-statement"/);
+    // Kept current on every answer change (no hand-edit guard: the statement is not editable any more).
+    assert.match(section2, /if \(composed !== sectionData\.summary_text\) \{/);
     assert.equal(section2.includes("{sectionData.baseline_smart_draft}"), false);
-    assert.doesNotMatch(section2, /baseline_smart_draft: text/);
-    assert.match(section2, /Rewrite with AI from my current answers/);
-    // The student is told this is the paragraph the rubric reads and when it refreshes.
-    assert.match(section2, /same paragraph as “AI summary — what the rubric will read”/);
-    assert.match(section2, /Needs a rewrite/);
 });
 
 test("banner tells Section 2 students about the button; other steps keep the Next-only note", () => {

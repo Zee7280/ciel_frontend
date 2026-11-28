@@ -241,6 +241,8 @@ export interface ReportData {
         validation_status: 'pending' | 'validated' | 'weak';
         summary_stage: 'preliminary' | 'validated';
         summary_text?: string;
+        /** Fingerprint of the answers the statement was written from (see utils/sectionSummarySync). */
+        summary_source?: string;
     };
     section4: {
         activity_blocks: Array<{

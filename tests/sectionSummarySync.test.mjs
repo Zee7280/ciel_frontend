@@ -67,11 +67,10 @@ test("legacy and empty summaries; combined steps", () => {
     assert.match(sectionSummarySource(section9()), /^v1:[0-9a-f]{8}:\d+$/);
 });
 
-test("Next stores the fingerprint with the summary; the banner shows sync state and a live summary", () => {
+test("Next no longer writes per-section AI summaries; the banner component keeps its sync states", () => {
     const page = read("src/app/dashboard/student/report/page.tsx");
-    assert.match(page, /const summarySource = sectionSummarySource\(data\[sectionKey\]\);\s*const summaryRes = await generateAISummary\(sectionKey, data\[sectionKey\]\);/);
-    assert.match(page, /summary_text: summaryRes\.summary,\s*summary_source: summarySource,/);
-    assert.match(page, /updateSection\(sectionKey, \{ summary_text: summaryRes\.summary, summary_source: summarySource \}\)/);
+    assert.doesNotMatch(page, /generateAISummary/);
+    assert.doesNotMatch(page, /Analyzing Data & Writing Summary/);
 
     const chrome = read("src/app/dashboard/student/report/ReportFormChrome.tsx");
     assert.equal((chrome.match(/ai=\{aiShown\} aiSync=\{aiSync\} live=\{live\}/g) || []).length, 8, "steps 2–9");

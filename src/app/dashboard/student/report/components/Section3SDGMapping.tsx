@@ -20,6 +20,7 @@ import {
 import clsx from "clsx";
 import { listOpportunityReportSdgs, registeredSecondaryContribution } from "../utils/reportSdgMerge";
 import { MAX_ADDITIONAL_SDGS } from "../utils/sdgAdditionalCap";
+import { sectionSummarySource } from "../utils/sectionSummarySync";
 import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_MAX_WORDS, FIELD_WORD_POLICY, reportTextWordMeter } from "../utils/validation";
 
 const PRIMARY_SDG_WORD_RANGE = FIELD_WORD_POLICY.contribution_intent_statement;
@@ -443,8 +444,9 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
         const currentSummary = data.section3.summary_text || "";
         // A summary the student rewrote by hand no longer starts with the generated lead-in — keep it.
         // (The old guard also froze the generated text once it passed 100 characters, so SDGs added
-        // later never reached the summary — V19 item 21.)
-        if (currentSummary && !currentSummary.startsWith(SDG_AUTO_SUMMARY_LEAD)) {
+        // later never reached the summary — V19 item 21.) The old AI "SDG: / Logic: / Facts:" lines
+        // (Section 3 no longer calls the AI) are replaced by the statement below.
+        if (currentSummary && !currentSummary.startsWith(SDG_AUTO_SUMMARY_LEAD) && !/^SDG:/.test(currentSummary.trim())) {
             return currentSummary;
         }
 
@@ -452,40 +454,41 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
         const target = oppPrimaryRow?.targetId || studentTargetId || "";
         const indicator = oppPrimaryRow?.indicatorId || studentIndicatorId || "";
         const nameOf = (num: number) => ALL_SDGS.find((s) => s.num === num)?.name || `Goal ${num}`;
+        const sdgLabel = (num: number) => `SDG ${num} (${nameOf(num)})`;
+        const andList = (items: string[]) =>
+            items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+        const primaryNum = Number(goalNum);
         const registeredSecondaryNums = oppSecondaries.map((r) => r.goalNumber);
-        const studentOnly = finalizedGoals.filter((g) => g.source === "student");
+        const studentOnlyNums = finalizedGoals.filter((g) => g.source === "student" && g.num !== primaryNum).map((g) => g.num);
 
+        // Short, readable statement (the pre-V19 wording) that still names every mapped goal. The
+        // contribution statements themselves are shown above, so they are not quoted again here.
         const parts: string[] = [];
         parts.push(
-            `${SDG_AUTO_SUMMARY_LEAD} ${goalNum}${target ? `, Target ${target}` : ""}${indicator ? `, Indicator ${indicator}` : ""}${oppPrimaryNum ? " as its registered primary goal" : ""}.`,
+            `${SDG_AUTO_SUMMARY_LEAD} ${primaryNum ? sdgLabel(primaryNum) : goalNum}${target ? `, Target ${target}` : ""}${indicator ? `, Indicator ${indicator}` : ""}${oppPrimaryNum ? " as its registered primary goal" : ""}.`,
         );
         if (registeredSecondaryNums.length) {
             parts.push(
-                `Registered secondary goal${registeredSecondaryNums.length === 1 ? "" : "s"}: ${registeredSecondaryNums.map((n) => `SDG ${n} (${nameOf(n)})`).join(", ")}.`,
+                `${andList(registeredSecondaryNums.map(sdgLabel))} ${registeredSecondaryNums.length === 1 ? "is" : "are"} also registered as secondary ${registeredSecondaryNums.length === 1 ? "goal" : "goals"}.`,
             );
         }
-        if (studentOnly.length) {
-            parts.push(
-                `During implementation the team also mapped ${studentOnly.map((g) => `SDG ${g.num} (${nameOf(g.num)})`).join(", ")}.`,
-            );
+        if (studentOnlyNums.length) {
+            parts.push(`During implementation the team also mapped ${andList(studentOnlyNums.map(sdgLabel))}.`);
         }
-        const quoted = finalizedGoals.filter((g) => g.quote.trim());
-        if (quoted.length) {
-            parts.push(
-                `Reported contributions — ${quoted.map((g) => `SDG ${g.num}: "${firstSentence(g.quote, 160)}"`).join("; ")}.`,
-            );
-        }
+        parts.push("The planned intervention follows the contribution pathway described above.");
         parts.push(
-            "These are the team's reported contributions; registered alignment is distinct from demonstrated contribution, which is validated against the outputs and outcomes in Sections 4 and 5.",
+            "Final validation of indicator-level contribution will be determined after measurable outputs and outcomes are submitted in Sections 4 and 5.",
         );
         return parts.join(" ");
     }, [data.section3.summary_text, oppPrimaryNum, oppPrimaryRow?.targetId, oppPrimaryRow?.indicatorId, studentPrimaryId, studentTargetId, studentIndicatorId, oppSecondaries, finalizedGoals]);
 
+    // The statement is written from these exact answers, so the live banner shows it as up to date.
+    const section3SummarySource = useMemo(() => sectionSummarySource(data.section3), [data.section3]);
     useEffect(() => {
-        if (data.section3.summary_text !== autoSummary) {
-            updateSection('section3', { summary_text: autoSummary });
+        if (data.section3.summary_text !== autoSummary || data.section3.summary_source !== section3SummarySource) {
+            updateSection('section3', { summary_text: autoSummary, summary_source: section3SummarySource });
         }
-    }, [autoSummary, data.section3.summary_text]);
+    }, [autoSummary, data.section3.summary_text, data.section3.summary_source, section3SummarySource]);
 
 
 
@@ -1140,7 +1143,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 <span className="inline-flex items-center gap-1.5">
                                     <Pencil className="h-3.5 w-3.5" /> Tap any goal above to edit before final submission
                                 </span>
-                                <span>This summary feeds your flash card &amp; the university&apos;s SDG analytics</span>
+                                <span>These goals feed your flash card &amp; the university&apos;s SDG analytics</span>
                                 <button
                                     type="button"
                                     onClick={handleUnfinalize}
@@ -1153,49 +1156,12 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
                         <p className="flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-emerald-600">
                             <CheckCircle2 className="h-4 w-4" />
-                            Section 3 saved — your SDG summary above travels with your report.
+                            Section 3 saved — your SDG goals above travel with your report.
                         </p>
                     </>
                 )}
             </section>
 
-            {/* ── Preliminary Summary ──────────────────────────────────── */}
-            {!isFinalized ? (
-                <section className="cer-card space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Preliminary SDG alignment statement
-                        </h3>
-                        <span className="cer-tag auto">
-                            System synthesis
-                        </span>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                        <p className="text-sm leading-relaxed text-slate-700">
-                            {data.section3.summary_text}
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                            {[
-                                { label: "Standardized formatting", icon: CheckCircle2 },
-                                { label: "No performance claims", icon: Info },
-                                { label: "Structural validation only", icon: Layers },
-                            ].map((tag) => (
-                                <span
-                                    key={tag.label}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500"
-                                >
-                                    <tag.icon className="h-3 w-3 text-[var(--teal)]" />
-                                    {tag.label}
-                                </span>
-                            ))}
-                        </div>
-                        <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                            This statement is generated from your selections above and will be finalized with
-                            measurable impact data once Sections 4 and 5 are completed.
-                        </p>
-                    </div>
-                </section>
-            ) : null}
         </div>
     );
 }

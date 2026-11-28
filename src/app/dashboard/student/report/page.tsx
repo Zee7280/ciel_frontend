@@ -24,7 +24,6 @@ import { pickPreferredEngagementSeat } from '@/utils/teamReportSubmitAccess';
 import { isStudentImpactPackageView } from '@/utils/studentImpactPackageHref';
 import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
 import {
-    dataSectionsToSummarize,
     dataSectionToWizardStep,
     FLASH_CARD_STEP,
     formatIncompleteSectionHeading,
@@ -64,7 +63,7 @@ import {
 import PreReportGuide from './components/PreReportGuide';
 import ResultPackageFeedbackGate from '@/components/feedback/ResultPackageFeedbackGate';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportLiveBanner, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote, ReportRevisionNotice } from './ReportFormChrome';
+import { ReportLiveBanner, ReportCompiledSummary, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportExampleSpot, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote, ReportRevisionNotice } from './ReportFormChrome';
 import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
 import "./community-engagement-report.css";
 
@@ -651,64 +650,9 @@ function ReportFormContent() {
         
         if (activeStep < FLASH_CARD_STEP) {
             setIsSaving(true);
-            let updatedData = { ...data };
-
-            // Auto-generate AI Summary for specific sections (non-blocking for navigation if save succeeds)
-            const dataNums = dataSectionsToSummarize(activeStep);
-            let aiSummaryIssue: string | null = null;
-            const stepsForAi = dataNums.filter((n) => {
-                if (n === 4) return validateSection4(data.section4).isValid;
-                if (n === 5) return validateSection5(data.section5).isValid;
-                return isValid;
-            });
-            let skipOptionalAiToast = false;
-            if (stepsForAi.length) {
-                setAiStatus('Analyzing Data & Writing Summary...');
-                try {
-                    const { generateAISummary, isOptionalAiSummaryUnavailable } = await import('./utils/aiSummarizer');
-                    const { sectionSummarySource } = await import('./utils/sectionSummarySync');
-                    for (const stepNum of stepsForAi) {
-                        const sectionKey = `section${stepNum}` as Exclude<keyof typeof data, 'project_id'>;
-                        try {
-                            // Fingerprint of the exact answers the summary is written from (live banner sync check).
-                            const summarySource = sectionSummarySource(data[sectionKey]);
-                            const summaryRes = await generateAISummary(sectionKey, data[sectionKey]);
-                            if (summaryRes.summary) {
-                                updatedData = {
-                                    ...updatedData,
-                                    [sectionKey]: {
-                                        ...(updatedData[sectionKey] as Record<string, unknown>),
-                                        summary_text: summaryRes.summary,
-                                        summary_source: summarySource,
-                                    }
-                                };
-                                updateSection(sectionKey, { summary_text: summaryRes.summary, summary_source: summarySource });
-                            } else if (summaryRes.skipped) {
-                                skipOptionalAiToast = true;
-                            } else if (summaryRes.error) {
-                                if (isOptionalAiSummaryUnavailable(summaryRes.error)) {
-                                    skipOptionalAiToast = true;
-                                } else {
-                                    aiSummaryIssue = summaryRes.error;
-                                }
-                            }
-                        } catch (error) {
-                            console.error('Failed to auto-generate summary', error);
-                            const message =
-                                error instanceof Error ? error.message : 'Auto-summary request failed.';
-                            if (isOptionalAiSummaryUnavailable(message)) {
-                                skipOptionalAiToast = true;
-                            } else {
-                                aiSummaryIssue = message;
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Failed to auto-generate summary', error);
-                    aiSummaryIssue =
-                        error instanceof Error ? error.message : 'Auto-summary request failed.';
-                }
-            }
+            // Sections no longer get an AI summary on Next: the one compiled summary is shown on the final
+            // step, built from the answers (no OpenAI call per section).
+            const updatedData = { ...data };
 
             if (!isTeamMemberAttendanceOnly) {
                 setAiStatus('Saving Progress...');
@@ -719,12 +663,6 @@ function ReportFormContent() {
                 }
             }
 
-            if (aiSummaryIssue && !skipOptionalAiToast) {
-                toast.warning(
-                    `Step saved, but the auto-summary did not complete: ${aiSummaryIssue} You can edit the summary field on this step or try Next again.`,
-                );
-            }
-            
             if (!isValid) {
                 toast.info("Draft saved. Some fields need attention before submission.");
             }
@@ -1247,6 +1185,14 @@ function ReportFormContent() {
                     {activeStep === 9 && <Section10Sustainability projectData={projectDetails} />}
                     {isFlashCardStep(activeStep) && (
                         <>
+                            {!postSubmitAwaitingReview && !ciiVerifiedSummaryLock ? (
+                                <ReportCompiledSummary
+                                    data={data}
+                                    projectData={projectDetails}
+                                    incompleteSections={incompleteStepNums}
+                                    onEdit={!isReadOnly && !stepperLockedToSummaryOnly ? goJourney : undefined}
+                                />
+                            ) : null}
                             {(() => {
                                 const flashCard = (
                                     <ReportFlashCard
@@ -1332,7 +1278,7 @@ function ReportFormContent() {
                         </>
                     )}
                 </div>
-                {activeStep >= 1 && activeStep < FLASH_CARD_STEP && activeStep !== 3 ? (
+                {activeStep === 1 ? (
                     <LiveBannerView step={activeStep} data={deferredData} projectData={projectDetails} />
                 ) : null}
 

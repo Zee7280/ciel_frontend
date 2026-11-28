@@ -113,7 +113,6 @@ test("Section 2 wiring: the live statement, the AI-unavailable fallback and the 
     const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
     const s2 = read("src/app/dashboard/student/report/components/Section2ProjectContext.tsx");
     assert.match(s2, /safeguardingSummarySentence\(sectionData\),\s*\);/);
-    assert.match(s2, /safeguarding: safeguardingSummarySentence\(sectionData\),/);
     assert.match(s2, /if \(safeguarding\) parts\.push\(safeguarding\);/);
     assert.match(s2, /hasRiskBlockContent\(sectionData\);/);
     for (const key of ["risk_factors", "risk_mitigation", "risk_consent", "risk_safeguarding_lead", "risk_unresolved"]) {

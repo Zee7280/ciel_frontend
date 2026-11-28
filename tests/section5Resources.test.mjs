@@ -43,9 +43,10 @@ test("the section blocks appear in the V21 order with the V21 wording", () => {
         "Preview thank-you email",
         "Student team’s own contribution",
         "What happens after you submit?",
-        "SECTION 5 · RESOURCES &amp; CONTRIBUTIONS · AI-READY SUMMARY",
-        "Student-reported · pending review",
     ], "section");
+    // No per-section summary card: the one compiled summary is shown before submit.
+    assert.doesNotMatch(main, /AI-READY SUMMARY/);
+    assert.doesNotMatch(main, /data-ciel-section5-summary/);
     inOrder(main, ['"Resource pathway"', '"Who gave what"', '"Student team’s own contribution"', '"Cash in PKR and contributors"'], "summary lines");
     // V21 replaces the long source and verification chip lists with one question and two dropdowns.
     assert.doesNotMatch(s6, /Source · choose all that apply|Verification · choose all that apply/);
