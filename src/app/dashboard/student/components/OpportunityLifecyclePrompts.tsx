@@ -241,7 +241,10 @@ export function OpportunitySubmittedReviewModal({
     const facultyEmail = chain?.faculty?.email?.trim() || "";
     const facultyDept = chain?.faculty?.department?.trim() || "";
     const partnerOrg = chain?.partner?.organization?.trim() || "";
-    const partnerContact = chain?.partner?.contact?.trim() || "";
+    // A phone number typed into the contact-person field is not a name: never show it as "who".
+    const partnerContactRaw = chain?.partner?.contact?.trim() || "";
+    const partnerContact =
+        /^[+\d][\d\s().-]{6,}$/.test(partnerContactRaw) && partnerContactRaw.replace(/\D/g, "").length >= 7 ? "" : partnerContactRaw;
     const partnerEmail = chain?.partner?.email?.trim() || "";
     const hasPartner = Boolean(partnerOrg || partnerEmail);
     const privateCandidate = chain?.privateCandidate === true;
