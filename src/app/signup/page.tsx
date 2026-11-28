@@ -1,5 +1,6 @@
 "use client";
 
+import { academicUnitOptionsForInstitution, studentProgramOptions } from "@/utils/academicChoices";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -12,7 +13,6 @@ import { DEFAULT_PHONE_COUNTRY_KEY, dialFromPhoneCountryKey, validateNationalPho
 import { pakistaniUniversities } from "@/utils/universityData";
 import { usePublicPlatformConfig } from "@/utils/publicPlatformConfig";
 import { PENDING_SUBSCRIPTION_STATUS } from "@/utils/studentSubscription";
-import { hecPrograms } from "@/utils/hecProgramsData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
@@ -849,9 +849,9 @@ function SignUpContent() {
                                             <div className="relative z-20 min-w-0">
                                                 <label className={labelClass}>{role === "student" ? "Programme" : "Department"}</label>
                                                 {role === "student" ? (
-                                                    <SearchableSelect value={formData.department} onChange={(v) => handleGenericChange("department", v)} options={hecPrograms} placeholder={formData.institution ? "Select programme" : "Select university first"} searchPlaceholder="Search HEC programs..." hasError={!!errors.department} ariaLabel="Programme" disabled={!formData.institution} variant="field" />
+                                                    <SearchableSelect value={formData.department} onChange={(v) => handleGenericChange("department", v)} options={studentProgramOptions(formData.institution)} allowCustomValue={false} placeholder={formData.institution ? "Select programme" : "Select university first"} searchPlaceholder="Search HEC programs..." hasError={!!errors.department} ariaLabel="Programme" disabled={!formData.institution} variant="field" />
                                                 ) : (
-                                                    <input type="text" value={formData.department} onChange={(e) => handleGenericChange("department", e.target.value)} className={fieldClass(!!errors.department)} placeholder="e.g. School of Management Sciences" aria-label="Department" />
+                                                    <SearchableSelect value={formData.department} onChange={(v) => handleGenericChange("department", v)} options={academicUnitOptionsForInstitution(formData.institution)} allowCustomValue={false} placeholder={formData.institution ? "Select department" : "Select university first"} searchPlaceholder="Search departments / programmes..." hasError={!!errors.department} ariaLabel="Department" disabled={!formData.institution} variant="field" />
                                                 )}
                                                 {errors.department && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.department}</p>}
                                             </div>

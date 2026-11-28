@@ -1,5 +1,6 @@
 "use client";
 
+import { academicUnitOptionsForInstitution, academicUnitOptionsForInstitutions } from "@/utils/academicChoices";
 import { apiErrorMessage } from "@/utils/apiErrorMessage";
 import { STUDENT_SKILL_PRESETS } from "@/utils/opportunityChipOptions";
 import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
@@ -38,7 +39,7 @@ import {
     validateNationalPhone,
 } from "@/utils/countryCallingCodes";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
-import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInstitutions, pakistaniUniversities } from "@/utils/universityData";
+import { facultyDepartmentOptionsForInstitution, pakistaniUniversities } from "@/utils/universityData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { OpportunitySubmittedReviewModal } from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
 import {
@@ -3604,7 +3605,8 @@ function StudentOpportunityCreationPageInner() {
                                                 next[idx] = value;
                                                 setFormData({ ...formData, participation: { ...formData.participation, departments: next, departmentScope: "specific" } });
                                             }}
-                                            options={facultyDepartmentOptionsForInstitutions(formData.selectedUniversities)}
+                                            options={academicUnitOptionsForInstitutions(formData.selectedUniversities)}
+                                            allowCustomValue={false}
                                             placeholder="Select department / programme…"
                                             searchPlaceholder="Search departments…"
                                             ariaLabel={`Department ${idx + 1}`}
@@ -3661,7 +3663,8 @@ function StudentOpportunityCreationPageInner() {
                                                 next[idx] = value;
                                                 setFormData({ ...formData, participation: { ...formData.participation, departments: next, departmentScope: "specific" } });
                                             }}
-                                            options={facultyDepartmentOptionsForInstitution(studentDetails.institution)}
+                                            options={academicUnitOptionsForInstitution(studentDetails.institution)}
+                                            allowCustomValue={false}
                                             placeholder="Select department / programme…"
                                             searchPlaceholder="Search departments…"
                                             ariaLabel={`Permitted department ${idx + 1}`}

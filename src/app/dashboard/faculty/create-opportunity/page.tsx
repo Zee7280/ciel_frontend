@@ -1,5 +1,6 @@
 "use client";
 
+import { academicUnitOptionsForInstitutions } from "@/utils/academicChoices";
 import DuplicateNotice, { type DuplicateNoticeState } from "@/components/opportunities/DuplicateNotice";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { apiErrorMessage } from "@/utils/apiErrorMessage";
@@ -26,7 +27,7 @@ import { validateTimelineForPersist } from "@/utils/opportunityTimelineLifecycle
 import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
-import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInstitutions, pakistaniUniversities } from "@/utils/universityData";
+import { facultyDepartmentOptionsForInstitution, pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isFacultyProfileComplete, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToFacultyForm } from "./mapDetailToForm";
@@ -2707,11 +2708,12 @@ export default function FacultyOpportunityCreationPage() {
                                                     participationScope: { ...formData.participationScope, departments: next },
                                                 });
                                             }}
-                                            options={facultyDepartmentOptionsForInstitutions(
+                                            options={academicUnitOptionsForInstitutions(
                                                 formData.participationScope.selectedUniversities.length
                                                     ? formData.participationScope.selectedUniversities
                                                     : [facultyDetails.institution],
                                             )}
+                                            allowCustomValue={false}
                                             placeholder="Select department / programme…"
                                             searchPlaceholder="Search departments…"
                                             ariaLabel={`Permitted department ${idx + 1}`}

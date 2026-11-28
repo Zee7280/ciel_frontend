@@ -1,5 +1,6 @@
 "use client";
 
+import { academicUnitOptionsForInstitution } from "@/utils/academicChoices";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
@@ -9,7 +10,6 @@ import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { pakistaniUniversities } from "@/utils/universityData";
-import { hecPrograms } from "@/utils/hecProgramsData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import {
     composeInternationalPhone,
@@ -415,8 +415,9 @@ export default function FacultyProfilePage() {
                                             hasLeftIcon
                                             value={formData.department}
                                             onChange={(v) => setFormData((f) => ({ ...f, department: v }))}
-                                            options={hecPrograms}
-                                            placeholder="Select or type department"
+                                            options={academicUnitOptionsForInstitution(formData.institution)}
+                                            allowCustomValue={false}
+                                            placeholder="Select department / programme"
                                             searchPlaceholder="Search departments / programs..."
                                             ariaLabel="Department"
                                         />

@@ -1,5 +1,6 @@
 "use client";
 
+import { studentProgramOptions } from "@/utils/academicChoices";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "../report/components/ui/button";
@@ -9,7 +10,6 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
 import { pakistaniUniversities } from "@/utils/universityData";
-import { hecPrograms } from "@/utils/hecProgramsData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
@@ -461,7 +461,8 @@ export default function StudentProfilePage() {
                                                 hasLeftIcon
                                                 value={formData.department}
                                                 onChange={(v) => setFormData((f) => ({ ...f, department: v }))}
-                                                options={hecPrograms}
+                                                options={studentProgramOptions(formData.institution)}
+                                                allowCustomValue={false}
                                                 placeholder="Select programme"
                                                 searchPlaceholder="Search HEC programs..."
                                                 ariaLabel="Programme"

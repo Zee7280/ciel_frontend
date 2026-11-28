@@ -1,5 +1,6 @@
 "use client";
 
+import { academicUnitOptionsForInstitutions } from "@/utils/academicChoices";
 import DuplicateNotice, { type DuplicateNoticeState } from "@/components/opportunities/DuplicateNotice";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { apiErrorMessage } from "@/utils/apiErrorMessage";
@@ -26,7 +27,7 @@ import { integerFieldInput } from "@/utils/integerFieldInput";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import OrgAiDraftAssistant from "@/app/dashboard/student/create-opportunity/OrgAiDraftAssistant";
-import { facultyDepartmentOptionsForInstitution, facultyDepartmentOptionsForInstitutions, pakistaniUniversities } from "@/utils/universityData";
+import { facultyDepartmentOptionsForInstitution, pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isPartnerOrganizationComplete } from "@/utils/profileCompletion";
 import { readStoredCurrentUser } from "@/utils/currentUser";
@@ -2915,7 +2916,8 @@ export default function OpportunityPostingPage() {
                                                         next[idx] = value;
                                                         setFormData({ ...formData, selectedDepartments: next });
                                                     }}
-                                                    options={facultyDepartmentOptionsForInstitutions(formData.restrictedUniversities)}
+                                                    options={academicUnitOptionsForInstitutions(formData.restrictedUniversities)}
+                                                    allowCustomValue={false}
                                                     placeholder="Select department / programme…"
                                                     searchPlaceholder="Search departments…"
                                                     ariaLabel={`Permitted department ${idx + 1}`}

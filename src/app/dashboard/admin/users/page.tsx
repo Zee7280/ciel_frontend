@@ -1,5 +1,6 @@
 "use client";
 
+import { studentProgramOptions } from "@/utils/academicChoices";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { authenticatedFetch } from "@/utils/api";
@@ -41,7 +42,6 @@ import SearchableSelect from "@/components/ui/SearchableSelect";
 import { normalizeActiveOtps, type AdminActiveOtp } from "@/utils/adminActiveOtp";
 import { ActiveOtpPanel, UserOtpCodes } from "./AdminOtpViews";
 import { pakistaniUniversities } from "@/utils/universityData";
-import { hecPrograms } from "@/utils/hecProgramsData";
 
 const STATUS_OPTIONS = [
     "active",
@@ -1200,7 +1200,8 @@ export default function AdminUsersPage() {
                                             accent="blue"
                                             value={affiliation.department}
                                             onChange={(v) => setAffiliation((a) => ({ ...a, department: v }))}
-                                            options={hecPrograms}
+                                            options={studentProgramOptions(affiliation.university)}
+                                            allowCustomValue={false}
                                             placeholder="Select programme"
                                             searchPlaceholder="Search HEC programs..."
                                             ariaLabel="Program / Department"
