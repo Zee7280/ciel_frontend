@@ -27,6 +27,8 @@ test("one compiled summary is shown on the final step, before submit", () => {
     assert.match(page, /\{!postSubmitAwaitingReview && !ciiVerifiedSummaryLock \? \(\s*<ReportCompiledSummary/);
     assert.match(page, /onEdit=\{!isReadOnly && !stepperLockedToSummaryOnly \? goJourney : undefined\}/);
     assert.match(chrome, /Report summary — compiled from all sections/);
+    // Flash-card mode is full-bleed: the card keeps to the package column like the other cards below it.
+    assert.match(chrome, /<section data-ciel-compiled-summary className="cer-ipkg-below /);
     assert.match(chrome, /text: step === 1 \? participation : liveSectionSummary\(step, data, a\) \|\| "Not answered yet\."/);
     for (const title of ["Participation", "Project context", "SDG mapping", "Activities & outcomes", "Resources", "Partnerships", "Evidence", "Reflection", "Sustainability"]) {
         assert.match(chrome, new RegExp(`\\d: "${title}",`), title);

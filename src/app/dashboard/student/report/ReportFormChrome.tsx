@@ -1420,7 +1420,7 @@ export function ReportCompiledSummary({
     const needsWork = (step: number) => wizardStepToDataSections(step).some((n) => incompleteSections?.has(n));
     const open = rows.filter((row) => needsWork(row.step)).length;
     return (
-        <section data-ciel-compiled-summary className="mb-5 overflow-hidden rounded-2xl border border-[#d9e6e2] bg-white shadow-sm">
+        <section data-ciel-compiled-summary className="cer-ipkg-below mb-5 mt-4 overflow-hidden rounded-2xl border border-[#d9e6e2] bg-white shadow-sm">
             <header className="flex flex-wrap items-end justify-between gap-2 border-b border-[#e6efec] bg-gradient-to-r from-[#e9f7f4] to-white px-5 py-4">
                 <div>
                     <p className="text-[10.5px] font-black uppercase tracking-[0.14em] text-[#0e7d74]">Before you submit</p>

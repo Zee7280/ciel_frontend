@@ -1140,15 +1140,23 @@ function ReportFormContent() {
                 />
 
                 {isTeamMemberAttendanceOnly ? (
-                    <div className="cer-note">
-                        Team member — you can read the full shared report. Only Section 1 attendance can be updated. Your team lead files and submits.
-                        {" "}
+                    <div className="cer-tm-banner" role="note" data-testid="team-member-banner">
+                        <span className="cer-tm-ico" aria-hidden="true">👥</span>
+                        <div className="cer-tm-copy">
+                            <p className="cer-tm-k">Team member view</p>
+                            <p className="cer-tm-t">
+                                You can read the full shared report. Only your Section 1 attendance can be updated — your team lead files and submits.
+                            </p>
+                        </div>
                         {onFlash ? (
-                            <button type="button" className="cer-ghost" onClick={() => goJourney(1)}>
-                                ← Back to Section 1
-                            </button>
+                            // A verified / summary-locked report can't leave the flash card, so the button would do nothing.
+                            !stepperLockedToSummaryOnly ? (
+                                <button type="button" className="cer-tm-btn" onClick={() => goJourney(1)}>
+                                    ← Back to Section 1
+                                </button>
+                            ) : null
                         ) : (
-                            <button type="button" className="cer-ghost" onClick={() => goJourney(FLASH_CARD_STEP)}>
+                            <button type="button" className="cer-tm-btn" onClick={() => goJourney(FLASH_CARD_STEP)}>
                                 View Flash Card →
                             </button>
                         )}
@@ -1215,7 +1223,7 @@ function ReportFormContent() {
                                 );
                             })()}
                             {isTeamMemberAttendanceOnly ? (
-                                <div className="mt-4 flex flex-wrap items-center gap-5 rounded-2xl border border-[var(--line)] bg-gradient-to-br from-[var(--teal-soft)] via-white to-white p-6">
+                                <div className="cer-ipkg-below mt-4 flex flex-wrap items-center gap-5 rounded-2xl border border-[var(--line)] bg-gradient-to-br from-[var(--teal-soft)] via-white to-white p-6">
                                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--teal-soft)]">
                                         <CheckCircle className="h-8 w-8 text-[var(--teal)]" />
                                     </div>
@@ -1232,7 +1240,7 @@ function ReportFormContent() {
                                     </div>
                                 </div>
                             ) : !isReadOnly && !postSubmitAwaitingReview ? (
-                                <div className="mt-5 space-y-4 rounded-2xl border border-[#d9dfd4] bg-[#fffef9] p-6">
+                                <div className="cer-ipkg-below mt-5 space-y-4 rounded-2xl border border-[#d9dfd4] bg-[#fffef9] p-6">
                                     {!isEligibleForSubmission ? (
                                         <p className="rounded-xl border border-[#efdbb6] bg-[#fff1d8] px-4 py-3 text-sm text-[#744c10]">
                                             Submit stays closed until every teammate has logged their own required hours.

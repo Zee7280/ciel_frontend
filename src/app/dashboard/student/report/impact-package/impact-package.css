@@ -244,3 +244,36 @@
 .ipkg .dr-table .dr-clip{display:block;-webkit-line-clamp:unset;line-clamp:unset;overflow:visible}
 .ipkg .dr-table tr{break-inside:avoid}
 }
+
+/* Flash-card mode: .cer-wrap is full-bleed (padding 0) so the package can span the page.
+   Page chrome around it (toolbar, notices, team banner, cards under the package, footer) is
+   held to the package's own 1170px / 28px column instead of running edge to edge. */
+.cer.cer-ipkg .cer-sticky-head{padding:10px 28px 2px}
+.cer.cer-ipkg .cer-sticky-head > *{max-width:1114px;margin-left:auto;margin-right:auto}
+.cer.cer-ipkg .cer-sticky-head .cer-apph-actions{background:#fffef9;border-color:#d9dfd4;box-shadow:0 4px 14px rgba(12,49,45,.05)}
+.cer.cer-ipkg .cer-wrap > .cer-tm-banner,
+.cer.cer-ipkg .cer-wrap > .cer-life,
+.cer.cer-ipkg .cer-wrap > .cer-foot,
+.cer.cer-ipkg .cer-ipkg-below{
+  width:calc(100% - 56px);
+  max-width:1114px;
+  margin-left:auto;
+  margin-right:auto
+}
+.cer.cer-ipkg .cer-wrap > .cer-tm-banner{
+  margin-top:6px;
+  background:#fffef9;
+  border-color:#d9dfd4
+}
+.cer.cer-ipkg .cer-tm-ico{border-color:#d9dfd4;background:#f0efe8}
+.cer.cer-ipkg .cer-tm-k{color:#286b60}
+.cer.cer-ipkg .cer-tm-t{color:#143f3b}
+.cer.cer-ipkg .cer-tm-btn{background:#0c312d;border-color:#0c312d}
+.cer.cer-ipkg .cer-tm-btn:hover{background:#286b60;border-color:#286b60}
+@media(max-width:600px){
+  .cer.cer-ipkg .cer-sticky-head{padding-left:18px;padding-right:18px}
+  .cer.cer-ipkg .cer-wrap > .cer-tm-banner,
+  .cer.cer-ipkg .cer-wrap > .cer-life,
+  .cer.cer-ipkg .cer-wrap > .cer-foot,
+  .cer.cer-ipkg .cer-ipkg-below{width:calc(100% - 36px)}
+}

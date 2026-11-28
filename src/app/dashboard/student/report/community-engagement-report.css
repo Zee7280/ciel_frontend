@@ -5281,3 +5281,94 @@
     :is(.cer, .cer-scope) .cer-rx-portal-stats { grid-template-columns: 1fr; }
     :is(.cer, .cer-scope) .cer-rx-cert { padding: 22px 12px; }
 }
+
+/* ───────── Team member banner (read-only teammates: Section 1 attendance only) ───────── */
+.cer .cer-tm-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(135deg, var(--aqua-soft), #fff 70%);
+    border: 1px solid #bfe6e2;
+    border-radius: 14px;
+    padding: 12px 14px 12px 12px;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 16px rgba(4, 37, 43, 0.04);
+}
+
+.cer .cer-tm-ico {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: #fff;
+    border: 1px solid #bfe6e2;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.cer .cer-tm-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cer .cer-tm-k {
+    margin: 0 0 2px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--teal);
+}
+
+.cer .cer-tm-t {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #0f5e57;
+}
+
+.cer .cer-tm-btn {
+    flex: none;
+    border: 1px solid var(--teal);
+    background: var(--teal);
+    color: #fff;
+    border-radius: 10px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.cer .cer-tm-btn:hover {
+    background: #0b6a62;
+    border-color: #0b6a62;
+}
+
+.cer .cer-tm-btn:focus-visible {
+    outline: 3px solid #b78024;
+    outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+    .cer .cer-tm-banner {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+    .cer .cer-tm-copy {
+        flex-basis: calc(100% - 52px);
+    }
+    .cer .cer-tm-btn {
+        width: 100%;
+    }
+}
+
+@media print {
+    .cer .cer-tm-banner {
+        display: none !important;
+    }
+}
