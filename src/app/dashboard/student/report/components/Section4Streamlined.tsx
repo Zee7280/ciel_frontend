@@ -334,7 +334,7 @@ export default function Section4Streamlined() {
     const err = (field: string) => getFieldError(field);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-4 pb-10" data-ciel-section4-v19>
+        <div className="mx-auto max-w-6xl space-y-4" data-ciel-section4-v19>
             {/* 4.1 Activities & outputs */}
             <section className="space-y-4 rounded-[18px] border border-[#dcebee] bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -634,7 +634,7 @@ export default function Section4Streamlined() {
                 <div>
                     <p className={kickerCls}>What challenges did you face and how did they affect your work or results?</p>
                     <p className="text-[11.5px] text-slate-500">
-                        In 15–60 words, describe delivery barriers, what could not be achieved or measured, and any alternative explanations for the change. If there were no significant challenges, explain what was and was not assessed.
+                        Describe delivery barriers, what could not be achieved or measured, and any alternative explanations for the change. If there were no significant challenges, explain what was and was not assessed.
                     </p>
                     <textarea
                         className={clsx(textareaCls, "mt-1.5")}
@@ -673,7 +673,7 @@ export default function Section4Streamlined() {
                 ) : (
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
                         <span className="inline-flex items-center gap-1.5 font-semibold">
-                            <CheckCircle2 className="h-4 w-4" /> Section 4 finalised — its summary travels with your report.
+                            <CheckCircle2 className="h-4 w-4" /> Section 4 finalised.
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                             <Lock className="h-3.5 w-3.5" /> Editing any field above re-opens it.

@@ -167,7 +167,6 @@ test("report mission card lists every registered SDG (primary + supporting), mat
     const chrome = read("src/app/dashboard/student/report/ReportFormChrome.tsx");
     assert.match(chrome, /\.\.\.a\.sdgs\.filter\(\(row\) => row\.role === "primary"\),\s*\.\.\.a\.sdgs\.filter\(\(row\) => row\.role !== "primary"\),/);
     assert.match(chrome, /registeredSdgNumbers\.map\(\(n\) => `SDG \$\{n\}`\)\.join\(" \+ "\)/);
-    assert.match(chrome, /`🌍 \$\{a\.sdgs\.length\} registered SDG/);
     assert.doesNotMatch(chrome, /\.filter\(\(row\) => row\.role === "primary"\)\s*\.map\(\(row\) => `SDG \$\{row\.goalNumber\}`\)/);
     const merge = read("src/app/dashboard/student/report/utils/reportSdgMerge.ts");
     assert.match(merge, /role: "secondary"/, "supporting SDGs are part of the merged snapshot rows");

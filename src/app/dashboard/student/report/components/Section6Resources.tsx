@@ -910,17 +910,7 @@ export default function Section6Resources({ projectData }: { projectData?: any }
     const showRollup = use_resources === "yes" && (contributors.length > 0 || teamLines.length > 0);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-3 pb-10" data-ciel-section5-v21>
-            {/* Header */}
-            <div className="cer-dup-head space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Section 5 of 11 — Resources</p>
-                <h1 className="pt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">What the project ran on 📦</h1>
-                <p className="text-sm text-slate-500">
-                    One box per resource, three short steps in each box. 1 · The resource: what it was, how much, and what it made possible.
-                    2 · Who contributed it: your team, someone outside, or both — for an outside contributor add their name, WhatsApp number and email.
-                    3 · Proof: upload a receipt, photo or letter and say what kind it is.
-                </p>
-            </div>
+        <div className="mx-auto max-w-6xl space-y-3" data-ciel-section5-v21>
 
             {/* One box per resource */}
             <div className="cer-cr-intro" data-ciel-resource-intro>

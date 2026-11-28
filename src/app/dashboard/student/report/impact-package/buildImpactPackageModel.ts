@@ -12,7 +12,6 @@ import {
 import {
     MEDIA_VISIBILITY_LABELS,
     hasPublicSharePermission,
-    isPublicMediaVisibility,
     resolveMediaVisibility,
     type MediaVisibility,
 } from "../utils/mediaVisibility";

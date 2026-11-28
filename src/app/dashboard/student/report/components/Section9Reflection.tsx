@@ -299,7 +299,7 @@ export default function Section9Reflection() {
     }, [autoNarrative, section9.summary_text, updateSection]);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-3 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3">
             <section className="cer-card space-y-4">
                 <div className="cer-secl">
                     <span className="cer-secn">8.1</span>

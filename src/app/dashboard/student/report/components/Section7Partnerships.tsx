@@ -1,18 +1,9 @@
-import {
-    Handshake, Plus, Trash2, ShieldCheck, Info,
-    Users2, CheckCircle2, Activity, Globe, Upload, FileText,
-} from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import React, { useMemo, useEffect, useRef } from "react";
 import clsx from "clsx";
-import { toast } from "sonner";
-import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
-import { EvidenceMediaPreview } from "./ui/EvidenceMediaPreview";
-import { evidenceItemKind } from "../utils/evidencePreviewKind";
-import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
 import {
@@ -33,15 +24,6 @@ const partnerTypes = [
     "✏️ Other",
 ];
 
-function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
-    const { accepted, rejected } = splitReportFilesByImageSize(files);
-    if (rejected.length > 0) {
-        toast.error(`Each file must be ${MAX_REPORT_UPLOAD_LABEL} or smaller: ${rejected.map((file) => file.name).join(", ")}`);
-        input.value = "";
-    }
-    return accepted;
-}
-
 const roleOptions = [
     "🏫 Host site",
     "🤝 Co-delivery",
@@ -52,14 +34,6 @@ const roleOptions = [
     "✏️ Other",
 ];
 
-const formalizationOptions = [
-    "Memorandum of Understanding (MOU)",
-    "Letter of Collaboration",
-    "Official Email Confirmation",
-    "Government Approval / Notification",
-    "None of the above",
-];
-
 const inputClasses =
     "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
@@ -68,40 +42,6 @@ const badgeMandatory =
     "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
 const badgeRequired =
     "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
-const badgeOptional =
-    "shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
-
-function classifyEngagement(partnerCount: number, verifiedCount: number, formalCount: number): {
-    label: string; color: string; desc: string;
-} {
-    if (partnerCount === 0) {
-        return {
-            label: "No engagement",
-            color: "border-slate-200 bg-slate-50 text-slate-700",
-            desc: "No active partners recorded.",
-        };
-    }
-    if (partnerCount >= 3 && formalCount >= 1 && verifiedCount >= 2) {
-        return {
-            label: "Strategic Partnership",
-            color: "border-indigo-200 bg-indigo-50 text-[var(--teal)]",
-            desc: "Multi-sector collaboration, formalized, high verification",
-        };
-    }
-    if (partnerCount >= 2 || verifiedCount >= 2) {
-        return {
-            label: "Collaborative Engagement",
-            color: "border-indigo-200 bg-indigo-50 text-[var(--aqua)]",
-            desc: "Multiple partners, shared roles, verified outputs",
-        };
-    }
-    return {
-        label: "Basic Engagement",
-        color: "border-slate-200 bg-slate-50 text-slate-700",
-        desc: "One partner, limited role, low verification",
-    };
-}
-
 function CheckGrid({
     options,
     selected,
@@ -133,65 +73,6 @@ function CheckGrid({
             })}
         </div>
     );
-}
-
-function FilePreview({ file }: { file: any }) {
-    // Read the kind from the MIME type, the stored name or the URL — a saved record is often just `{ url }`.
-    const isImage = evidenceItemKind(file) === "image";
-    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-
-    useEffect(() => {
-        if (isImage) {
-            if (file instanceof File || file instanceof Blob) {
-                const url = URL.createObjectURL(file);
-                setPreviewUrl(url);
-                return () => URL.revokeObjectURL(url);
-            } else if (typeof file === "string") {
-                setPreviewUrl(file);
-            } else if (file?.url) {
-                setPreviewUrl(file.url);
-            }
-        }
-    }, [file, isImage]);
-
-    if (isImage && previewUrl) {
-        return (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-                <img src={previewUrl} alt={file?.name || "Preview"} className="h-full w-full object-cover" />
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600">
-            <FileText className="h-5 w-5" />
-        </div>
-    );
-}
-
-function FullFilePreview({ file }: { file: any }) {
-    const name: string = typeof file === "string" ? file.split(/[?#]/)[0].split("/").pop() || file : file?.name || "Preview";
-    const mimeType: string = typeof file === "string" ? "" : file?.type || "";
-    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-
-    useEffect(() => {
-        if (!file) return;
-        if (file instanceof File || file instanceof Blob) {
-            const url = URL.createObjectURL(file);
-            setPreviewUrl(url);
-            return () => URL.revokeObjectURL(url);
-        } else if (typeof file === "string") {
-            setPreviewUrl(file);
-        } else if (file?.url) {
-            setPreviewUrl(file.url);
-        } else {
-            setPreviewUrl(null);
-        }
-    }, [file]);
-
-    if (!file) return null;
-
-    return <EvidenceMediaPreview url={previewUrl} name={name} mimeType={mimeType} />;
 }
 
 function PartnerCard({
@@ -490,55 +371,16 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
         next[i] = { ...next[i], ...fields };
         update("partners", next);
     };
-    const toggleFormalization = (opt: string) => {
-        const cur = formalization_status || [];
-        if (opt === "None of the above") {
-            update("formalization_status", cur.includes(opt) ? [] : [opt]);
-        } else {
-            let next = cur.includes(opt) ? cur.filter(x => x !== opt) : [...cur, opt];
-            next = next.filter(x => x !== "None of the above");
-            update("formalization_status", next);
-        }
-    };
-
+    
     const activePartners = has_partners === "yes" ? partners : [];
-    const govPartners = activePartners.filter(p =>
-        p.type?.toLowerCase().includes("government") || p.type?.toLowerCase().includes("local council"),
-    );
-    const privatePartners = activePartners.filter(p =>
-        p.type?.toLowerCase().includes("private")
-        || p.type?.toLowerCase().includes("corporate")
-        || p.type?.toLowerCase().includes("csr"),
-    );
-    const academicPartners = activePartners.filter(p =>
-        p.type?.toLowerCase().includes("school")
-        || p.type?.toLowerCase().includes("university")
-        || p.type?.toLowerCase().includes("research"),
-    );
-    const verifiedPartners = activePartners.filter(p =>
+                const verifiedPartners = activePartners.filter(p =>
         p.verification && !p.verification.includes("Self-Reported"),
     );
-    const selfReportedPartners = activePartners.filter(p =>
-        p.verification?.includes("Self-Reported"),
-    );
-    const formalCount = has_partners === "yes"
+        const formalCount = has_partners === "yes"
         ? (formalization_status?.filter(s => s !== "None of the above" && s !== "No Formal Documentation").length || 0)
         : 0;
-    const classification = classifyEngagement(
-        activePartners.length,
-        verifiedPartners.length,
-        formalCount,
-    );
-
-    const fullyVerified = verifiedPartners.filter(p =>
-        p.verification?.includes("Output") || p.verification?.includes("Outcome"),
-    ).length;
-    const partiallyVerified = verifiedPartners.filter(p =>
-        p.verification?.includes("Attendance")
-        || p.verification?.includes("Activity")
-        || p.verification?.includes("Resource"),
-    ).length;
-
+    
+        
     const contributingNote = useMemo(() => {
         if (!contributorGroups.length) return "";
         const n = contributorGroups.length;
@@ -561,37 +403,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
     }, [autoNarrative, data.section7.summary_text, updateSection]);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-3 pb-10">
-            {/* Header */}
-            <div className="cer-dup-head space-y-5">
-                <div className="flex items-center gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
-                        <Handshake className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
-                            Measurable multi-stakeholder engagement (SDG 17)
-                        </p>
-                        <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 6:</span> Partnerships &amp; collaboration
-                        </h2>
-                    </div>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
-                    <div>
-                        <p className="text-sm font-semibold text-indigo-900">
-                            Only include partners who actively contributed
-                        </p>
-                        <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
-                            Do not list organizations that were only informed, mentioned, or tagged.
-                            Include only those who provided support, coordination, expertise, resources,
-                            hosting, or verification.
-                        </p>
-                    </div>
-                </div>
-            </div>
+        <div className="mx-auto max-w-6xl space-y-3">
 
             {/* 7.0 Confirmation */}
             <section className="cer-card space-y-4">
@@ -652,13 +464,13 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
 
             {/* 7.1 + 7.2 when yes */}
             {has_partners === "yes" ? (
-                <div className="space-y-8">
+                <div className="space-y-3">
                     <section className="cer-card space-y-4">
                         <div className="cer-secl">
                             <span className="cer-secn">6.1</span>
                             <h3>Your partner</h3>
                             <span className={clsx("cer-tag", partners[0]?._seeded && "auto")}>
-                                {partners[0]?._seeded ? "From section 1 · auto" : "Required"}
+                                {partners[0]?._seeded ? "From project setup · auto" : "Required"}
                             </span>
                         </div>
                         {partners[0]?._seeded ? (

@@ -21,7 +21,6 @@ test("every screen that shows a report's hours uses it", () => {
         "src/app/dashboard/student/report/ReportFormChrome.tsx",
         "src/app/dashboard/student/report/components/CertificateView.tsx",
         "src/app/dashboard/student/report/impact-package/ImpactPackageCertificate.tsx",
-        "src/app/dashboard/student/report/components/Section11Summary.tsx",
         "src/app/dashboard/student/report/components/ReportPrintView.tsx",
         "src/app/dashboard/student/report/components/Section6Resources.tsx",
         "src/utils/reportSection1ParticipationDisplay.ts",

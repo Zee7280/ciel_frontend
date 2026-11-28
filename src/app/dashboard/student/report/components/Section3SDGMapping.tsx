@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef } from "react";
-import { Target, Info, Trash2, AlertCircle, CheckCircle2, Lock, Plus, Layers, ChevronDown, Pencil, Globe2 } from "lucide-react";
+import { Trash2, AlertCircle, CheckCircle2, Lock, Plus, ChevronDown, Pencil, Globe2 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
@@ -497,53 +497,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const studentWordCount = (student_contribution_intent_statement || "").trim().split(/\s+/).filter((w: string) => w).length;
 
     return (
-        <div className="mx-auto max-w-6xl space-y-3 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3">
 
-            {/* ── Section Header ───────────────────────────────────────── */}
-            <div className="cer-dup-head space-y-5">
-                <div className="flex items-center gap-3.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--teal)] text-white shadow-sm">
-                        <Target className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-[var(--teal)]">SECTION 3:</span> SDG contribution mapping
-                        </h2>
-                    </div>
-                </div>
-
-                <div className="rounded-xl border border-[#bfe6e2] bg-[var(--aqua-soft)] px-4 py-3.5 sm:px-5">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--aqua)]">
-                        Purpose of this section
-                    </p>
-                    <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
-                        This section establishes{" "}
-                        <span className="font-semibold text-slate-900">
-                            technical and moral alignment of your project
-                        </span>{" "}
-                        with the Global Goals. It provides a structured framework for:
-                    </p>
-                    <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
-                        {[
-                            "Reviewing opportunity-level SDGs",
-                            "Selecting a project-specific primary SDG",
-                            "Defining the contribution pathway",
-                            "Mapping secondary goal alignments",
-                            "Standardizing UN indicator reporting",
-                            "Optional local sub-indicators",
-                            "Synthesizing your alignment logic",
-                        ].map((item) => (
-                            <div
-                                key={item}
-                                className="flex items-center gap-2 text-sm text-slate-700"
-                            >
-                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--teal)]" />
-                                {item}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
 
             {hasErrors && (
                 <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
@@ -772,7 +727,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
                     <div className="space-y-3">
                         <label className={fieldLabelClass}>
-                            C1. Select Primary SDG <span className="text-red-500">*</span>
+                            Select primary SDG <span className="text-red-500">*</span>
                         </label>
                         <SDGTileGrid
                             selectedId={studentPrimaryId}
@@ -1041,7 +996,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
             </section>
 
             {/* ── Finalize SDGs ────────────────────────────────────────── */}
-            <section className="space-y-3 border-t border-slate-200 pt-8">
+            <section className="space-y-3 border-t border-slate-200 pt-5">
                 {!isFinalized ? (
                     <>
                         <button

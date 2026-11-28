@@ -121,7 +121,7 @@ export default function Section10Sustainability({ projectData }: { projectData?:
     const otherMechanismOn = choiceOn(mechanisms, OTHER_MECHANISM, "✏️ Other");
 
     return (
-        <div className="mx-auto max-w-6xl space-y-3 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3">
             <div className="rounded-xl border border-[#cbe7e3] bg-[#f5fbfa] px-4 py-3 text-sm leading-relaxed text-slate-700">
                 <b>Not all projects are sustainable — that’s okay to say.</b> The rubric rewards accuracy, not optimism.
             </div>
@@ -321,7 +321,7 @@ function ConsistencyReview({
 function ReportTravelCard() {
     const stops = [
         ["⭐＋📄", "1 · Flashcard + detailed report", "Both are built from this report. Nothing is re-typed, and both carry the same CII."],
-        ["🧑‍🏫", "2 · Faculty approves — once", "One review of the flashcard and the detailed report. That locks the official CII."],
+        ["🧑‍🏫", "2 · Reviewed once", "One review of the flashcard and the detailed report locks the official CII."],
         ["📬", "3 · Who receives what", "You keep the flashcard and the full report. University, partner and HEC receive the flashcard. CIEL PK archives the detailed report."],
     ];
     return (

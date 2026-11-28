@@ -1,6 +1,5 @@
 "use client";
-import React, { useMemo, useState, useLayoutEffect, useRef } from "react";
-import { toast } from "sonner";
+import React, { useMemo, useLayoutEffect, useRef } from "react";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
@@ -463,7 +462,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const project = asRecord(projectData);
     const projectLocation = asRecord(project?.location);
     const projectTimeline = asRecord(project?.timeline);
-    const title = projectData?.title || "Untitled Engagement";
     const partner = projectData?.organization_name || projectData?.partner_name || projectData?.organization || "Self-Initiated";
     const venue = pickString(projectLocation?.venue, projectData?.venue);
     const district = pickString(projectData?.city, projectData?.district, projectData?.location_district, projectLocation?.city, projectLocation?.district);
@@ -476,8 +474,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const startDate = formatDate(pickString(projectData?.start_date, projectData?.startDate, projectTimeline?.start_date, projectTimeline?.startDate));
     const endDate = formatDate(pickString(projectData?.end_date, projectData?.endDate, projectTimeline?.end_date, projectTimeline?.endDate));
 
-    const charCount = (sectionData.problem_statement || "").length;
-    const disciplineCharCount = (sectionData.discipline_contribution || "").length;
 
 
     const fieldClass = "min-h-[110px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-[var(--teal)] focus:bg-white focus:ring-2 focus:ring-[var(--aqua-soft)]";
@@ -491,21 +487,8 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         );
 
     return (
-        <div className="mx-auto max-w-5xl space-y-5 pb-8">
+        <div className="mx-auto max-w-5xl space-y-5">
 
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="cer-dup-head space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Section 2 of 11 — Project Context
-                </p>
-                <p className="text-base font-semibold text-slate-900">{title}</p>
-                <h1 className="pt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                    What was the situation before you started?
-                </h1>
-                <p className="text-sm text-slate-500">
-                    Answer a few quick questions — we&apos;ll compose the baseline statement for you. You just review and edit.
-                </p>
-            </div>
 
             {/* V19 item 04: partner, dates and location come from the approved opportunity — shown
                 read-only here so the student never re-types them in Section 2. */}
@@ -537,7 +520,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             <div className="cer-note !mb-0">
                 <span aria-hidden>☝️</span>
                 <p>
-                    <span className="font-semibold">One rule:</span> describe things <span className="font-semibold">before</span> your project — activities &amp; results live in Sections 4 &amp; 5.
+                    <span className="font-semibold">One rule:</span> describe things <span className="font-semibold">before</span> your project — activities &amp; results live in Section 4.
                 </p>
             </div>
 
@@ -549,7 +532,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <h2>Quick questions</h2>
                         <span className="cer-tag">Mandatory</span>
                     </div>
-                    <p className="cer-sub">Short answers are fine — the statement builds itself below.</p>
+                    <p className="cer-sub">Short answers are fine.</p>
                 </div>
 
                     {/* Q1 */}
@@ -817,7 +800,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     <p className="grid grid-cols-[84px_1fr] gap-x-3">
                         <span className="font-bold text-amber-800">Where it goes</span>
                         <span>
-                            Evidence &amp; ethics review (the 15 admin points) · Safeguarding register the university must keep for every
+                            Evidence &amp; ethics review · Safeguarding register the university must keep for every
                             child-facing project.
                         </span>
                     </p>

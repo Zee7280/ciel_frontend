@@ -22,7 +22,7 @@ import { reportRequiresReportingFee, communityReportReviewerName, isStudentRepor
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
 import { pickPreferredEngagementSeat } from '@/utils/teamReportSubmitAccess';
 import { isStudentImpactPackageView } from '@/utils/studentImpactPackageHref';
-import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
+import { getIncompleteSectionsSummary } from './utils/validation';
 import {
     dataSectionToWizardStep,
     FLASH_CARD_STEP,
@@ -63,7 +63,7 @@ import {
 import PreReportGuide from './components/PreReportGuide';
 import ResultPackageFeedbackGate from '@/components/feedback/ResultPackageFeedbackGate';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { ReportLiveBanner, ReportCompiledSummary, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportSectionLeadNote, ReportRevisionNotice } from './ReportFormChrome';
+import { ReportLiveBanner, ReportCompiledSummary, ReportFlashCard, ReportMissionHero, ReportImpactJourney, ReportSectionModel, ReportWritingGuide, ReportGlobalCoverage, ReportRevisionNotice } from './ReportFormChrome';
 import { downloadExhibitionFlashcard, shareExhibitionFlashcard } from "./utils/flashcardExport";
 import "./community-engagement-report.css";
 
@@ -200,7 +200,6 @@ function ReportFormContent() {
         prevStep,
         validateCurrentSection,
         revealSectionErrors,
-        validationErrors,
         data,
         setFullData,
         setStep,
@@ -209,7 +208,6 @@ function ReportFormContent() {
         setReadOnly,
         isReadOnly,
         isEligibleForSubmission,
-        areAllSectionsComplete,
         finalDeclarationComplete,
         canSubmitReport,
         canFinalizeSubmit,
@@ -1190,7 +1188,6 @@ function ReportFormContent() {
                     <>
                         <ReportWritingGuide step={activeStep} />
                         <ReportGlobalCoverage step={activeStep} />
-                        <ReportSectionLeadNote step={activeStep} />
                         <SectionModelView step={activeStep} data={deferredData} />
                     </>
                 ) : null}

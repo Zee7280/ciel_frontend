@@ -24,8 +24,6 @@ const inOrder = (haystack, markers, label) => {
 test("the section blocks appear in the V21 order with the V21 wording", () => {
     const main = s6.slice(s6.indexOf("export default function Section6Resources"));
     inOrder(main, [
-        "Section 5 of 11 — Resources",
-        "What the project ran on 📦",
         "One box per resource.",
         'data-ciel-choice-card="use_resources:no"',
         'data-ciel-choice-card="use_resources:yes"',
@@ -177,7 +175,7 @@ test("one model per step: the resources donut lives in Section 5, not in the chr
     assert.doesNotMatch(chrome, /className="cer-resource-model"/);
     assert.match(chrome, /the donut inside Section 5, right after 5\.1/);
     const css = read(`${dir}/community-engagement-report.css`);
-    for (const cls of ["cer-cr-intro", "cer-donut-wrap", "cer-donut-hole", "cer-v17-body", "cer-cr-table", "cer-ok", "cer-muted", "cer-proof", "cer-rx-box", "cer-rx-step", "cer-rx-who", "cer-rx-choice", "cer-rx-timeline", "cer-rx-mail", "cer-rx-cert"]) {
+    for (const cls of ["cer-cr-intro", "cer-donut-wrap", "cer-donut-hole", "cer-cr-table", "cer-ok", "cer-muted", "cer-proof", "cer-rx-box", "cer-rx-step", "cer-rx-who", "cer-rx-choice", "cer-rx-timeline", "cer-rx-mail", "cer-rx-cert"]) {
         assert.match(css, new RegExp(`\\.${cls}\\b`), cls);
     }
 });

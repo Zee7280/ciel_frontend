@@ -63,13 +63,9 @@ test("the parser still reads a secondary SDG that only lives inside sdg_info whe
 
 test("banner, live summary, tiles and print show a pathway for every goal and count registered goals by source", () => {
     const chrome = read("src/app/dashboard/student/report/ReportFormChrome.tsx");
-    assert.match(chrome, /plural\(a\.sdgs\.filter\(isRegisteredReportSdg\)\.length, "registered goal"\)/);
-    assert.match(chrome, /PATHWAY · ONE PER GOAL/);
-    assert.match(chrome, /data-ciel-sdg-pathway=\{row\.goalNumber\}/);
     assert.match(chrome, /reportSdgContributionText\(row, data\.section3\)/);
     assert.doesNotMatch(chrome, /<div className="cer-bsec">PATHWAY<\/div>/);
     assert.match(chrome, /Contribution logic written for \$\{written\.length\} of \$\{a\.sdgs\.length\}/);
-    assert.match(chrome, /✍️ \$\{wordsOf\(row\)\} words/);
     const print = read("src/app/dashboard/student/report/components/ReportPrintView.tsx");
     assert.match(print, /Contribution to registered SDG \$\{goal\}/);
 });

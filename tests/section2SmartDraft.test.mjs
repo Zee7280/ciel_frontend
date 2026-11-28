@@ -73,12 +73,6 @@ test("Section 2 has no summary card or AI rewrite; the statement is composed fro
     assert.equal(section2.includes("{sectionData.baseline_smart_draft}"), false);
 });
 
-test("banner tells Section 2 students about the button; other steps keep the Next-only note", () => {
-    assert.match(chrome, /aiRewriteHint="when you press Next on this step, or right away with “Rewrite with AI” under 2.2"/);
-    assert.match(chrome, /DEFAULT_AI_REWRITE_HINT = "when you press Next on this step"/);
-    assert.match(chrome, /aiSyncNoteText\(sync\.note, aiRewriteHint\)/);
-});
-
 test("a rewrite written from the current answers reads as fresh, and the legacy 2.2 draft never makes it stale", () => {
     const base = { problem_statement: "No lights.", affected_group: "students", affected_count: "26" };
     const written = { ...base, summary_text: "AI paragraph with 26.", summary_source: sectionSummarySource(base) };

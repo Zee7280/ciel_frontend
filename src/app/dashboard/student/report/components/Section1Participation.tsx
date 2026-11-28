@@ -1,7 +1,5 @@
 import React from "react";
-import { Users, User, Shield, AlertCircle, CheckCircle2, Check, Loader2, ChevronRight, ChevronLeft, Save, Lock } from "lucide-react";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
+import { User, Shield, AlertCircle, CheckCircle2, Check, Loader2, ChevronRight, ChevronLeft, Save, Lock } from "lucide-react";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import { authenticatedFetch } from "@/utils/api";
@@ -21,8 +19,6 @@ import { formTeamFromLead } from "@/utils/participationGuide";
 import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog, isLogCountedBeforeFacultyReview, resolveRequiredHoursPerStudent } from "../utils/engagementMetrics";
 import { pickPreferredEngagementSeat } from "@/utils/teamReportSubmitAccess";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
-import { calculateSection1CII } from "@/utils/reportQuality";
-import { calculateCII } from "../utils/calculateCII";
 import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
 import { effectiveParticipationStatusForReportActions } from "@/utils/studentJoinApplication";
 import { resolveAttendanceSubmitError } from "@/utils/attendanceSubmitError";
@@ -388,7 +384,6 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
         data,
         updateSection,
         getFieldError,
-        validationErrors,
         nextStep,
         saveReport,
         isReadOnly,
@@ -409,7 +404,6 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
     const team_members = Array.isArray(rawTeamMembers) ? rawTeamMembers : [];
     const attendanceLogs = Array.isArray(data.section1?.attendance_logs) ? data.section1.attendance_logs : [];
     // Extract available spots using all possible backend keys for the opportunity
-    const maxTeamSize = projectData?.timeline?.volunteers_required || projectData?.volunteers_needed || projectData?.available_spots || 20;
     const seatCapRaw = Math.floor(Number(projectData?.timeline?.volunteers_required ?? projectData?.volunteers_needed ?? projectData?.volunteersNeeded));
     // The lead takes one seat, so members are capped at seats − 1. No cap when it has no seat count.
     // Builder listings (team_mode set) also cap each report team at 20 people, matching the server.
@@ -438,7 +432,6 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
             individual_metrics: data.section1?.metrics?.individual_metrics,
         } : null
     );
-    const [verifiedSummary, setVerifiedSummary] = React.useState<string>(data.section1?.verified_summary || "");
     const isSubmittedReport = [
         "submitted",
         "pending_payment",
@@ -456,7 +449,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
         );
     const [isSubmitted, setIsSubmitted] = React.useState(isSubmittedReport);
     const reviewChecked = data.section1?.review_checked || [false, false, false];
-    const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
+    const [, setIsDeleting] = React.useState<string | null>(null);
     const [selectedParticipantId, setSelectedParticipantId] = React.useState<string | null>(null);
     const [isEditingLead, setIsEditingLead] = React.useState(false);
     const [leadStatus, setLeadStatus] = React.useState<string>(
@@ -558,7 +551,7 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                 if (email) setCurrentUserEmail(email);
                 const uid = u?.id ?? u?.userId ?? u?.user_id;
                 if (uid) setCurrentUserId(String(uid));
-            } catch (e) { }
+            } catch { }
         }
     }, []);
 
@@ -694,11 +687,8 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
     }, [internalStep]);
 
     // Hard Validation Gates
-    const canMoveToStep2 = participation_type !== null && isVerified && (!!participantId || !!data.section1?.team_lead?.id);
-    const canMoveToStep3 = isVerified && (!!participantId || !!data.section1?.team_lead?.id); // Self must be verified and have ID
     const canMoveToStep4 = participation_type === 'individual' ||
         (participation_type === 'team' && team_members.length > 0 && team_members.every(m => m.verified));
-    const canMoveToStep5 = attendanceLogs.length > 0;
 
     const steps = [
         { id: 1, title: 'Identity & Team Setup' },
@@ -1184,23 +1174,6 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
     };
 
     // Helpers
-    async function loadEntries(pId: string) {
-        // Individual loadEntries is now deprecated in favor of loadAllEntries bulk sync,
-        // but we keep it for fallback or specific single-user refreshes if needed.
-        try {
-            const segments = pId.split(':');
-            const realId = segments.length > 1 ? segments[segments.length - 1] : pId;
-            const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`);
-            if (res && res.ok) {
-                const result = await res.json();
-                return (result.data || []).map((e: any) =>
-                    normalizeEngagementAttendanceLog(e, { participantPrefixedId: pId }),
-                );
-            }
-        } catch (e) {}
-        return [];
-    }
-
     async function loadAllEntries(knownLeadParticipantId?: string | null, teamMembersSnapshot?: any[] | null) {
         if (!projectIdFromUrl) return;
         try {
@@ -1790,18 +1763,6 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
 
                         return (
                             <div className="space-y-4">
-                                <div className="cer-inner-bridge overflow-hidden rounded-[22px] bg-gradient-to-br from-[#04252b] via-[#0e5f63] to-[#12a5a0] px-5 py-4 text-white sm:px-6">
-                                    <p className="text-[9px] font-extrabold tracking-[0.22em] text-[#99f6e4]">
-                                        SECTION 1 · PARTICIPATION
-                                    </p>
-                                    <h3 className="mt-1 text-lg font-extrabold tracking-tight sm:text-[19px]">
-                                        Log sessions for your crew
-                                    </h3>
-                                    <p className="mt-1 max-w-xl text-[11.5px] leading-relaxed text-[#cdf5f0]">
-                                        Tap a member, log date · time · location · activity · photos. Hours compute
-                                        automatically. CIEL PK Admin reviews the whole report after you submit.
-                                    </p>
-                                </div>
 
                                 <div className="flex gap-2 rounded-[12px] border border-[#bfe6e2] bg-[#e3f4fa] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#0f5e57]">
                                     <span className="shrink-0 text-base" aria-hidden>
@@ -1924,16 +1885,6 @@ export default function Section1Participation({ projectData, onWillAdvanceSectio
                                             allowManualUnlock={!isSubmittedReport}
                                         />
 
-                                        {!isSubmittedReport && !isParticipationUnlocked ? (
-                                            <div className="mt-5 border-t border-[#dcebee] pt-4">
-                                                <p className="text-xs leading-relaxed text-slate-500">
-                                                    Sessions stay editable here until you submit the whole
-                                                    report. There is no Faculty or Partner attendance
-                                                    verification step — CIEL PK Admin reviews hours with the
-                                                    report.
-                                                </p>
-                                            </div>
-                                        ) : null}
                                     </div>
 
                                     {/* Right: logged sessions + hours progress */}

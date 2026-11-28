@@ -67,21 +67,14 @@ test("legacy and empty summaries; combined steps", () => {
     assert.match(sectionSummarySource(section9()), /^v1:[0-9a-f]{8}:\d+$/);
 });
 
-test("Next no longer writes per-section AI summaries; the banner component keeps its sync states", () => {
+test("Next no longer writes per-section AI summaries; only Step 1 keeps a summary card", () => {
     const page = read("src/app/dashboard/student/report/page.tsx");
     assert.doesNotMatch(page, /generateAISummary/);
     assert.doesNotMatch(page, /Analyzing Data & Writing Summary/);
 
     const chrome = read("src/app/dashboard/student/report/ReportFormChrome.tsx");
-    assert.equal((chrome.match(/ai=\{aiShown\} aiSync=\{aiSync\} live=\{live\}/g) || []).length, 8, "steps 2–9");
-    assert.match(chrome, /LIVE SUMMARY — FROM YOUR CURRENT ANSWERS/);
-    assert.match(chrome, /⚠ WRITTEN FROM EARLIER ANSWERS/);
-    // Every step with an AI writer on Next is checked (drafts are saved without reading the server copy back).
-    assert.match(chrome, /const CLIENT_SUMMARY_STEPS = new Set\(\[2, 3, 4, 7, 8, 9\]\);/);
-    assert.doesNotMatch(chrome, /REWRITTEN FROM YOUR ANSWERS ON EVERY SAVE/);
-    // Section 4's "reached" is Section 4's own count, not the baseline's affected count.
-    assert.match(chrome, /🫶 \{reach4\} REACHED/);
-    assert.doesNotMatch(chrome, /🫶 \{a\.reach \|\| 0\} REACHED/);
-    // Step 1 keeps its own live participation summary.
+    // Steps 2–9 have no summary card any more; Step 1 keeps its own live participation summary.
+    assert.doesNotMatch(chrome, /AI SUMMARY — WHAT THE RUBRIC WILL READ|Rewrite with AI/);
+    assert.match(chrome, /if \(canonicalReportStep\(step\) !== 1\) return null;/);
     assert.match(chrome, /return <Section1ExecutiveSummary data=\{data\} \/>;/);
 });

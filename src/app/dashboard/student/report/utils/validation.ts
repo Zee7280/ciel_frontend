@@ -24,9 +24,6 @@ export interface ValidationResult {
     errors: ValidationError[];
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const CNIC_REGEX = /^(\d{13}|\d{5}-\d{7}-\d{1})$/;
-const MOBILE_REGEX = /^03\d{9}$/;
 
 /** Community report narrative textareas — default rule; specific fields can tighten it below. */
 export const REPORT_TEXT_MIN_WORDS = 10;

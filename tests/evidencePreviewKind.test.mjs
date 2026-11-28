@@ -88,11 +88,11 @@ test("the dialog body sniffs an unknown stored file (HEAD, then <img>, then <vid
     assert.match(dlg, /Open the file in a new tab/);
 });
 
-test("Sections 6 and 7 thumbnails use the same detector", () => {
+test("resource thumbnails use the shared detector (Partnerships no longer renders file thumbnails)", () => {
+    const s6 = read(`${dir}/components/Section6Resources.tsx`);
+    assert.match(s6, /const isImage = evidenceItemKind\(file\) === "image";/);
     for (const f of ["Section6Resources.tsx", "Section7Partnerships.tsx"]) {
-        const src = read(`${dir}/components/${f}`);
-        assert.match(src, /const isImage = evidenceItemKind\(file\) === "image";/, f);
-        assert.doesNotMatch(src, /file\?\.name\?\.match\(\/\\\.\(jpg\|jpeg\|png/, f);
+        assert.doesNotMatch(read(`${dir}/components/${f}`), /file\?\.name\?\.match\(\/\\\.\(jpg\|jpeg\|png/, f);
     }
 });
 

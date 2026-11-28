@@ -279,8 +279,7 @@ test("a blank before / after field is never read as 0 (banner, impact package, f
         const src = read(file);
         assert.match(src, /function pickNumber\(value: unknown\): number \| null \{[\s\S]*?if \(!text\) return null;/, file);
     }
-    const s11 = read("src/app/dashboard/student/report/components/Section11Summary.tsx");
-    assert.match(s11, /if \(!bText \|\| !eText\) return null;/);
+    // (The old Section 11 summary screen that carried a third copy was never rendered and is removed.)
 });
 
 test("legacy row rules match the submit gates: the explanation is required and sized like a short note; adopted numbers are plain", () => {

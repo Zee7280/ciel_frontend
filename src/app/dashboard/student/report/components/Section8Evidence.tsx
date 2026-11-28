@@ -374,7 +374,7 @@ export default function Section8Evidence() {
     }, [autoNarrative, section8.summary_text, updateSection]);
 
     return (
-        <div className="mx-auto max-w-6xl space-y-3 pb-10">
+        <div className="mx-auto max-w-6xl space-y-3">
             <section className="cer-card space-y-4">
                 <div className="cer-secl">
                     <span className="cer-secn">7.1</span>

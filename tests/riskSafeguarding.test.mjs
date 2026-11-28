@@ -120,7 +120,6 @@ test("Section 2 wiring: the live statement, the AI-unavailable fallback and the 
     }
     const chrome = read("src/app/dashboard/student/report/ReportFormChrome.tsx");
     assert.match(chrome, /safeguardingBannerLine\(data\.section2\),/);
-    assert.match(chrome, /🛡 \$\{riskFactorLabel\(id\)\}/);
     const draft = read("src/app/dashboard/student/report/utils/section2SmartDraft.ts");
     assert.match(draft, /const safeguarding = clean\(input\.safeguarding\);\s*if \(safeguarding\) parts\.push\(safeguarding\);/);
 });

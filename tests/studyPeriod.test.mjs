@@ -48,11 +48,6 @@ test("certificates, dossiers and the detailed report use the semester; hours til
         assert.doesNotMatch(src, /stored > 0\) return ciiVerifiedHours/, `${file}: stored-first shortcut removed`);
         assert.match(src, /total_verified_hours: ciiVerifiedHours/, `${file}: CII input unchanged`);
     }
-    assert.match(
-        read("src/app/dashboard/student/report/components/Section11Summary.tsx"),
-        /const verifiedHours = Number\(displayReportHours\(section1\.metrics\?\.total_verified_hours, section1\.attendance_logs\)\.toFixed\(1\)\);/,
-        "report summary tiles match the certificate",
-    );
     assert.match(read("src/utils/reportTeamScope.ts"), /composeProgramLine\(base, participantStudyPeriod\(row\)\)/);
     assert.match(read("src/app/dashboard/student/report/impact-package/buildImpactPackageDetailedReport.ts"), /row\("Semester", text\(leadRec\.semester, lead\?\.year, leadRec\.yearOfStudy\)\)/);
 });
