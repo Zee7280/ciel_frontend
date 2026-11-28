@@ -573,6 +573,17 @@ export function validateSection6(data: any): ValidationResult {
                     if (!String(row.evidence_trail || '').trim()) {
                         errors.push({ field: `resources.${index}.evidence_trail`, message: 'Describe the evidence trail: where it came from, how it was used, who received it' });
                     }
+                    // Optional estimated PKR value of a non-cash contribution: only checked once entered.
+                    const valueText = String(row.contributor_value_pkr ?? '').trim();
+                    if (valueText) {
+                        const value = Number(valueText.replace(/,/g, ''));
+                        if (!Number.isFinite(value) || value <= 0 || !/^\d[\d,]*(\.\d{1,2})?$/.test(valueText)) {
+                            errors.push({ field: `resources.${index}.contributor_value_pkr`, message: 'The estimated PKR value must be a positive amount (up to two decimal places)' });
+                        }
+                        if (!String(row.contributor_value_basis ?? '').trim()) {
+                            errors.push({ field: `resources.${index}.contributor_value_basis`, message: 'Say how it was valued (invoice, quotation or market rate)' });
+                        }
+                    }
                 }
             });
         }

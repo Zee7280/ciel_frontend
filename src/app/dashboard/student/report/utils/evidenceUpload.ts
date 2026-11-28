@@ -358,8 +358,12 @@ async function uploadEvidenceList(
             const uploaded = (await uploadEvidenceFile(projectId, section, field, pendingFile)) as EvidenceItem;
             // Section 5 proofs are linked to the resource entry they support (`resource_index`); the
             // link lives on the wrapper record, so it must survive the upload round-trip.
-            if (isRecord(item) && isRecord(uploaded) && typeof item.resource_index === "number") {
-                return { ...uploaded, resource_index: item.resource_index };
+            // The optional per-proof note is kept the same way.
+            if (isRecord(item) && isRecord(uploaded)) {
+                const kept: Record<string, unknown> = {};
+                if (typeof item.resource_index === "number") kept.resource_index = item.resource_index;
+                if (typeof item.note === "string" && item.note.trim()) kept.note = item.note;
+                if (Object.keys(kept).length) return { ...uploaded, ...kept };
             }
             return uploaded;
         }

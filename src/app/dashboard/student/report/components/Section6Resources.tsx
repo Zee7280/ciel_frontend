@@ -21,7 +21,7 @@ import {
     sourcesForContribution, type ResourceContributedBy,
 } from "../utils/resourceContributors";
 import {
-    CASH_UNITS, OTHER_VERIFICATION, contributedByText, contributorGaveText, contributorStage, fmtAmount, groupContributors,
+    CASH_UNITS, OTHER_VERIFICATION, contributedByText, contributorGaveText, contributorStage, fmtAmount, groupContributors, isCashResource,
     recognitionNote, reportStage, resourceAmountText, resourceBoxChecks, resourceName, resourceUnit, shareText, stepLabels, stepStateText,
     teamContributionLines, verificationList, type ContributorGroup, type ResourceRow, type ThankYouContext,
 } from "../utils/resourceContributorsView";
@@ -184,6 +184,12 @@ function proofName(file: ProofFile): string {
     const rec = file as ReportResourceProofFile;
     return String(rec.name || rec.file?.name || "Proof file");
 }
+/** The optional note saved on one proof file (empty for a bare File picked before notes existed). */
+function proofNote(file: ProofFile): string {
+    if (isNativeFile(file)) return "";
+    const note = (file as ReportResourceProofFile).note;
+    return typeof note === "string" ? note : "";
+}
 function proofSizeLabel(file: ProofFile): string {
     const size = isNativeFile(file) ? file.size : Number((file as ReportResourceProofFile).size ?? (file as ReportResourceProofFile).file?.size ?? 0);
     return size ? `${(size / (1024 * 1024)).toFixed(2)} MB` : "";
@@ -194,17 +200,21 @@ function toProofRecord(file: File, resourceIndex: number): ReportResourceProofFi
 }
 
 function ProofList({
-    proofs, onPreview, onRemove,
+    proofs, onPreview, onRemove, onNote,
 }: {
     proofs: Array<{ file: ProofFile; index: number }>;
     onPreview: (file: ProofFile) => void;
     onRemove: (fileIndex: number) => void;
+    onNote: (fileIndex: number, note: string) => void;
 }) {
     if (!proofs.length) return <p className="cer-hint">No proof uploaded yet.</p>;
     return (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {proofs.map(({ file, index }) => (
-                <div key={`${index}-${proofName(file)}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+            {proofs.map(({ file, index }) => {
+                const note = proofNote(file);
+                return (
+                <div key={`${index}-${proofName(file)}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2" data-ciel-proof-file={index}>
+                <div className="flex items-center justify-between gap-3">
                     <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => onPreview(file)}>
                         <FilePreview file={file} />
                         <span className="min-w-0">
@@ -221,7 +231,23 @@ function ProofList({
                         <Trash2 className="h-3.5 w-3.5" />
                     </button>
                 </div>
-            ))}
+                <details className="mt-1.5" data-ciel-proof-note={index}>
+                    <summary className="cursor-pointer truncate text-[11px] font-semibold text-[#0e7d74]">
+                        {note.trim() ? `Note: ${note.trim()}` : "Add a note about this proof (optional)"}
+                    </summary>
+                    <textarea
+                        rows={2}
+                        maxLength={240}
+                        aria-label={`Optional note for ${proofName(file)}`}
+                        placeholder="What does it show?"
+                        value={note}
+                        onChange={(e) => onNote(index, e.target.value)}
+                        className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-soft)]"
+                    />
+                </details>
+                </div>
+                );
+            })}
         </div>
     );
 }
@@ -240,7 +266,7 @@ function StepHead({ n, title, labels }: { n: 1 | 2 | 3; title: string; labels: s
 type ReusableContributor = { key: string; label: string; row: ResourceRow };
 
 function ResourceBox({
-    res, idx, open, onToggle, onUpdate, onUpdateFields, onRemove, getFieldError, proofs, onAddProofs, onRemoveProof, onPreview,
+    res, idx, open, onToggle, onUpdate, onUpdateFields, onRemove, getFieldError, proofs, onAddProofs, onRemoveProof, onProofNote, onPreview,
     teamNames, reusable,
 }: {
     res: any; idx: number; open: boolean;
@@ -252,6 +278,7 @@ function ResourceBox({
     proofs: Array<{ file: ProofFile; index: number }>;
     onAddProofs: (files: File[], input: HTMLInputElement) => void;
     onRemoveProof: (fileIndex: number) => void;
+    onProofNote: (fileIndex: number, note: string) => void;
     onPreview: (file: ProofFile) => void;
     teamNames: string[];
     reusable: ReusableContributor[];
@@ -547,6 +574,27 @@ function ResourceBox({
                                     <FieldError message={err("contributor_email")} />
                                 </div>
                             </div>
+                            {unit && !isCashResource(row) ? (
+                                <details className="rounded-xl border border-[#dcebee] bg-[#f5fbfa] px-3 py-2" data-ciel-resource-value={idx}>
+                                    <summary className="cursor-pointer text-[12px] font-semibold text-[#0e7d74]">
+                                        {String(res.contributor_value_pkr ?? "").trim()
+                                            ? `Estimated value · PKR ${String(res.contributor_value_pkr).trim()}${String(res.contributor_value_basis ?? "").trim() ? ` (${String(res.contributor_value_basis).trim()})` : ""}`
+                                            : "Add an estimated PKR value (optional)"}
+                                    </summary>
+                                    <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div className="space-y-1.5">
+                                            <Label className={fieldLabel}>Estimated value · PKR</Label>
+                                            <Input inputMode="decimal" placeholder="e.g. 8000" value={res.contributor_value_pkr ?? ""} onChange={e => onUpdate("contributor_value_pkr", e.target.value)} className={inputClasses} />
+                                            <FieldError message={err("contributor_value_pkr")} />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className={fieldLabel}>How was it valued?</Label>
+                                            <Input placeholder="Invoice / quotation / market rate" value={res.contributor_value_basis ?? ""} onChange={e => onUpdate("contributor_value_basis", e.target.value)} className={inputClasses} />
+                                            <FieldError message={err("contributor_value_basis")} />
+                                        </div>
+                                    </div>
+                                </details>
+                            ) : null}
                             {extras.length ? (
                                 <p className="cer-hint">
                                     Also recorded as a source earlier:{" "}
@@ -606,7 +654,7 @@ function ResourceBox({
                             <FieldError message={getFieldError(`resources.${idx}.verification`)} />
                         </div>
                     </div>
-                    <ProofList proofs={proofs} onPreview={onPreview} onRemove={onRemoveProof} />
+                    <ProofList proofs={proofs} onPreview={onPreview} onRemove={onRemoveProof} onNote={onProofNote} />
                     <div className="space-y-1.5">
                         <Label className={fieldLabel}>What does this proof show?{external ? <Star /> : <Optional />}</Label>
                         <textarea
@@ -701,6 +749,17 @@ export default function Section6Resources({ projectData }: { projectData?: any }
         update("evidence_files", [...evidenceFiles, ...accepted.map((file) => toProofRecord(file, idx))]);
     };
     const removeProof = (fileIndex: number) => update("evidence_files", evidenceFiles.filter((_, i) => i !== fileIndex));
+    const setProofNote = (fileIndex: number, note: string) =>
+        update(
+            "evidence_files",
+            evidenceFiles.map((file, i) => {
+                if (i !== fileIndex) return file;
+                if (isNativeFile(file)) {
+                    return { file, name: file.name, size: file.size, type: file.type, lastModified: file.lastModified, note } satisfies ReportResourceProofFile;
+                }
+                return { ...(file as ReportResourceProofFile), note };
+            }),
+        );
     const linkProof = (fileIndex: number, idx: number) =>
         update("evidence_files", evidenceFiles.map((file, i) => (i === fileIndex ? { ...(isNativeFile(file) ? toProofRecord(file, idx) : (file as ReportResourceProofFile)), resource_index: idx } : file)));
 
@@ -976,6 +1035,7 @@ export default function Section6Resources({ projectData }: { projectData?: any }
                                     proofs={proofsFor(idx)}
                                     onAddProofs={(files, input) => addProofs(idx, files, input)}
                                     onRemoveProof={removeProof}
+                                    onProofNote={setProofNote}
                                     onPreview={setPreviewFile}
                                     teamNames={teamNames}
                                     reusable={reusableFor(idx)}

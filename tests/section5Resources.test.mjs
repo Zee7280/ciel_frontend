@@ -95,7 +95,8 @@ test("proofs are uploaded per entry and keep their entry link through save / upl
     assert.match(s6, /resource_index: resourceIndex/);
     const upload = read(`${dir}/utils/evidenceUpload.ts`);
     assert.match(upload, /typeof item\.resource_index === "number"/);
-    assert.match(upload, /return \{ \.\.\.uploaded, resource_index: item\.resource_index \};/);
+    assert.match(upload, /if \(typeof item\.resource_index === "number"\) kept\.resource_index = item\.resource_index;/);
+    assert.match(upload, /if \(Object\.keys\(kept\)\.length\) return \{ \.\.\.uploaded, \.\.\.kept \};/);
     const ctx = read(`${dir}/context/ReportContext.tsx`);
     assert.match(ctx, /export type ReportResourceProofFile/);
     assert.match(ctx, /evidence_files: Array<File \| ReportResourceProofFile>;/);

@@ -25,6 +25,8 @@ export type ReportResourceProofFile = {
     lastModified?: number;
     /** Index of the 5.2 resource entry this proof supports; absent on files saved before entries were linked. */
     resource_index?: number;
+    /** Optional note about this one proof ("What does it show?"), max 240 characters. */
+    note?: string;
     [key: string]: unknown;
 };
 
@@ -384,6 +386,9 @@ export interface ReportData {
             contributor_phone?: string;
             /** They agreed to be named publicly; WhatsApp number and email always stay private. */
             contributor_public_recognition?: boolean;
+            /** Optional estimated PKR value of a non-cash outside contribution, with how it was valued. */
+            contributor_value_pkr?: string;
+            contributor_value_basis?: string;
             /** Where it came from, how it was used, who received it — the accountability trail. */
             evidence_trail?: string;
         }>;

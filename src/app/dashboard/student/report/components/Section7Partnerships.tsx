@@ -304,7 +304,7 @@ function PartnerCard({
                 <div className="cer-full">
                     <Label className="cer-field-label">
                         Email
-                        <span className="cer-soft-req">RECOMMENDED · LINKS THEIR DASHBOARD</span>
+                        <span className="cer-soft-req">RECOMMENDED</span>
                     </Label>
                     <Input
                         type="email"
@@ -317,7 +317,9 @@ function PartnerCard({
             </div>
 
             <div className="rounded-xl border border-[#c8e7dc] bg-[#eef9f4] px-3 py-2.5 text-[12.5px] leading-relaxed text-[#1e4d40]">
-                A partner can be a person, a shop, a professional, an NGO, or a large organization. Email and WhatsApp stay private and are not shown on the public flash card.
+                🌐 <b>Bringing your partner into the CIEL PK ecosystem.</b> A partner can be anyone who genuinely helped — an individual, a
+                small shop, a professional, a community elder, an NGO or a large organization. Contact details stay private: they never appear
+                on the public flash card.
             </div>
 
             <div className="space-y-2">
