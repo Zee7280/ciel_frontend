@@ -352,7 +352,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     patch.problem_category = classifyProblem(problemStatement);
                     patch.primary_beneficiary = detectBeneficiary(problemStatement);
                 }
-                updateSection('section2', patch);
+                updateSection('section2', patch, { keepErrors: true });
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps

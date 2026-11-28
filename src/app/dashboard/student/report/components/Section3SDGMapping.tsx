@@ -486,7 +486,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const section3SummarySource = useMemo(() => sectionSummarySource(data.section3), [data.section3]);
     useEffect(() => {
         if (data.section3.summary_text !== autoSummary || data.section3.summary_source !== section3SummarySource) {
-            updateSection('section3', { summary_text: autoSummary, summary_source: section3SummarySource });
+            // A system write: never wipes the submit errors just revealed for this section.
+            updateSection('section3', { summary_text: autoSummary, summary_source: section3SummarySource }, { keepErrors: true });
         }
     }, [autoSummary, data.section3.summary_text, data.section3.summary_source, section3SummarySource]);
 

@@ -20,7 +20,7 @@ test("only Section 1 keeps its summary card; steps 2–9 show none", () => {
     assert.doesNotMatch(s3, /Preliminary SDG alignment statement/);
     assert.doesNotMatch(s4, /summary banner at the top of this step/);
     // Section 3's local statement is still stored with the report (reviewers, print view, AI evaluation).
-    assert.match(s3, /updateSection\('section3', \{ summary_text: autoSummary, summary_source: section3SummarySource \}\)/);
+    assert.match(s3, /updateSection\('section3', \{ summary_text: autoSummary, summary_source: section3SummarySource \}, \{ keepErrors: true \}\)/);
 });
 
 test("one compiled summary is shown on the final step, before submit", () => {

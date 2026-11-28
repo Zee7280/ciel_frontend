@@ -24,7 +24,8 @@ test("a non-cash outside contribution can record an optional estimated PKR value
     assert.match(s6, /"Add an estimated PKR value \(optional\)"/);
     assert.match(s6, /How was it valued\?/);
     // Only checked once entered: positive amount + a valuation basis.
-    assert.match(validation, /const valueText = String\(row\.contributor_value_pkr \?\? ''\)\.trim\(\);\s*if \(valueText\) \{/);
+    // Only while the field is shown (unit chosen, not cash): a leftover value never blocks submit.
+    assert.match(validation, /if \(valueText && String\(row\.unit \?\? ''\)\.trim\(\) && !isCashResource\(row\)\) \{/);
     assert.match(validation, /field: `resources\.\$\{index\}\.contributor_value_basis`/);
 });
 

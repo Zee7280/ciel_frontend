@@ -288,6 +288,16 @@ export default function Section4Streamlined() {
         [section4.activity_blocks, section4.project_summary, section5.observed_change, section5.story_because, section5.measurable_outcomes, section5.challenges, section5.challenge_tags],
     );
 
+    // Sections 4 (Part A) and 5 (Part B) keep a summary written from the answers: reviewers, the print
+    // view and the AI evaluation read it (no per-section AI summary any more). A system write, so it
+    // never wipes the submit errors just revealed for these sections.
+    const section5Summary = `Results and evidence: ${summary.resultsText}\nChallenges and limitations: ${summary.challengesText}`;
+    useEffect(() => {
+        if (section4.summary_text !== summary.text) updateSection("section4", { summary_text: summary.text }, { keepErrors: true });
+        if (section5.summary_text !== section5Summary) updateSection("section5", { summary_text: section5Summary }, { keepErrors: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [summary.text, section5Summary, section4.summary_text, section5.summary_text]);
+
     const activityErrors = activities.flatMap((a, i) => activityIssues(a, i, subsFor));
     const tagErrors = challengeTagIssues(tags);
     const changeWords = wordCount(section5.observed_change);

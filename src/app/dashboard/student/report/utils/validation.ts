@@ -12,6 +12,7 @@ import { hasPublicSharePermission, isPublicMediaVisibility, resolveMediaVisibili
 import { riskBlockErrors } from './riskSafeguarding';
 import { followupBlockErrors } from './sustainabilityFollowup';
 import { contributorEmailLooksValid, contributorOrgRequired, contributorPhoneLooksValid, isExternalResourceSource, resourceContributedBy } from './resourceContributors';
+import { isCashResource } from './resourceContributorsView';
 
 export interface ValidationError {
     field: string;
@@ -574,8 +575,10 @@ export function validateSection6(data: any): ValidationResult {
                         errors.push({ field: `resources.${index}.evidence_trail`, message: 'Describe the evidence trail: where it came from, how it was used, who received it' });
                     }
                     // Optional estimated PKR value of a non-cash contribution: only checked once entered.
+                    // Only while the field is on screen (a unit is chosen and the resource is not cash):
+                    // a value left behind after switching to cash must not block submit.
                     const valueText = String(row.contributor_value_pkr ?? '').trim();
-                    if (valueText) {
+                    if (valueText && String(row.unit ?? '').trim() && !isCashResource(row)) {
                         const value = Number(valueText.replace(/,/g, ''));
                         if (!Number.isFinite(value) || value <= 0 || !/^\d[\d,]*(\.\d{1,2})?$/.test(valueText)) {
                             errors.push({ field: `resources.${index}.contributor_value_pkr`, message: 'The estimated PKR value must be a positive amount (up to two decimal places)' });
